@@ -7,21 +7,16 @@ final class ScreenshotTests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testStandardText() {
-        capture(sizeName: "standard", contentSize: nil)
+    /// CI sets the simulator's text size with `simctl ui <device> content_size`
+    /// before each run and passes its label in PSST_SIZE_LABEL.
+    func testCaptureAllStates() {
+        capture(sizeName: ProcessInfo.processInfo.environment["PSST_SIZE_LABEL"] ?? "default")
     }
 
-    func testAccessibilityText() {
-        capture(sizeName: "ax-xxxl", contentSize: "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge")
-    }
-
-    private func capture(sizeName: String, contentSize: String?) {
+    private func capture(sizeName: String) {
         let app = XCUIApplication()
         // Argument-domain defaults: start every run from the same favorite.
         app.launchArguments += ["-psst.demo-alex.favoriteSignal", "squeeze"]
-        if let contentSize {
-            app.launchArguments += ["-UIPreferredContentSizeCategoryName", contentSize]
-        }
         app.launch()
 
         let alex = app.buttons["Alex"]

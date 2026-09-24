@@ -38,13 +38,18 @@ jobs:
           set -o pipefail
           for kind in compact large; do
             UDID=$(python3 scripts/pick_simulators.py "$kind")
-            xcodebuild test \
-              -project Psst.xcodeproj -scheme Psst \
-              -destination "id=$UDID" \
-              -only-testing:PsstUITests \
-              -resultBundlePath "results-$kind.xcresult" \
-              CODE_SIGNING_ALLOWED=NO
-            python3 scripts/export_screenshots.py "results-$kind.xcresult" screenshots
+            xcrun simctl boot "$UDID" || true
+            xcrun simctl bootstatus "$UDID" -b
+            for size in large:standard accessibility-extra-extra-extra-large:ax-xxxl; do
+              xcrun simctl ui "$UDID" content_size "${size%%:*}"
+              TEST_RUNNER_PSST_SIZE_LABEL="${size##*:}" xcodebuild test \
+                -project Psst.xcodeproj -scheme Psst \
+                -destination "id=$UDID" \
+                -only-testing:PsstUITests \
+                -resultBundlePath "results-$kind-${size##*:}.xcresult" \
+                CODE_SIGNING_ALLOWED=NO
+              python3 scripts/export_screenshots.py "results-$kind-${size##*:}.xcresult" screenshots
+            done
           done
       - uses: actions/upload-artifact@v4
         if: always()

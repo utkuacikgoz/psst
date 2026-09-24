@@ -53,13 +53,11 @@ jobs:
           chmod 600 "$KEY_PATH"
           echo "KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
       - name: Point the build at the development backend
         run: |
-          ANON=$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_REF" -o json | python3 -c "
+          # One Management API call instead of installing the Supabase CLI.
+          ANON=$(curl -sf -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys" | python3 -c "
           import json, sys
           keys = json.load(sys.stdin)
           pick = next((k for k in keys if k.get('name') == 'anon'), None) \

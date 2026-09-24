@@ -66,7 +66,8 @@ jobs:
           rm -rf docs/screenshots && mkdir -p docs/screenshots
           for f in screenshots/*.png; do
             name=$(basename "${f%.png}" | tr ' ' '-' | tr -d '()')
-            sips -s format jpeg -s formatOptions 70 --resampleWidth 540 "$f" --out "docs/screenshots/$name.jpg" >/dev/null
+            sips -s format jpeg -s formatOptions 70 --resampleWidth 540 "$f" --out "docs/screenshots/$name.jpg" >/dev/null \
+              || echo "::warning::Skipped unreadable image $f"
           done
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

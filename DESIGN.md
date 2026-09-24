@@ -25,7 +25,7 @@ Use one centralized token definition in this app (`Psst/DesignTokens.swift`). Do
 | Touch target | At least 44 × 44 points, including icon-only controls |
 | Primary action size | Use the app-specific layout below |
 | Sheet inset | 24 points |
-| Ordinary control radius | 12 points; circles only for deliberately circular actions |
+| Ordinary control radius | 0 points for primary colour bands; native sheets retain platform shape |
 | Text | System SF family; no downloaded font dependency |
 | Body / important labels | 17 / 15 points, scalable |
 | Secondary metadata | 13 points minimum; never essential information in tiny text |
@@ -40,38 +40,23 @@ Use SF Symbols at one consistent weight for utility controls. Avoid mixing line 
 
 This app is about people and one-tap contact. Its tone is warm with optional mischief: an inside joke between people who care about each other. Keep the interface restrained and make the exchange expressive.
 
-### Starting palette and type
+### Owner-selected reference: original Yo
 
-- Canvas: deep cobalt `#2448D8`.
-- Main text: `#FFFFFF`.
-- Raised person surface: `#FFFFFF`; text/icon: `#17224D`.
-- Success/error feedback uses explicit wording and an icon, not colour alone.
-- System SF Pro, regular/semibold. Avoid rounded toy typography here.
+The owner explicitly chose **Yo** after rejecting the earlier cobalt-card design. This supersedes the previous small-header/rounded-white-row direction.
 
-Validate actual contrast, including disabled and pressed states. Do not layer several translucent blue surfaces with indistinguishable boundaries.
+- Use edge-to-edge, solid colour bands with large centered uppercase contact names.
+- Purple canvas (`#713F93`); white type on strong blue, teal, orange, pink, and violet bands. Contact colour is stable for a name, not a network status.
+- Header uses a bold 40-point “psst” wordmark. Contact names begin at 52 points and scale with Dynamic Type. Long names wrap instead of clipping.
+- No rounded contact cards, perimeter gutters, outlines, persistent decorative symbols, or large explanatory paragraphs.
+- The entire person band sends. The following darker bar explicitly opens the effect picker; it is a separate action and never sends.
+- A single connection gets a larger band; multiple connections become a scrollable stack. Never invent contacts to fill space.
+- In the local demo, one concise notice identifies the fictional contact and local-only exchange. Do not repeat the full disclaimer in every control. Preserve honest statuses and VoiceOver hints.
+- Picker: one preview stage, four full-width coloured choices, a checkmark for selection, and a distinct accessible preview button. Choosing or previewing must never send.
+- Recipient view uses the received signal’s colour, large signal name, sender identity, and a clear reply band.
+- Press feedback is a brief local colour change. On success, the signal can briefly replace the contact name before the name returns. Do not imply remote delivery.
+- Keep safe areas, Dynamic Type, reduced motion, readable contrast, and minimum touch targets. At accessibility sizes, allow the content to scroll and stack controls.
 
-### Home screen
-
-```text
-[safe area]
-psst                                      [+]
-
-[Ada                                    tap]
-[Emre                                   tap]
-[Sam                                    tap]
-
-               empty space is allowed
-
-[quiet access to settings / effects]
-[safe area]
-```
-
-- Small wordmark/header, one explicit add-person action.
-- A single column of large person rows. Start at about 88 points high, 12-point radius, 12-point separation. Names approximately 24-point semibold and readable at large text sizes.
-- The whole row is the send target. Do not put secondary destructive controls inside it. Connection details/effect selection use a separate, clearly accessible action rather than an undiscoverable long press alone.
-- With one connection, show one excellent row. Do not fill the screen with invented friends, sample activity, tips, cards, or prompts.
-- With many connections, scroll the person list. No fake feed or analytics dashboard.
-- Empty state: one plain sentence and **Invite someone**. No elaborate illustration or multi-step tour.
+Reference: original Yo contact-band screenshots, https://www.macrumors.com/2014/06/20/yo-vulnerable-hacking/ . This is a visual reference; Psst keeps its own name, effects, and backend.
 
 ### Send feedback must be truthful
 

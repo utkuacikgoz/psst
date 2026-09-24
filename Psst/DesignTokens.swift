@@ -12,9 +12,9 @@ enum Tokens {
         static let xxxl: CGFloat = 48
     }
 
-    static let controlRadius: CGFloat = 12
+    static let controlRadius: CGFloat = 0
     static let minTouch: CGFloat = 44
-    static let personRowMinHeight: CGFloat = 88
+    static let personRowMinHeight: CGFloat = 144
     static let sheetInset: CGFloat = 24
 
     /// 24 pt side inset, 20 pt on very narrow phones. Safe areas are excluded by the caller.
@@ -34,21 +34,31 @@ extension Color {
         )
     }
 
-    /// Canvas. White text on it measures about 7.0:1.
-    static let psstCanvas = Color(hex: 0x2448D8)
+    /// Yo-inspired purple canvas.
+    static let psstCanvas = Color(hex: 0x713F93)
     /// Main text on canvas.
     static let onCanvas = Color.white
-    /// Secondary text on canvas. White at 82% over cobalt measures about 5.2:1.
+    /// Secondary text on the purple canvas.
     static let onCanvasSecondary = Color.white.opacity(0.82)
 
     /// Raised person surface and sheets.
     static let surface = Color.white
     /// Pressed person surface. Ink on it stays above 13:1.
-    static let surfacePressed = Color(hex: 0xE3E8FA)
+    static let surfacePressed = Color(hex: 0xEEE7F3)
     /// Inset areas inside sheets (preview stage, option rows).
-    static let surfaceInset = Color(hex: 0xEEF1FB)
-    /// Text and icons on the white surface: about 15:1.
-    static let ink = Color(hex: 0x17224D)
-    /// Secondary text on white surfaces: about 7:1.
-    static let inkSecondary = Color(hex: 0x4A5580)
+    static let surfaceInset = Color(hex: 0xF5F0F7)
+    /// Text and icons on white surfaces.
+    static let ink = Color(hex: 0x292031)
+    /// Secondary text on white surfaces.
+    static let inkSecondary = Color(hex: 0x66586E)
+}
+
+extension Color {
+    /// Stable name-derived colours: reordering contacts does not change their identity.
+    static func personBand(_ name: String) -> Color {
+        let palette: [UInt32] = [0x2476AA, 0x187F69, 0xB34F2B, 0xAC3E68, 0x5F61AE]
+        let seed = name.lowercased().unicodeScalars.reduce(0) { ($0 + Int($1.value)) % palette.count }
+        return Color(hex: palette[seed])
+    }
+    static let addBand = Color(hex: 0xB87500)
 }

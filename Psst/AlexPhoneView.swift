@@ -1,147 +1,75 @@
 import SwiftUI
 
-/// A simulated view of what Alex would see, shown on this same device.
 struct AlexPhoneView: View {
     @Environment(LocalExchange.self) private var exchange
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     @State private var incomingEffect: EffectTrigger?
     @State private var replyEffect: EffectTrigger?
-    @ScaledMetric(relativeTo: .title2) private var signalTitleSize: CGFloat = 24
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 52
 
     var body: some View {
         GeometryReader { proxy in
-            let inset = Tokens.sideInset(forWidth: proxy.size.width)
-
             VStack(spacing: 0) {
                 HStack {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Label("Your phone", systemImage: "chevron.left")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Color.onCanvas)
-                            .frame(minHeight: Tokens.minTouch)
-                            .contentShape(Rectangle())
+                    Button { dismiss() } label: {
+                        Label("Your phone", systemImage: "arrow.left")
+                            .font(.body.weight(.semibold)).frame(minHeight: 48)
                     }
                     Spacer()
-                }
-                .padding(.horizontal, inset)
-                .padding(.top, Tokens.Space.s)
-
+                    Text("ALEX’S SIDE").font(.caption.weight(.semibold)).tracking(1)
+                }.foregroundStyle(.white).padding(.horizontal, 24).padding(.vertical, 12)
                 ScrollView {
-                    VStack(alignment: .leading, spacing: Tokens.Space.m) {
-                        Text("Alex's phone")
-                            .font(.system(.title3, weight: .semibold))
-                            .foregroundStyle(Color.onCanvas)
-                            .accessibilityAddTraits(.isHeader)
-                        LocalPreviewNotice(text: "Simulated on this device. Nothing is sent or received.")
-                            .padding(.bottom, Tokens.Space.s)
-
-                        if let incoming = exchange.latestEvent(to: .alex) {
-                            incomingCard(incoming)
+                    VStack(spacing: 0) {
+                        if let event = exchange.latestEvent(to: .alex) {
+                            VStack(spacing: 22) {
+                                Text("FROM YOU").font(.subheadline.weight(.semibold)).tracking(2)
+                                SignalGlyph(signal: event.signal, trigger: incomingEffect?.id, baseSize: 64, tint: .white)
+                                    .frame(height: 90)
+                                Text(event.signal.title.uppercased())
+                                    .font(.system(size: titleSize, weight: .bold)).tracking(-1.5)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text(event.signal.meaning).font(.body)
+                            }.multilineTextAlignment(.center).foregroundStyle(.white)
+                                .padding(24).frame(maxWidth: .infinity, minHeight: max(300, proxy.size.height * 0.50))
+                                .background(event.signal.accent).accessibilityElement(children: .combine)
                         } else {
-                            Text("Nothing from you yet. Go back and tap Alex first.")
-                                .font(.body)
-                                .foregroundStyle(Color.onCanvas)
-                                .padding(.vertical, Tokens.Space.l)
+                            Text("Nothing from you yet.")
+                                .font(.title2.weight(.semibold)).foregroundStyle(.white)
+                                .frame(maxWidth: .infinity, minHeight: 220).padding(24)
                         }
-
-                        PersonRow(
-                            name: "You",
-                            status: replyStatusText,
-                            signal: exchange.tapSignal(for: .alex),
-                            effect: replyEffect,
-                            accessibilityHint: "Plays \(exchange.tapSignal(for: .alex).title) back to you in the simulation.",
-                            action: tapBack
-                        )
-                        .padding(.top, Tokens.Space.l)
+                        PersonRow(name: "You", status: replyStatusText,
+                                  signal: exchange.tapSignal(for: .alex), effect: replyEffect,
+                                  accessibilityHint: "Plays \(exchange.tapSignal(for: .alex).title) back in the local demo.",
+                                  action: tapBack)
+                        Text("Local demo. Nothing leaves this phone.")
+                            .font(.footnote).foregroundStyle(Color.onCanvasSecondary).padding(24)
                     }
-                    .padding(.horizontal, inset)
-                    .padding(.vertical, Tokens.Space.l)
                 }
             }
-        }
-        .background(Color.psstCanvas.ignoresSafeArea())
-        .sensoryFeedback(trigger: replyEffect) { _, new in new?.signal.haptic }
-        .task { await revealIncoming() }
+        }.background(Color.psstCanvas.ignoresSafeArea()).preferredColorScheme(.dark)
+            .sensoryFeedback(trigger: replyEffect) { _, new in new?.signal.haptic }
+            .task { await revealIncoming() }
     }
-
-    /// Sender first, then the effect.
-    private func incomingCard(_ event: SignalEvent) -> some View {
-        let earlier = max(0, exchange.events.filter { $0.to == .alex }.count - 1)
-
-        return VStack(alignment: .leading, spacing: Tokens.Space.s) {
-            Text("From you")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.inkSecondary)
-
-            cardLayout {
-                SignalGlyph(signal: event.signal, trigger: incomingEffect?.id, baseSize: 36)
-                VStack(alignment: .leading, spacing: Tokens.Space.xs) {
-                    Text(event.signal.title)
-                        .font(.system(size: signalTitleSize, weight: .semibold))
-                        .foregroundStyle(Color.ink)
-                    Text(event.signal.meaning)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.inkSecondary)
-                }
-            }
-
-            timeLine(for: event, earlier: earlier)
-                .font(.footnote)
-                .foregroundStyle(Color.inkSecondary)
-        }
-        .padding(Tokens.Space.xl)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: Tokens.controlRadius).fill(Color.surface))
-        .accessibilityElement(children: .combine)
-    }
-
-    private func timeLine(for event: SignalEvent, earlier: Int) -> Text {
-        let ago = Text("\(Text(event.createdAt, style: .relative)) ago")
-        return earlier > 0 ? ago + Text(" · \(earlier) earlier") : ago
-    }
-
-    /// Glyph beside the title normally; above it at accessibility sizes.
-    private var cardLayout: AnyLayout {
-        dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Tokens.Space.s))
-            : AnyLayout(HStackLayout(spacing: Tokens.Space.m))
-    }
-
     private var replyStatusText: String {
         switch exchange.status(for: .alex) {
-        case .ready(let signal):
-            "Tap to play \(signal.title)"
-        case .received(let signal):
-            "Tap to send \(signal.title) back"
-        case .playedLocally(let signal):
-            "\(signal.title) back · shows when you return to your phone"
-        case .shownToOther(let signal):
-            "\(signal.title) back · shown on your phone"
-        case .paused:
-            "Paused for a moment after several taps"
+        case .ready(let signal), .received(let signal): "Tap to \(signal.title.lowercased()) back"
+        case .playedLocally(let signal): "\(signal.title) back · played locally"
+        case .shownToOther(let signal): "\(signal.title) back · seen in demo"
+        case .paused: "Paused briefly. Try again shortly."
         }
     }
-
     private func revealIncoming() async {
         guard let latest = exchange.unseenEvents(to: .alex).last else { return }
         exchange.markSeen(by: .alex)
         try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 350))
         incomingEffect = EffectTrigger(id: latest.id, signal: latest.signal)
     }
-
     private func tapBack() {
         switch exchange.send(exchange.tapSignal(for: .alex), from: .alex) {
-        case .played(let event):
-            replyEffect = EffectTrigger(id: event.id, signal: event.signal)
-        case .paused:
-            AccessibilityNotification.Announcement("Paused for a moment after several taps").post()
-        case .tooSoon, .alreadyRecorded:
-            break
+        case .played(let event): replyEffect = EffectTrigger(id: event.id, signal: event.signal)
+        case .paused: AccessibilityNotification.Announcement("Paused for a moment after several taps").post()
+        case .tooSoon, .alreadyRecorded: break
         }
     }
 }

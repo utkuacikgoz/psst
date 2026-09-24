@@ -22,14 +22,17 @@ struct ChangeSignalButton: View {
                     Spacer(minLength: Tokens.Space.s)
                 }
                 HStack(spacing: Tokens.Space.xs) {
-                    Text("Change")
+                    Text("Change signal")
                     Image(systemName: "chevron.right").accessibilityHidden(true)
                 }
             }
-            .font(.subheadline.weight(.semibold))
+            .font(.subheadline.weight(.medium))
             .foregroundStyle(Color.onCanvas)
             .multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, minHeight: Tokens.minTouch, alignment: .leading)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .background(Color.black.opacity(0.15))
             .contentShape(Rectangle())
         }
         .accessibilityElement(children: .ignore)

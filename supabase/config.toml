@@ -1,0 +1,25 @@
+# Supabase CLI configuration for local development (`supabase start`).
+# Hosted projects: set the same options in the dashboard (see supabase/README.md).
+project_id = "psst"
+
+[api]
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 200
+
+[auth]
+site_url = "psst://"
+# Minimal identity for the vertical slice: an anonymous account plus a display name.
+enable_anonymous_sign_ins = true
+enable_signup = true
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+
+[auth.rate_limit]
+anonymous_users = 30
+
+[functions.send-signal]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true

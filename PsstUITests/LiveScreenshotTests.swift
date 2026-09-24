@@ -19,7 +19,9 @@ final class LiveScreenshotTests: XCTestCase {
         shot("live-01-name")
         name.tap()
         name.typeText("Utku")
-        app.buttons["Continue"].tap()
+        // At large text sizes the keyboard's return key is also labelled "Continue";
+        // either one submits the name.
+        app.buttons["Continue"].firstMatch.tap()
 
         let notNow = app.buttons["Not now"]
         XCTAssertTrue(notNow.waitForExistence(timeout: 10))

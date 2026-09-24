@@ -29,6 +29,8 @@ jobs:
   screenshots:
     runs-on: macos-15
     timeout-minutes: 45
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Capture screenshots on a compact and a large iPhone
@@ -50,3 +52,16 @@ jobs:
           name: screenshots
           path: screenshots
           if-no-files-found: warn
+      - name: Commit review copies (manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          rm -rf docs/screenshots && mkdir -p docs/screenshots
+          for f in screenshots/*.png; do
+            name=$(basename "${f%.png}" | tr ' ' '-' | tr -d '()')
+            sips -s format jpeg -s formatOptions 70 --resampleWidth 540 "$f" --out "docs/screenshots/$name.jpg" >/dev/null
+          done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots
+          git diff --cached --quiet || git commit -m "Update screenshots from CI [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

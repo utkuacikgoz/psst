@@ -32,6 +32,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Select Xcode 26
+        run: scripts/select_xcode.sh
+
       - name: Check that every secret is set
         run: |
           missing=0

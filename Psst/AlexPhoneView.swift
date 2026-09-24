@@ -9,6 +9,7 @@ struct AlexPhoneView: View {
     @State private var incomingEffect: EffectTrigger?
     @State private var replyEffect: EffectTrigger?
     @ScaledMetric(relativeTo: .title2) private var signalTitleSize: CGFloat = 24
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         GeometryReader { proxy in
@@ -77,7 +78,7 @@ struct AlexPhoneView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.inkSecondary)
 
-            HStack(spacing: Tokens.Space.m) {
+            cardLayout {
                 SignalGlyph(signal: event.signal, trigger: incomingEffect?.id, baseSize: 36)
                 VStack(alignment: .leading, spacing: Tokens.Space.xs) {
                     Text(event.signal.title)
@@ -102,6 +103,13 @@ struct AlexPhoneView: View {
     private func timeLine(for event: SignalEvent, earlier: Int) -> Text {
         let ago = Text("\(Text(event.createdAt, style: .relative)) ago")
         return earlier > 0 ? ago + Text(" · \(earlier) earlier") : ago
+    }
+
+    /// Glyph beside the title normally; above it at accessibility sizes.
+    private var cardLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Tokens.Space.s))
+            : AnyLayout(HStackLayout(spacing: Tokens.Space.m))
     }
 
     private var replyStatusText: String {

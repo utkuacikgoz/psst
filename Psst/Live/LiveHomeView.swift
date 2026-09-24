@@ -50,7 +50,6 @@ struct LiveHomeView: View {
                                 row(connection)
                             }
                         }
-                    }
                         if dynamicTypeSize.isAccessibilitySize { settingsButton }
                     }
                     .padding(.horizontal, inset)

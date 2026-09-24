@@ -12,6 +12,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        #if DEBUG
+        if let testStore = UITestAPI.storeFromLaunchArguments() {
+            store = testStore
+            return true
+        }
+        #endif
         guard let config = AppConfig.live else { return true }
         store = LiveStore(api: APIClient(config: config))
 

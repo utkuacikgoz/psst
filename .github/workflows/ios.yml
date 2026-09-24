@@ -36,6 +36,7 @@ jobs:
       - name: Capture screenshots on a compact and a large iPhone
         run: |
           set -o pipefail
+          status=0
           for kind in compact large; do
             UDID=$(python3 scripts/pick_simulators.py "$kind")
             xcrun simctl boot "$UDID" || true
@@ -47,10 +48,12 @@ jobs:
                 -destination "id=$UDID" \
                 -only-testing:PsstUITests \
                 -resultBundlePath "results-$kind-${size##*:}.xcresult" \
-                CODE_SIGNING_ALLOWED=NO
-              python3 scripts/export_screenshots.py "results-$kind-${size##*:}.xcresult" screenshots
+                CODE_SIGNING_ALLOWED=NO || status=1
+              # Export whatever was captured, even if a later step failed.
+              python3 scripts/export_screenshots.py "results-$kind-${size##*:}.xcresult" screenshots || true
             done
           done
+          exit $status
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -58,7 +61,7 @@ jobs:
           path: screenshots
           if-no-files-found: warn
       - name: Commit review copies (manual runs only)
-        if: github.event_name == 'workflow_dispatch'
+        if: always() && github.event_name == 'workflow_dispatch'
         run: |
           rm -rf docs/screenshots && mkdir -p docs/screenshots
           for f in screenshots/*.png; do

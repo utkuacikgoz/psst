@@ -8,6 +8,10 @@ struct PersonRow: View {
     let effect: EffectTrigger?
     let accessibilityHint: String
     let action: () -> Void
+    /// A small in-row progress treatment while a request is in flight.
+    var isBusy = false
+    /// Paired with the status text so meaning never relies on colour alone.
+    var statusSymbol: String?
 
     @ScaledMetric(relativeTo: .title2) private var nameSize: CGFloat = 24
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -23,10 +27,19 @@ struct PersonRow: View {
                     Text(name)
                         .font(.system(size: nameSize, weight: .semibold))
                         .foregroundStyle(Color.ink)
-                    Text(status)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.inkSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.xs) {
+                        if isBusy {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .tint(Color.inkSecondary)
+                        } else if let statusSymbol {
+                            Image(systemName: statusSymbol)
+                        }
+                        Text(status)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(Color.inkSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 

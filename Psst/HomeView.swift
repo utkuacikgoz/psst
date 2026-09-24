@@ -15,7 +15,7 @@ struct HomeView: View {
                 HStack {
                     Text("psst").font(.system(size: 40, weight: .heavy)).tracking(-2)
                     Spacer()
-                    Text("LOCAL DEMO").font(.caption.weight(.semibold)).tracking(1)
+                    Text("LOCAL DEMO").font(.footnote.weight(.semibold)).tracking(1)
                 }.foregroundStyle(.white).padding(.horizontal, 24).padding(.vertical, 22)
                 ScrollView {
                     VStack(spacing: 0) {

@@ -62,3 +62,15 @@ extension Color {
     }
     static let addBand = Color(hex: 0xB87500)
 }
+
+extension Text {
+    /// Oversized band titles wrap between words but never inside one: each word
+    /// gets at most one line, and a word too wide for the band scales down instead.
+    func bandTitle(_ text: String, size: CGFloat, tracking: CGFloat) -> some View {
+        let words = max(1, text.split(whereSeparator: \.isWhitespace).count)
+        return font(.system(size: size, weight: .bold))
+            .tracking(tracking)
+            .lineLimit(words)
+            .minimumScaleFactor(0.4)
+    }
+}

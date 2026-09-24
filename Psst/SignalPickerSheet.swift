@@ -69,7 +69,7 @@ private struct SignalOptionRow: View {
             Button(action: select) {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(signal.title.uppercased()).font(.system(size: titleSize, weight: .bold)).tracking(-0.7)
+                        Text(signal.title.uppercased()).bandTitle(signal.title, size: titleSize, tracking: -0.7)
                         Text(signal.meaning).font(.subheadline)
                     }.fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
@@ -82,7 +82,7 @@ private struct SignalOptionRow: View {
                 .accessibilityHint("Selects this signal. Nothing is sent.")
                 .accessibilityAddTraits(isSelected ? AccessibilityTraits([.isButton, .isSelected]) : .isButton)
             Button(action: preview) {
-                Image(systemName: "play.fill").font(.system(size: 20))
+                Image(systemName: "play.fill").font(.title3)
                     .frame(width: 48, height: 52).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel("Preview \(signal.title)")
         }.foregroundStyle(.white).padding(.horizontal, 24).background(signal.accent)

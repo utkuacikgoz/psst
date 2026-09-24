@@ -10,29 +10,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  unit-tests:
     runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Show Xcode
-        run: xcodebuild -version
-      - name: Pick an available iPhone simulator
-        id: sim
+      - run: xcodebuild -version
+      - name: Build and run unit tests
         run: |
-          UDID=$(xcrun simctl list devices available -j | python3 -c "
-          import json, sys
-          devices = json.load(sys.stdin)['devices']
-          print(next(d['udid'] for runtime, ds in sorted(devices.items(), reverse=True)
-                     if 'iOS' in runtime for d in ds if d['name'].startswith('iPhone')))
-          ")
-          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
-      - name: Build and test
-        run: |
+          UDID=$(python3 scripts/pick_simulators.py any)
+          set -o pipefail
           xcodebuild test \
-            -project Psst.xcodeproj \
-            -scheme Psst \
-            -destination "id=${{ steps.sim.outputs.udid }}" \
-            CODE_SIGNING_ALLOWED=NO \
-            | tee xcodebuild.log
-          exit ${PIPESTATUS[0]}
+            -project Psst.xcodeproj -scheme Psst \
+            -destination "id=$UDID" \
+            -only-testing:PsstTests \
+            CODE_SIGNING_ALLOWED=NO
+
+  screenshots:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture screenshots on a compact and a large iPhone
+        run: |
+          set -o pipefail
+          for kind in compact large; do
+            UDID=$(python3 scripts/pick_simulators.py "$kind")
+            xcodebuild test \
+              -project Psst.xcodeproj -scheme Psst \
+              -destination "id=$UDID" \
+              -only-testing:PsstUITests \
+              -resultBundlePath "results-$kind.xcresult" \
+              CODE_SIGNING_ALLOWED=NO
+            python3 scripts/export_screenshots.py "results-$kind.xcresult" screenshots
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: screenshots
+          if-no-files-found: warn

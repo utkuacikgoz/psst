@@ -3,3 +3,9 @@ xcuserdata/
 DerivedData/
 build/
 *.xcuserstate
+supabase/.branches/
+supabase/.temp/
+supabase/functions/.env
+.env
+Config/Secrets.xcconfig
+*.p8

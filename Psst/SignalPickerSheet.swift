@@ -119,19 +119,24 @@ private struct SignalOptionRow: View {
                         .foregroundStyle(signal.accent)
                         .frame(width: Tokens.minTouch, height: Tokens.minTouch)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(signal.title)
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Color.ink)
+                        HStack(spacing: Tokens.Space.xs) {
+                            Text(signal.title)
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(Color.ink)
+                            if isSelected {
+                                // Shape plus the 2 pt border: selection never relies on colour alone.
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Color.psstCanvas)
+                                    .accessibilityHidden(true)
+                            }
+                        }
                         Text(signal.meaning)
                             .font(.subheadline)
                             .foregroundStyle(Color.inkSecondary)
                     }
-                    Spacer(minLength: Tokens.Space.s)
-                    if isSelected {
-                        Label("Selected", systemImage: "checkmark")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.psstCanvas)
-                    }
+                    .layoutPriority(1)
+                    Spacer(minLength: 0)
                 }
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, minHeight: Tokens.minTouch, alignment: .leading)

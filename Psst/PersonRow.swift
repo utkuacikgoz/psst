@@ -24,8 +24,7 @@ struct PersonRow: View {
                         .frame(minHeight: nameSize * 1.15)
                 } else {
                     Text(name.uppercased())
-                        .font(.system(size: nameSize, weight: .bold))
-                        .tracking(-1.5)
+                        .bandTitle(name, size: nameSize, tracking: -1.5)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(minHeight: nameSize * 1.15)
                 }

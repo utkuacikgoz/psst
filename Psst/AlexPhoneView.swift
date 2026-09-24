@@ -7,17 +7,21 @@ struct AlexPhoneView: View {
     @State private var incomingEffect: EffectTrigger?
     @State private var replyEffect: EffectTrigger?
     @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 52
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         GeometryReader { proxy in
             VStack(spacing: 0) {
-                HStack {
+                // Stacks at accessibility sizes so "Your phone" never breaks mid-word.
+                (dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: Tokens.Space.xs))
+                    : AnyLayout(HStackLayout())) {
                     Button { dismiss() } label: {
                         Label("Your phone", systemImage: "arrow.left")
                             .font(.body.weight(.semibold)).frame(minHeight: 48)
                     }
-                    Spacer()
-                    Text("ALEX’S SIDE").font(.caption.weight(.semibold)).tracking(1)
+                    if !dynamicTypeSize.isAccessibilitySize { Spacer() }
+                    Text("ALEX’S SIDE").font(.footnote.weight(.semibold)).tracking(1)
                 }.foregroundStyle(.white).padding(.horizontal, 24).padding(.vertical, 12)
                 ScrollView {
                     VStack(spacing: 0) {
@@ -27,7 +31,7 @@ struct AlexPhoneView: View {
                                 SignalGlyph(signal: event.signal, trigger: incomingEffect?.id, baseSize: 64, tint: .white)
                                     .frame(height: 90)
                                 Text(event.signal.title.uppercased())
-                                    .font(.system(size: titleSize, weight: .bold)).tracking(-1.5)
+                                    .bandTitle(event.signal.title, size: titleSize, tracking: -1.5)
                                     .fixedSize(horizontal: false, vertical: true)
                                 Text(event.signal.meaning).font(.body)
                             }.multilineTextAlignment(.center).foregroundStyle(.white)

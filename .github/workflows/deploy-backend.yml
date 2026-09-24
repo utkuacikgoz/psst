@@ -40,8 +40,11 @@ jobs:
                       APNS_TEAM_ID APNS_KEY_ID APNS_BUNDLE_ID APNS_PRIVATE_KEY; do
             if [ -z "${!name}" ]; then echo "::error::Repository secret $name is not set"; missing=1; fi
           done
-          if ! grep -q "BEGIN PRIVATE KEY" <<<"$APNS_PRIVATE_KEY"; then
-            echo "::error::APNS_PRIVATE_KEY should be the full contents of the .p8 file"; missing=1
+          # Accept the whole .p8 file or just its base64 body; reject anything else.
+          body=$(sed '/-----/d' <<<"$APNS_PRIVATE_KEY" | tr -d ' \r\n\t')
+          if ! [[ "$body" =~ ^[A-Za-z0-9+/]+=*$ ]] || [ ${#body} -lt 150 ] || [ ${#body} -gt 400 ]; then
+            echo "::error::APNS_PRIVATE_KEY doesn't look like an APNs key. Paste the full text of the AuthKey_XXXXXXXXXX.p8 file (about 200 characters between the BEGIN and END lines)."
+            missing=1
           fi
           exit $missing
 
@@ -62,11 +65,14 @@ jobs:
           APNS_BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
           APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
         run: |
+          # Normalize to PEM whichever form was pasted.
+          body=$(sed '/-----/d' <<<"$APNS_PRIVATE_KEY" | tr -d ' \r\n\t')
+          pem=$(printf -- '-----BEGIN PRIVATE KEY-----\n%s\n-----END PRIVATE KEY-----' "$(fold -w 64 <<<"$body")")
           supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" \
             APNS_TEAM_ID="$APNS_TEAM_ID" \
             APNS_KEY_ID="$APNS_KEY_ID" \
             APNS_BUNDLE_ID="$APNS_BUNDLE_ID" \
-            APNS_PRIVATE_KEY="$APNS_PRIVATE_KEY" > /dev/null
+            APNS_PRIVATE_KEY="$pem" > /dev/null
           echo "Secrets set (values not printed)."
 
       - name: Deploy functions

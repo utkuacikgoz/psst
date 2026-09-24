@@ -41,25 +41,25 @@ struct LiveHomeView: View {
                 header.padding(.horizontal, inset)
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: Tokens.Space.m) {
-                        notices
+                    VStack(alignment: .leading, spacing: 0) {
+                        notices.padding(.horizontal, inset)
                         if store.connections.isEmpty {
                             if store.hasLoadedConnections { emptyState }
                         } else {
                             ForEach(store.connections) { connection in
-                                row(connection)
+                                row(connection, minHeight: store.connections.count == 1 ? max(160, proxy.size.height * 0.38) : 144)
                             }
                         }
                         if dynamicTypeSize.isAccessibilitySize { settingsButton }
                     }
-                    .padding(.horizontal, inset)
-                    .padding(.vertical, Tokens.Space.l)
+                    .padding(.bottom, Tokens.Space.l)
                 }
                 .refreshable { await store.refresh() }
                 .pinnedFooter(!dynamicTypeSize.isAccessibilitySize, inset: inset) { settingsButton }
             }
         }
         .background(Color.psstCanvas.ignoresSafeArea())
+        .preferredColorScheme(.dark)
         .sensoryFeedback(trigger: store.latestEffect) { _, new in new?.signal.haptic }
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
@@ -111,7 +111,7 @@ struct LiveHomeView: View {
     private var header: some View {
         HStack {
             Text("psst")
-                .font(.system(.title3, weight: .semibold))
+                .font(.system(size: 40, weight: .heavy)).tracking(-2)
                 .foregroundStyle(Color.onCanvas)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
@@ -126,7 +126,7 @@ struct LiveHomeView: View {
             }
             .accessibilityLabel("Invite someone")
         }
-        .padding(.top, Tokens.Space.s)
+        .padding(.vertical, 18)
     }
 
     @ViewBuilder private var notices: some View {
@@ -156,9 +156,10 @@ struct LiveHomeView: View {
             PrimaryButton(title: "Invite someone") { showingInvite = true }
         }
         .padding(.top, Tokens.Space.xl)
+        .padding(.horizontal, 24)
     }
 
-    private func row(_ connection: ConnectionSummary) -> some View {
+    private func row(_ connection: ConnectionSummary, minHeight: CGFloat) -> some View {
         let status = store.status(for: connection)
         return VStack(alignment: .leading, spacing: 0) {
             PersonRow(
@@ -169,12 +170,13 @@ struct LiveHomeView: View {
                 accessibilityHint: Self.hint(for: status, connection: connection),
                 action: { store.tap(connection) },
                 isBusy: Self.isBusy(status),
-                statusSymbol: Self.symbol(for: status)
+                statusSymbol: Self.symbol(for: status),
+                minHeight: minHeight
             )
             .accessibilityAction(named: "Choose signal") { managing = connection }
 
             ChangeSignalButton(
-                title: "Signal: \(connection.favorite.title)",
+                title: connection.favorite.title,
                 accessibilityLabel: "Signal for \(connection.otherName): \(connection.favorite.title)",
                 accessibilityHint: "Choose a signal, preview it, or manage this connection."
             ) { managing = connection }

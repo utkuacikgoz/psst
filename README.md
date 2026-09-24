@@ -12,8 +12,8 @@ Read `CLAUDE.md`, then `DESIGN.md`. This folder is an independent repository wit
 
 ## Try the local preview
 1. Tap **Alex** to play the selected signal on this phone.
-2. Tap **Signal for Alex · Change** to pick another signal. **Preview** plays it in the sheet without sending anything. The choice is remembered on this device.
-3. Tap **View Alex's phone (simulated)** to see the recipient side: first who it's from, then the effect.
+2. Tap the signal bar beneath Alex to pick another signal. The play button previews it in the sheet without sending anything. The choice is remembered on this device.
+3. Tap **Alex’s side** to see the recipient side: first who it's from, then the effect.
 4. Tap **You** on Alex's phone to tap back, then **Your phone** to return and see Alex's reply play on the row.
 
 VoiceOver users can also use the **Choose signal** action on the Alex row.
@@ -21,11 +21,11 @@ VoiceOver users can also use the **Choose signal** action on the Alex row.
 ## What the states mean
 | Row text | Meaning |
 |---|---|
-| Tap to play Psst | Nothing exchanged yet |
-| Squeeze · played on this phone only | You tapped. Alex's simulated screen hasn't been opened since then |
-| Squeeze · shown on Alex's simulated phone | Alex's simulated screen displayed it |
-| Alex sent Oi back | Alex tapped back most recently |
-| Paused for a moment after several taps | More than 5 taps in 20 seconds; resumes after 20 seconds |
+| Tap to psst | Nothing exchanged yet |
+| Squeeze · played locally | You tapped. Alex's simulated screen hasn't been opened since then |
+| Squeeze · seen in demo | Alex's simulated screen displayed it |
+| Oi back from Alex | Alex tapped back most recently |
+| A little breather. Try again shortly. | More than 5 taps in 20 seconds; resumes after 20 seconds |
 
 Taps less than 0.8 s apart count as one. Each signal event has a unique ID, and retrying the same ID never creates a duplicate. These are the same rules the backend will have to enforce.
 
@@ -67,3 +67,8 @@ Config/                    xcconfig, Info.plist, entitlements, Secrets.example.x
 supabase/                  migrations, edge functions, backend tests
 PsstTests/, PsstUITests/
 ```
+
+## Visual direction
+The owner-selected reference is the original Yo: edge-to-edge colour bands, oversized contact names, and direct tap feedback. Demo, signal picker, recipient view, and live contact rows share the revised language. Existing networking, authorization, notification, and exchange state logic is retained. See `DESIGN.md`.
+
+Validation for the Yo-inspired revision: 34 existing unit tests passed, the final simulator build succeeded, and local send → effect selection → recipient → tap-back was checked in the running iPhone 17 Pro simulator. The checked-in `docs/screenshots` images predate this visual revision. Physical-device push delivery and the deployed backend remain unverified.

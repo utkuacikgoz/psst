@@ -24,6 +24,7 @@ struct LiveRootView: View {
 struct LiveHomeView: View {
     @Environment(LiveStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var showingInvite = false
     @State private var showingSettings = false
@@ -50,22 +51,13 @@ struct LiveHomeView: View {
                             }
                         }
                     }
+                        if dynamicTypeSize.isAccessibilitySize { settingsButton }
+                    }
                     .padding(.horizontal, inset)
                     .padding(.vertical, Tokens.Space.l)
                 }
                 .refreshable { await store.refresh() }
-
-                Button {
-                    showingSettings = true
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.onCanvas)
-                        .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
-                        .contentShape(Rectangle())
-                }
-                .padding(.horizontal, inset)
-                .padding(.bottom, Tokens.Space.s)
+                .pinnedFooter(!dynamicTypeSize.isAccessibilitySize, inset: inset) { settingsButton }
             }
         }
         .background(Color.psstCanvas.ignoresSafeArea())
@@ -88,6 +80,18 @@ struct LiveHomeView: View {
         .sheet(isPresented: $showingInvite) { InviteSheet() }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
         .sheet(item: $managing) { ConnectionSheet(connection: $0) }
+    }
+
+    private var settingsButton: some View {
+        Button {
+            showingSettings = true
+        } label: {
+            Label("Settings", systemImage: "gearshape")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.onCanvas)
+                .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
+                .contentShape(Rectangle())
+        }
     }
 
     private func updateVisibility() {
@@ -170,24 +174,11 @@ struct LiveHomeView: View {
             )
             .accessibilityAction(named: "Choose signal") { managing = connection }
 
-            Button {
-                managing = connection
-            } label: {
-                HStack(spacing: Tokens.Space.s) {
-                    Text("Signal: \(connection.favorite.title)")
-                    Spacer(minLength: Tokens.Space.s)
-                    Text("Change")
-                    Image(systemName: "chevron.right").accessibilityHidden(true)
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.onCanvas)
-                .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
-                .contentShape(Rectangle())
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Signal for \(connection.otherName): \(connection.favorite.title)")
-            .accessibilityHint("Choose a signal, preview it, or manage this connection.")
-            .accessibilityAddTraits(.isButton)
+            ChangeSignalButton(
+                title: "Signal: \(connection.favorite.title)",
+                accessibilityLabel: "Signal for \(connection.otherName): \(connection.favorite.title)",
+                accessibilityHint: "Choose a signal, preview it, or manage this connection."
+            ) { managing = connection }
         }
     }
 

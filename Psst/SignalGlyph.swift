@@ -16,6 +16,7 @@ struct SignalGlyph: View {
     let trigger: UUID?
     var baseSize: CGFloat = 28
     var showsBurst = true
+    var tint: Color? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -30,14 +31,14 @@ struct SignalGlyph: View {
 
         ZStack {
             if showsBurst && !reduceMotion {
-                BurstRing(color: signal.accent, trigger: trigger)
+                BurstRing(color: tint ?? signal.accent, trigger: trigger)
                     .frame(width: size * 1.6, height: size * 1.6)
             }
 
             KeyframeAnimator(initialValue: GlyphPose(), trigger: trigger) { pose in
                 Image(systemName: signal.symbolName)
                     .font(.system(size: size, weight: .semibold))
-                    .foregroundStyle(signal.accent)
+                    .foregroundStyle(tint ?? signal.accent)
                     .scaleEffect(x: pose.scaleX, y: pose.scaleY)
                     .rotationEffect(.degrees(pose.rotation))
                     .offset(y: pose.offsetY)

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A large white row. The whole row is the send target; nothing else lives inside it.
+/// A person is the action: one edge-to-edge band, with no nested controls.
 struct PersonRow: View {
     let name: String
     let status: String
@@ -8,68 +8,59 @@ struct PersonRow: View {
     let effect: EffectTrigger?
     let accessibilityHint: String
     let action: () -> Void
-    /// A small in-row progress treatment while a request is in flight.
     var isBusy = false
-    /// Paired with the status text so meaning never relies on colour alone.
     var statusSymbol: String?
+    var minHeight: CGFloat = Tokens.personRowMinHeight
 
-    @ScaledMetric(relativeTo: .title2) private var nameSize: CGFloat = 24
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = 52
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var showingEffect = false
 
     var body: some View {
         Button(action: action) {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: Tokens.Space.s))
-                : AnyLayout(HStackLayout(spacing: Tokens.Space.m))
-
-            layout {
-                VStack(alignment: .leading, spacing: Tokens.Space.xs) {
-                    Text(name)
-                        .font(.system(size: nameSize, weight: .semibold))
-                        .foregroundStyle(Color.ink)
-                    HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.xs) {
-                        if isBusy {
-                            ProgressView()
-                                .controlSize(.mini)
-                                .tint(Color.inkSecondary)
-                        } else if let statusSymbol {
-                            Image(systemName: statusSymbol)
-                        }
-                        Text(status)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(Color.inkSecondary)
+            VStack(spacing: 12) {
+                if showingEffect, let effect {
+                    SignalGlyph(signal: effect.signal, trigger: effect.id, baseSize: 52, tint: .white)
+                        .frame(minHeight: nameSize * 1.15)
+                } else {
+                    Text(name.uppercased())
+                        .font(.system(size: nameSize, weight: .bold))
+                        .tracking(-1.5)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(minHeight: nameSize * 1.15)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                SignalGlyph(signal: effect?.signal ?? signal, trigger: effect?.id)
+                HStack(spacing: 7) {
+                    if isBusy { ProgressView().tint(.white) }
+                    else if let statusSymbol { Image(systemName: statusSymbol) }
+                    Text(status).fixedSize(horizontal: false, vertical: true)
+                }.font(.subheadline.weight(.medium))
             }
-            .multilineTextAlignment(.leading)
-            .padding(.horizontal, Tokens.Space.xl)
-            .padding(.vertical, Tokens.Space.l)
-            .frame(maxWidth: .infinity, minHeight: Tokens.personRowMinHeight, alignment: .leading)
-            .contentShape(RoundedRectangle(cornerRadius: Tokens.controlRadius))
+            .multilineTextAlignment(.center)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 24).padding(.vertical, 30)
+            .frame(maxWidth: .infinity, minHeight: minHeight)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(PersonRowStyle())
+        .buttonStyle(PersonBandStyle(color: .personBand(name)))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name)
         .accessibilityValue(status)
         .accessibilityHint(accessibilityHint)
         .accessibilityAddTraits(.isButton)
+        .task(id: effect?.id) {
+            guard effect != nil else { return }
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) { showingEffect = true }
+            try? await Task.sleep(for: .milliseconds(850))
+            guard !Task.isCancelled else { return }
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) { showingEffect = false }
+        }
     }
 }
 
-private struct PersonRowStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
+private struct PersonBandStyle: ButtonStyle {
+    let color: Color
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(
-                RoundedRectangle(cornerRadius: Tokens.controlRadius)
-                    .fill(configuration.isPressed ? Color.surfacePressed : Color.surface)
-            )
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+        configuration.label.background(color.opacity(configuration.isPressed ? 0.72 : 1))
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
     }
 }

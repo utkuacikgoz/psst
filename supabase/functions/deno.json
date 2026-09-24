@@ -1,0 +1,6 @@
+{
+  "tasks": {
+    "test": "deno test tests/",
+    "check": "deno check send-signal/index.ts delete-account/index.ts"
+  }
+}

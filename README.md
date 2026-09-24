@@ -5,7 +5,7 @@ Native SwiftUI iPhone app, iOS 17+, no third-party packages. Open `Psst.xcodepro
 The app has two modes:
 
 - **Local preview** (default, no setup): one fictional connection, Alex. Everything happens on this phone and is labelled that way.
-- **Live**, when `Config/Secrets.xcconfig` points at a Supabase project: real accounts, invites, sending, push notifications and tap-back. See [`supabase/README.md`](supabase/README.md) for setup and the two-device checklist. Live mode has not yet been run against a deployed backend or on physical devices.
+- **Live**, when `Config/Secrets.xcconfig` points at a Supabase project: real accounts, invites, sending, push notifications and tap-back. See [`supabase/README.md`](supabase/README.md) for setup and the two-device checklist. The development backend is deployed and passes the live server checks (`scripts/smoke_live.py`); push delivery on physical devices is not yet verified.
 
 ## Start Claude Code here
 Read `CLAUDE.md`, then `DESIGN.md`. This folder is an independent repository with no dependency on another project.

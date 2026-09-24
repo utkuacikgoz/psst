@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(LocalExchange.self) private var exchange
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var effect: EffectTrigger?
     @State private var showingPicker = false
@@ -33,15 +34,16 @@ struct HomeView: View {
                         .accessibilityAction(named: "Choose signal") { showingPicker = true }
 
                         signalButton
+
+                        if dynamicTypeSize.isAccessibilitySize {
+                            alexPhoneButton.padding(.top, Tokens.Space.l)
+                        }
                     }
                     .padding(.horizontal, inset)
                     .padding(.top, Tokens.Space.l)
                     .padding(.bottom, Tokens.Space.xl)
                 }
-
-                alexPhoneButton
-                    .padding(.horizontal, inset)
-                    .padding(.bottom, Tokens.Space.l)
+                .pinnedFooter(!dynamicTypeSize.isAccessibilitySize, inset: inset) { alexPhoneButton }
             }
         }
         .background(Color.psstCanvas.ignoresSafeArea())
@@ -84,25 +86,11 @@ struct HomeView: View {
     }
 
     private var signalButton: some View {
-        Button {
-            showingPicker = true
-        } label: {
-            HStack(spacing: Tokens.Space.s) {
-                Text("Signal for Alex: \(exchange.favorite.title)")
-                Spacer(minLength: Tokens.Space.s)
-                Text("Change")
-                Image(systemName: "chevron.right")
-                    .accessibilityHidden(true)
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(Color.onCanvas)
-            .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
-            .contentShape(Rectangle())
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Signal for Alex: \(exchange.favorite.title)")
-        .accessibilityHint("Opens signal choices and previews. Nothing is sent.")
-        .accessibilityAddTraits(.isButton)
+        ChangeSignalButton(
+            title: "Signal for Alex: \(exchange.favorite.title)",
+            accessibilityLabel: "Signal for Alex: \(exchange.favorite.title)",
+            accessibilityHint: "Opens signal choices and previews. Nothing is sent."
+        ) { showingPicker = true }
     }
 
     private var alexPhoneButton: some View {
@@ -112,6 +100,9 @@ struct HomeView: View {
             Label("View Alex's phone (simulated)", systemImage: "iphone")
                 .font(.body.weight(.semibold))
                 .foregroundStyle(Color.onCanvas)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Tokens.Space.m)
+                .padding(.vertical, Tokens.Space.s)
                 .frame(maxWidth: .infinity, minHeight: 50)
                 .overlay(
                     RoundedRectangle(cornerRadius: Tokens.controlRadius)

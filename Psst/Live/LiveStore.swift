@@ -64,8 +64,8 @@ final class LiveStore {
     @ObservationIgnored private var lastTapAt: [UUID: Date] = [:]
     @ObservationIgnored private var lastRegisteredToken: String?
 
-    private static let profileKey = "psst.live.profileCreated"
-    private static let notificationChoiceKey = "psst.live.notificationChoiceMade"
+    static let profileKey = "psst.live.profileCreated"
+    static let notificationChoiceKey = "psst.live.notificationChoiceMade"
 
     init(api: PsstAPI, defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init,
          sentDisplayDuration: Duration = .seconds(2)) {

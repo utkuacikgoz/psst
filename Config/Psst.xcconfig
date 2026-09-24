@@ -1,0 +1,11 @@
+// Base settings for the Psst app target.
+//
+// With no backend configured, the app runs as the labelled local preview.
+// To use a Supabase project, copy Secrets.example.xcconfig to Secrets.xcconfig
+// (git-ignored) and fill it in. See supabase/README.md.
+
+PRODUCT_BUNDLE_IDENTIFIER = app.psst.prototype
+PSST_SUPABASE_HOST =
+PSST_SUPABASE_ANON_KEY =
+
+#include? "Secrets.xcconfig"

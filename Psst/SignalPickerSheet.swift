@@ -1,60 +1,66 @@
 import SwiftUI
 
-/// Deliberate signal choice with local previews. Nothing here sends.
+/// Local-preview picker for fictional Alex.
 struct SignalPickerSheet: View {
     let personName: String
 
     @Environment(LocalExchange.self) private var exchange
     @Environment(\.dismiss) private var dismiss
-    @State private var preview: EffectTrigger?
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: Tokens.Space.l) {
-                    previewStage
-
-                    Text("Tapping \(personName) uses the selected signal. Choosing or previewing here sends nothing.")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.inkSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    VStack(spacing: Tokens.Space.m) {
-                        ForEach(Signal.allCases) { signal in
-                            SignalOptionRow(
-                                signal: signal,
-                                isSelected: exchange.favorite == signal,
-                                select: { exchange.setFavorite(signal) },
-                                preview: { play(signal) }
-                            )
-                        }
-                    }
-
-                    Text("All four signals are free to send and receive.")
-                        .font(.footnote)
-                        .foregroundStyle(Color.inkSecondary)
-                }
+                SignalChoiceContent(
+                    personName: personName,
+                    selected: exchange.favorite,
+                    onSelect: { exchange.setFavorite($0) }
+                )
                 .padding(Tokens.sheetInset)
             }
-            .background(Color.surface)
-            .navigationTitle("Signal for \(personName)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.surface, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.light, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
+            .psstSheetChrome(title: "Signal for \(personName)") { dismiss() }
         }
         .tint(Color.psstCanvas)
         .environment(\.colorScheme, .light)
+    }
+}
+
+/// Deliberate signal choice with local previews. Nothing here sends.
+struct SignalChoiceContent: View {
+    let personName: String
+    let selected: Signal
+    let onSelect: (Signal) -> Void
+
+    @State private var preview: EffectTrigger?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.l) {
+            previewStage
+
+            Text("Tapping \(personName) uses the selected signal. Choosing or previewing here sends nothing.")
+                .font(.subheadline)
+                .foregroundStyle(Color.inkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(spacing: Tokens.Space.m) {
+                ForEach(Signal.allCases) { signal in
+                    SignalOptionRow(
+                        signal: signal,
+                        isSelected: selected == signal,
+                        select: { onSelect(signal) },
+                        preview: { play(signal) }
+                    )
+                }
+            }
+
+            Text("All four signals are free to send and receive.")
+                .font(.footnote)
+                .foregroundStyle(Color.inkSecondary)
+        }
         .sensoryFeedback(trigger: preview) { _, new in new?.signal.haptic }
     }
 
     private var previewStage: some View {
-        let shown = preview?.signal ?? exchange.favorite
+        let shown = preview?.signal ?? selected
 
         return VStack(spacing: Tokens.Space.s) {
             SignalGlyph(signal: shown, trigger: preview?.id, baseSize: 48)
@@ -72,6 +78,23 @@ struct SignalPickerSheet: View {
     private func play(_ signal: Signal) {
         preview = EffectTrigger(signal: signal)
         AccessibilityNotification.Announcement("Previewing \(signal.title). Not sent.").post()
+    }
+}
+
+extension View {
+    /// White sheet surface with an inline title and a Done button.
+    func psstSheetChrome(title: String, doneTitle: String = "Done", onDone: @escaping () -> Void) -> some View {
+        background(Color.surface)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.surface, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(doneTitle, action: onDone)
+                }
+            }
     }
 }
 

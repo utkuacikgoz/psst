@@ -18,9 +18,12 @@ This repository contains only Psst, a native iPhone one-tap social app. Build th
 “Psst” remains a working name. The cobalt visual direction, paid pack prices, and backend provider are proposed, not separately approved. No revenue or retention assumptions have been validated.
 
 ## Existing implementation
-Open `Psst.xcodeproj`. It is a native SwiftUI iPhone interaction prototype, targeting iOS 17+, with no third-party packages. Alex is an explicitly fictional demo connection. The user can choose a signal, trigger a local sender reaction, switch to Alex’s recipient preview, and tap back.
+Open `Psst.xcodeproj`. It is a native SwiftUI iPhone app, targeting iOS 17+, with no third-party packages. It runs in one of two modes:
 
-The prototype must remain visibly labeled local preview. It does not establish remote delivery. It currently has no account system, invitations, backend, APNs, purchases, custom audio, or production effect animations. The favorite signal for Alex is persisted on the device only. The four effects are represented with SF Symbols, accent colours, and basic native motion. Do not claim a generated notification or “delivered” status.
+- **Local preview** (no configuration): Alex is an explicitly fictional demo connection. The user can choose a signal, trigger a local sender reaction, switch to Alex's recipient preview, and tap back. It must remain visibly labeled local preview and does not establish remote delivery.
+- **Live** (when `Config/Secrets.xcconfig` names a Supabase project): anonymous account plus display name, invites, mutual connections, authenticated send through the `send-signal` edge function, APNs push, notification "Send back", seen acknowledgements, block/remove, and account deletion. The backend is in `supabase/` with migrations and tests. Live mode compiles and is unit-tested against fakes, but it has not been run against a deployed project or on physical devices. Treat push delivery as unverified until the two-device checklist in `supabase/README.md` passes.
+
+There are no purchases, custom audio, or production effect animations yet. The four effects are represented with SF Symbols, accent colours, and basic native motion. Do not claim a generated notification or “delivered” status.
 
 Use native SwiftUI. Do not build a landing page, wrap a web app, or create Android infrastructure without a platform requirement. Evolve the included source rather than re-scaffolding repeatedly.
 

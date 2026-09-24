@@ -1,0 +1,88 @@
+name: Deploy backend (development)
+
+# Manual only: deploying changes a live service.
+# Repository secrets needed (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN   personal access token from supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_REF    the xxxx in xxxx.supabase.co (development project)
+#   SUPABASE_DB_PASSWORD    that project's database password
+#   APNS_TEAM_ID, APNS_KEY_ID, APNS_BUNDLE_ID, APNS_PRIVATE_KEY (full .p8 contents)
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend-development
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    uses: ./.github/workflows/backend.yml
+
+  deploy:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that every secret is set
+        env:
+          APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          APNS_BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+          APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
+        run: |
+          missing=0
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF SUPABASE_DB_PASSWORD \
+                      APNS_TEAM_ID APNS_KEY_ID APNS_BUNDLE_ID APNS_PRIVATE_KEY; do
+            if [ -z "${!name}" ]; then echo "::error::Repository secret $name is not set"; missing=1; fi
+          done
+          if ! grep -q "BEGIN PRIVATE KEY" <<<"$APNS_PRIVATE_KEY"; then
+            echo "::error::APNS_PRIVATE_KEY should be the full contents of the .p8 file"; missing=1
+          fi
+          exit $missing
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Apply migrations
+        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Set function secrets
+        env:
+          APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          APNS_BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+          APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
+        run: |
+          supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" \
+            APNS_TEAM_ID="$APNS_TEAM_ID" \
+            APNS_KEY_ID="$APNS_KEY_ID" \
+            APNS_BUNDLE_ID="$APNS_BUNDLE_ID" \
+            APNS_PRIVATE_KEY="$APNS_PRIVATE_KEY" > /dev/null
+          echo "Secrets set (values not printed)."
+
+      - name: Deploy functions
+        run: |
+          supabase functions deploy send-signal --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy delete-account --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Smoke test the deployed backend
+        run: |
+          SUPABASE_ANON_KEY=$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_REF" -o json | python3 -c "
+          import json, sys
+          keys = json.load(sys.stdin)
+          pick = next((k for k in keys if k.get('name') == 'anon'), None) \
+              or next((k for k in keys if k.get('type') == 'publishable'), None)
+          print(pick['api_key'] if pick else '')
+          ")
+          if [ -z "$SUPABASE_ANON_KEY" ]; then echo "::error::Couldn't read the project's anon key"; exit 1; fi
+          echo "::add-mask::$SUPABASE_ANON_KEY"
+          SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" python3 scripts/smoke_live.py

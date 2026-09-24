@@ -38,12 +38,9 @@ Limits enforced in the database: 10 signals a minute to one person, 30 a minute
 overall, 5 open invites, 10 device tokens per person. Errors come back as HTTP
 status plus a code (`not_connected`, `rate_limited`, `invite_expired`, …).
 
-Retention: signals 30 days, finished invites 30 days. Schedule the purge once
-per project (the pg_cron extension is available on Supabase):
-
-```sql
-select cron.schedule('psst-purge', '17 3 * * *', 'select private.purge_expired()');
-```
+Retention: signals 30 days, finished invites 30 days. The second migration
+schedules `private.purge_expired()` daily with pg_cron (available on Supabase;
+skipped on plain Postgres).
 
 ## Run the tests
 
@@ -63,35 +60,66 @@ tests run on plain Postgres. `.github/workflows/backend.yml` runs both suites.
 ## Set up a development project
 
 Use separate Supabase projects for development and production, each with its
-own keys. Nothing below costs money on Supabase's free tier, but creating the
-projects, the Apple key and any paid plan are your decisions.
+own keys. None of this costs money on Supabase's free tier. The Apple Developer
+membership needed for push is the only paid part.
 
-1. Create a project, then link and push the schema:
-   ```sh
-   supabase link --project-ref <ref>
-   supabase db push
-   ```
+### One-time setup (you)
+
+1. Create a Supabase project for development.
 2. **Authentication → Sign In / Providers**: turn on **Allow anonymous sign-ins**.
-3. **APNs key.** In Apple Developer → Keys, create a key with Apple Push
-   Notifications service enabled. Note its Key ID and your Team ID, and keep
-   the `.p8` file out of the repository (`*.p8` is git-ignored).
-4. Set the function secrets. `SUPABASE_URL`, `SUPABASE_ANON_KEY` and
-   `SUPABASE_SERVICE_ROLE_KEY` are provided automatically:
-   ```sh
-   supabase secrets set \
-     APNS_TEAM_ID=ABCDE12345 \
-     APNS_KEY_ID=XYZ9876543 \
-     APNS_BUNDLE_ID=com.example.psst \
-     APNS_PRIVATE_KEY="$(cat AuthKey_XYZ9876543.p8)"
-   supabase functions deploy send-signal
-   supabase functions deploy delete-account
-   ```
-5. Schedule the purge (SQL above).
-6. In the app, copy `Config/Secrets.example.xcconfig` to `Config/Secrets.xcconfig`
-   and fill in the project host, anon key, your team, and the same bundle ID
-   as `APNS_BUNDLE_ID`. Builds from Xcode register **sandbox** tokens and
-   Release builds register **production** tokens. The function sends each
-   token to the matching APNs host.
+3. Create an access token at supabase.com/dashboard/account/tokens.
+4. In Apple Developer → Keys, create a key with **Apple Push Notifications
+   service**. Note its Key ID and your Team ID. Register a bundle ID you own.
+5. In GitHub → this repo → Settings → Secrets and variables → Actions, add:
+
+   | Secret | Value |
+   |---|---|
+   | `SUPABASE_ACCESS_TOKEN` | the token from step 3 |
+   | `SUPABASE_PROJECT_REF` | the `xxxx` in `xxxx.supabase.co` |
+   | `SUPABASE_DB_PASSWORD` | the project's database password |
+   | `APNS_TEAM_ID` | 10-character team ID |
+   | `APNS_KEY_ID` | 10-character key ID |
+   | `APNS_BUNDLE_ID` | e.g. `com.yourname.psst` |
+   | `APNS_PRIVATE_KEY` | the full text of the `.p8` file, including the BEGIN/END lines |
+
+   Keep the `.p8` file itself out of the repository (`*.p8` is git-ignored).
+
+### Deploy
+
+Run **Actions → Deploy backend (development) → Run workflow**. It:
+
+1. runs the database and function tests,
+2. links the project and applies migrations (`supabase db push`),
+3. sets the APNs function secrets without printing them,
+4. deploys `send-signal` and `delete-account`,
+5. runs `scripts/smoke_live.py` against the deployed project: three throwaway
+   anonymous accounts invite, connect, send, retry (checked to be a
+   duplicate), are refused on someone else's connection, acknowledge, and are
+   deleted. It sends no push, since the test accounts have no devices.
+
+Running it again is safe: migrations apply once, and the rest is replaced.
+
+### Point the app at it
+
+Copy `Config/Secrets.example.xcconfig` to `Config/Secrets.xcconfig` on your Mac
+and fill in the project host, the anon (publishable) key, your team, and the
+same bundle ID as `APNS_BUNDLE_ID`. Builds run from Xcode register **sandbox**
+tokens and Release builds register **production** tokens. The function sends
+each token to the matching APNs host.
+
+### Without GitHub
+
+The same steps by hand, with the Supabase CLI:
+
+```sh
+supabase link --project-ref <ref>
+supabase db push
+supabase secrets set APNS_TEAM_ID=… APNS_KEY_ID=… APNS_BUNDLE_ID=… \
+  APNS_PRIVATE_KEY="$(cat AuthKey_XXXXXXXXXX.p8)"
+supabase functions deploy send-signal
+supabase functions deploy delete-account
+SUPABASE_PROJECT_REF=<ref> SUPABASE_ANON_KEY=<anon key> python3 scripts/smoke_live.py
+```
 
 For a fully local stack, `supabase start` (Docker) applies the migrations, and
 `supabase functions serve --env-file supabase/functions/.env` runs the

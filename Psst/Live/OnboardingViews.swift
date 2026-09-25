@@ -201,53 +201,7 @@ struct NotificationStepView: View {
     }
 }
 
-struct OnboardingLayout<Field: View, Actions: View>: View {
-    let title: String
-    let message: String
-    let error: String?
-    @ViewBuilder let field: Field
-    @ViewBuilder let actions: Actions
-
-    var body: some View {
-        GeometryReader { proxy in
-            let inset = Tokens.sideInset(forWidth: proxy.size.width)
-            VStack(alignment: .leading, spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: Tokens.Space.l) {
-                        Text("psst")
-                            .font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy))
-                            .tracking(Tokens.Band.wordmarkTracking)
-                            .foregroundStyle(Color.onCanvas)
-                            .padding(.bottom, Tokens.Space.xl)
-                        Text(title)
-                            .font(.system(.title, weight: .semibold))
-                            .foregroundStyle(Color.onCanvas)
-                            .accessibilityAddTraits(.isHeader)
-                        Text(message)
-                            .font(.body)
-                            .foregroundStyle(Color.onCanvasSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        field
-                        if let error {
-                            Label(error, systemImage: "exclamationmark.circle")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(Color.onCanvas)
-                        }
-                    }
-                    .padding(.horizontal, inset)
-                    .padding(.top, Tokens.Space.l)
-                }
-                .scrollDismissesKeyboard(.interactively)
-                VStack(spacing: Tokens.Space.s) { actions }
-                    .padding(.horizontal, inset)
-                    .padding(.bottom, Tokens.Space.l)
-            }
-        }
-        .background(Color.psstCanvas.ignoresSafeArea())
-    }
-}
-
-/// White filled button on the cobalt canvas.
+/// Full-width white band button on the canvas.
 struct PrimaryButton: View {
     let title: String
     var isBusy = false

@@ -142,33 +142,61 @@ private struct BlinkingCaret: View {
     }
 }
 
-/// Step 2: explain before asking, and make "Not now" a real choice.
+/// Step 2 (option P6): one plain question before iOS asks for permission.
+/// "Not now" is a real choice: signals still appear when Psst is opened.
 struct NotificationStepView: View {
     @Environment(LiveStore.self) private var store
     @State private var isAsking = false
+    @ScaledMetric(relativeTo: .largeTitle) private var questionSize: CGFloat = 40
 
     var body: some View {
-        OnboardingLayout(
-            title: "Know when someone taps you",
-            message: "Psst shows a notification with the person's name and signal. You can turn off sounds or alerts anytime in Settings. Without notifications, signals still appear here when you open Psst.",
-            error: nil
-        ) {
-            EmptyView()
-        } actions: {
-            PrimaryButton(title: "Turn on notifications", isBusy: isAsking, isEnabled: true) {
-                isAsking = true
-                Task {
-                    let granted = (try? await UNUserNotificationCenter.current()
-                        .requestAuthorization(options: [.alert, .sound])) ?? false
-                    if granted { UIApplication.shared.registerForRemoteNotifications() }
-                    isAsking = false
-                    store.finishNotificationChoice()
+        GeometryReader { proxy in
+            let inset = Tokens.sideInset(forWidth: proxy.size.width)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("psst")
+                    .font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy))
+                    .tracking(Tokens.Band.wordmarkTracking)
+                    .padding(.horizontal, inset)
+                    .padding(.vertical, Tokens.Space.l)
+
+                ScrollView {
+                    Text("Get a notification when someone taps you?")
+                        .font(.system(size: questionSize, weight: .heavy))
+                        .tracking(Tokens.Band.titleTracking)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, inset)
+                        .frame(minHeight: proxy.size.height * 0.6)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+
+                VStack(spacing: 0) {
+                    PrimaryButton(title: "Yes, notify me", isBusy: isAsking, isEnabled: true, action: allow)
+                    Button { store.finishNotificationChoice() } label: {
+                        Text("Not now")
+                            .font(.body.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: Tokens.Band.barMinHeight)
+                            .background(Color.bandShade)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityHint("Signals still appear when you open Psst.")
                 }
             }
-            Button("Not now") { store.finishNotificationChoice() }
-                .font(.body.weight(.semibold))
-                .foregroundStyle(Color.onCanvas)
-                .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
+            .foregroundStyle(Color.onCanvas)
+        }
+        .background(Color.psstCanvas.ignoresSafeArea())
+    }
+
+    private func allow() {
+        isAsking = true
+        Task {
+            let granted = (try? await UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .sound])) ?? false
+            if granted { UIApplication.shared.registerForRemoteNotifications() }
+            isAsking = false
+            store.finishNotificationChoice()
         }
     }
 }

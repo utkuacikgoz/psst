@@ -4,10 +4,11 @@ Draft for review. Grounded in the code as of 25 September 2026. Nothing here has
 
 ## Listing
 
-- **Name (store):** Psst – Tap a Friend (placeholder; "Psst" alone is taken). The home-screen name stays "Psst".
-- **Subtitle (30 chars):** One tap to say you're thinking
+- **Name (store, 26 of 30 chars):** Psst Back: Thinking of You (owner pick, 25 Sep 2026; "Psst" alone is taken). The home-screen name stays "Psst".
+- **Subtitle (28 of 30 chars):** One tap. They psst you back.
+- **Before committing:** run a trademark search (USPTO, EUIPO) and register psstback.app / psstback.com if free. Domain checks were blocked from the build environment.
 - **Category:** Social Networking
-- **Keywords:** tap,nudge,yo,thinking of you,friends,couples,poke,hello,psst
+- **Keywords:** tap,nudge,yo,friends,couples,poke,hello,whisper,miss you,partner
 - **Description:**
 
   Tap a person. They get a small signal. They can send one back without typing a thing.

@@ -11,7 +11,7 @@ final class AppStoreScreenshotTests: XCTestCase {
 
     func testAppStoreScreens() {
         let app = XCUIApplication()
-        app.launchArguments += ["-PsstUITestLive", "store", "-PsstUITestHoldMoments"]
+        app.launchArguments += ["-PsstUITestLive", "store", "-PsstUITestHoldMoments", "-PsstUITestPlusPrice"]
         app.launch()
 
         // Ada's Psst is waiting, so the app opens on her full-screen moment.
@@ -47,6 +47,38 @@ final class AppStoreScreenshotTests: XCTestCase {
         app.buttons["Connect with Kim"].tap()
         wait(1.1)
         shot("05-welcome")
+
+        // Psst+ before buying: also the purchase's App Review screenshot.
+        XCTAssertTrue(app.buttons["Kim is in. You're connected."].waitForNonExistence(timeout: 12))
+        app.buttons["Psst+"].tap()
+        XCTAssertTrue(app.buttons["Unlock for $2.99"].waitForExistence(timeout: 5))
+        wait(0.6)
+        shot("06-psst-plus")
+    }
+
+    /// Psst+ after buying: icon and sound choices, and a person's colour.
+    func testPsstPlusUnlocked() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-PsstUITestLive", "store", "-PsstUITestPlusUnlocked"]
+        app.launch()
+
+        let ada = app.buttons["Ada"]
+        XCTAssertTrue(ada.waitForExistence(timeout: 10))
+        // Let Ada's arrival play out before opening anything.
+        wait(3)
+        app.buttons["Psst+"].tap()
+        XCTAssertTrue(app.buttons["Play Whisper"].waitForExistence(timeout: 5))
+        wait(0.6)
+        shot("07-psst-plus-unlocked")
+        app.buttons["Done"].tap()
+        wait(0.8)
+
+        app.buttons["Emre"].press(forDuration: 1.0)
+        XCTAssertTrue(app.buttons["Colour…"].waitForExistence(timeout: 5))
+        app.buttons["Colour…"].tap()
+        XCTAssertTrue(app.staticTexts["Only your phone shows this."].waitForExistence(timeout: 5))
+        wait(0.6)
+        shot("08-colour")
     }
 
     private func wait(_ seconds: TimeInterval) {

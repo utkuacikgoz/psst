@@ -27,7 +27,25 @@ final class Purchases {
 
     @ObservationIgnored private var updates: Task<Void, Never>?
 
+    /// The price to show: the App Store's, or a sample in screenshot runs.
+    var displayPrice: String? { product?.displayPrice ?? Self.sampleUITestPrice }
+
+    #if DEBUG
+    /// Screenshot runs have no App Store connection: -PsstUITestPlusPrice shows
+    /// a sample price, and -PsstUITestPlusUnlocked shows the unlocked sheet.
+    private static let sampleUITestPrice: String? =
+        ProcessInfo.processInfo.arguments.contains("-PsstUITestPlusPrice") ? "$2.99" : nil
+    private static let uiTestUnlocked = ProcessInfo.processInfo.arguments.contains("-PsstUITestPlusUnlocked")
+    #else
+    private static let sampleUITestPrice: String? = nil
+    private static let uiTestUnlocked = false
+    #endif
+
     init() {
+        if Self.uiTestUnlocked {
+            isUnlocked = true
+            return
+        }
         updates = Task { [weak self] in
             for await update in StoreKit.Transaction.updates {
                 await self?.handle(update)

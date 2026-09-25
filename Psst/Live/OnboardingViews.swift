@@ -1,40 +1,107 @@
 import SwiftUI
 import UserNotifications
 
-/// Step 1: the only identity Psst asks for.
+/// Step 1: the only identity Psst asks for. You type straight into your own
+/// band, which is how you'll appear on the other person's phone.
 struct NameStepView: View {
     @Environment(LiveStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var name = ""
     @State private var isSaving = false
     @State private var error: String?
     @FocusState private var focused: Bool
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = Tokens.Band.titleSize
 
     private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
-        OnboardingLayout(
-            title: "What should people see?",
-            message: "Your name appears on the other person's phone when you send a signal. It's the only thing Psst asks for.",
-            error: error
-        ) {
-            TextField("", text: $name, prompt: Text("Your name").foregroundStyle(Color.inkSecondary))
-                .font(.title3)
-                .foregroundStyle(Color.ink)
-                .textContentType(.givenName)
-                .submitLabel(.continue)
-                .focused($focused)
-                .onSubmit(save)
-                .padding(.horizontal, Tokens.Space.l)
-                .frame(minHeight: Tokens.Band.barMinHeight)
-                .background(RoundedRectangle(cornerRadius: Tokens.controlRadius).fill(Color.surface))
-                .accessibilityLabel("Your name")
-                .onChange(of: name) { _, new in
-                    if new.count > 40 { name = String(new.prefix(40)) }
+        GeometryReader { proxy in
+            let inset = Tokens.sideInset(forWidth: proxy.size.width)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("psst")
+                        .font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy))
+                        .tracking(Tokens.Band.wordmarkTracking)
+                        .padding(.horizontal, inset)
+                        .padding(.vertical, Tokens.Space.l)
+
+                    Text("YOUR NAME")
+                        .font(.footnote.weight(.semibold))
+                        .tracking(Tokens.Band.labelTracking)
+                        .padding(.horizontal, inset)
+                        .padding(.top, Tokens.Space.s)
+                        .padding(.bottom, Tokens.Space.s)
+                        .accessibilityHidden(true)
+
+                    nameBand(inset: inset)
+
+                    if let error {
+                        Label(error, systemImage: "exclamationmark.circle")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, inset)
+                            .padding(.top, Tokens.Space.l)
+                    }
                 }
-        } actions: {
+                .foregroundStyle(Color.onCanvas)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollDismissesKeyboard(.never)
+        }
+        .background(Color.psstCanvas.ignoresSafeArea())
+        // Rides just above the keyboard.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             PrimaryButton(title: "Continue", isBusy: isSaving, isEnabled: !trimmed.isEmpty, action: save)
         }
         .onAppear { focused = true }
+    }
+
+    /// The real text field is underneath, so typing, VoiceOver and autofill work
+    /// normally. On top, the band shows the name the way contact bands do
+    /// (uppercase). The name is saved as typed.
+    private func nameBand(inset: CGFloat) -> some View {
+        let color = Color.personBand(trimmed.isEmpty ? "psst" : trimmed)
+        return VStack(spacing: Tokens.Space.m) {
+            ZStack {
+                TextField("", text: $name)
+                    .font(.system(size: titleSize, weight: .bold))
+                    .foregroundStyle(.clear)
+                    .tint(.clear)
+                    .multilineTextAlignment(.center)
+                    .textContentType(.givenName)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.continue)
+                    .focused($focused)
+                    .onSubmit(save)
+                    .accessibilityLabel("Your name")
+                    .accessibilityHint("Shown on the other person's phone when you send a signal.")
+                    .onChange(of: name) { _, new in
+                        if new.count > 40 { name = String(new.prefix(40)) }
+                    }
+
+                HStack(spacing: 2) {
+                    Text(trimmed.isEmpty ? "NAME" : name.uppercased())
+                        .bandTitle(trimmed.isEmpty ? "NAME" : name, size: titleSize, tracking: Tokens.Band.titleTracking)
+                        .opacity(trimmed.isEmpty ? 0.55 : 1)
+                        .multilineTextAlignment(.center)
+                    if focused { BlinkingCaret(height: titleSize) }
+                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+            .frame(minHeight: titleSize * 1.2)
+
+            Text("This band is you on their phone")
+                .font(.subheadline.weight(.medium))
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, inset)
+        .padding(.vertical, Tokens.Band.verticalPadding)
+        .frame(maxWidth: .infinity)
+        .background(color)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: color)
+        .contentShape(Rectangle())
+        .onTapGesture { focused = true }
     }
 
     private func save() {
@@ -51,6 +118,27 @@ struct NameStepView: View {
             }
             isSaving = false
         }
+    }
+}
+
+/// A text cursor for the band, which draws its own lettering. Steady with Reduce Motion.
+private struct BlinkingCaret: View {
+    let height: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var visible = true
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.white)
+            .frame(width: 3, height: height * 0.8)
+            .opacity(visible ? 1 : 0)
+            .task {
+                guard !reduceMotion else { return }
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(530))
+                    visible.toggle()
+                }
+            }
     }
 }
 

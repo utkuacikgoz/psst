@@ -29,7 +29,7 @@ final class Purchases {
 
     init() {
         updates = Task { [weak self] in
-            for await update in Transaction.updates {
+            for await update in StoreKit.Transaction.updates {
                 await self?.handle(update)
             }
         }
@@ -77,7 +77,7 @@ final class Purchases {
         await refreshEntitlement()
     }
 
-    private func handle(_ result: VerificationResult<Transaction>) async {
+    private func handle(_ result: VerificationResult<StoreKit.Transaction>) async {
         // Unverified transactions never unlock anything.
         if case .verified(let transaction) = result {
             await transaction.finish()
@@ -87,7 +87,7 @@ final class Purchases {
 
     private func refreshEntitlement() async {
         var unlocked = false
-        for await result in Transaction.currentEntitlements {
+        for await result in StoreKit.Transaction.currentEntitlements {
             if case .verified(let transaction) = result,
                Self.grants(productID: transaction.productID, revocationDate: transaction.revocationDate) {
                 unlocked = true

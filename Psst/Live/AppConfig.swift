@@ -16,6 +16,11 @@ struct AppConfig {
         return AppConfig(baseURL: url, anonKey: key)
     }()
 
+    /// Public pages (site/, hosted on Vercel).
+    static let privacyURL = URL(string: "https://psstapp.fun/privacy")!
+    static let termsURL = URL(string: "https://psstapp.fun/terms")!
+    static let supportURL = URL(string: "https://psstapp.fun/support")!
+
     /// APNs environment of this build's device tokens.
     static var pushEnvironment: String {
         #if DEBUG

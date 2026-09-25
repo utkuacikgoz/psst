@@ -25,5 +25,5 @@ As of 25 September 2026, `main`. "Automated" runs on every push in GitHub Action
 ## Known gaps
 
 - **Reports** are stored and block the person. The owner reviews them regularly by hand (`docs/REPORTS.md`); there is no automated alert.
-- The **app icon** is provisional (wordmark on purple).
+- The **app icon** is final: the white "psst" wordmark on #713F93, owner-approved. Psst+ adds Night, Gold and Pink versions.
 - Push delivery is only as good as APNs acceptance, which isn't device receipt. The app says "seen" only after the recipient's app displayed the signal.

@@ -66,4 +66,4 @@ A privacy policy URL is required before submission. This text needs a public hom
 - Reports: the owner reviews the `reports` table regularly (at least weekly) using `docs/REPORTS.md`. Reporting already blocks the person in the app. For the review notes: users can report and block from the long-press menu or Settings → People, and reports are reviewed by the developer.
 - The age rating questionnaire: the app lets connected people see each other's chosen names, with no free-text messaging.
 - A production Supabase project and a production TestFlight/App Store build pointed at it. TestFlight currently uses the development project.
-- Real app icon and screenshots.
+- App Store screenshots. (The app icon is final: the white "psst" wordmark on purple, approved by the owner on 25 Sep 2026.)

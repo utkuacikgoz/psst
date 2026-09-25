@@ -33,6 +33,12 @@ final class LiveScreenshotTests: XCTestCase {
         wait(0.4)
         shot("live-03-arrival")
         wait(2.2)
+        // Then the one-time tap-and-hold tip; tapping it only dismisses it.
+        let tip = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Tip'")).firstMatch
+        XCTAssertTrue(tip.waitForExistence(timeout: 5))
+        shot("live-04a-tip")
+        tip.tap()
+        wait(0.5)
         shot("live-04-home")
 
         // Answering Ada right after her Psst is a same moment.

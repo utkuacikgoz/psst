@@ -76,6 +76,11 @@ struct LiveHomeView: View {
         }
         .background(Color.psstCanvas.ignoresSafeArea())
         .overlay {
+            if store.showsCoach && store.hasLoadedConnections {
+                CoachOverlay { withAnimation { store.dismissCoach() } }
+            }
+        }
+        .overlay {
             if let arrival = store.arrival {
                 ArrivalView(arrival: arrival,
                             onTap: { withAnimation { store.psstBack(arrival) } },
@@ -347,5 +352,53 @@ struct NoticeView: View {
         .frame(maxWidth: .infinity, minHeight: Tokens.minTouch, alignment: .leading)
         .background(Color.black.opacity(0.28))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Option Y3: shown once. Any tap dismisses it without sending anything.
+struct CoachOverlay: View {
+    let onDismiss: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pressing = false
+
+    var body: some View {
+        Button(action: onDismiss) {
+            VStack(spacing: Tokens.Space.l) {
+                Image(systemName: "hand.tap.fill")
+                    .font(.system(size: 56))
+                    .scaleEffect(pressing ? 0.88 : 1)
+                    .accessibilityHidden(true)
+                Text("Tap a band to psst")
+                    .font(.title2.weight(.heavy))
+                Text("Hold to move someone or remove them")
+                    .font(.body.weight(.medium))
+                Text("Tap anywhere to start")
+                    .font(.footnote.weight(.semibold))
+                    .opacity(0.8)
+                    .padding(.top, Tokens.Space.l)
+            }
+            .multilineTextAlignment(.center)
+            .foregroundStyle(Color.onCanvas)
+            .padding(Tokens.Space.xl)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.black.opacity(0.6).ignoresSafeArea())
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .transition(.opacity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Tip: tap a band to send a Psst. Hold a band to move someone or remove them.")
+        .accessibilityHint("Dismisses the tip.")
+        .accessibilityAddTraits(.isButton)
+        .task {
+            guard !reduceMotion else { return }
+            while !Task.isCancelled {
+                withAnimation(.easeInOut(duration: 0.35)) { pressing = true }
+                try? await Task.sleep(for: .milliseconds(450))
+                withAnimation(.easeInOut(duration: 0.35)) { pressing = false }
+                try? await Task.sleep(for: .milliseconds(1100))
+            }
+        }
     }
 }

@@ -44,6 +44,7 @@ final class LiveStore {
     static let pauseDuration: TimeInterval = 60
     static let welcomedKey = "psst.live.welcomedConnections"
     static let pinnedOrderKey = "psst.live.pinnedOrder"
+    static let coachKey = "psst.live.coachShown"
 
     private(set) var phase: Phase = .loading
     private(set) var connections: [ConnectionSummary] = []
@@ -86,6 +87,7 @@ final class LiveStore {
         self.defaults = defaults
         self.now = now
         self.sentDisplayDuration = sentDisplayDuration
+        coachDismissed = defaults.bool(forKey: Self.coachKey)
         pinnedOrder = (defaults.stringArray(forKey: Self.pinnedOrderKey) ?? []).compactMap(UUID.init(uuidString:))
     }
 
@@ -190,6 +192,21 @@ final class LiveStore {
         latestEffect = trigger
     }
 
+    // MARK: Tap-and-hold tip (Y3)
+
+    /// Shown once, over home, the first time there's someone to tap and no
+    /// full-screen moment is playing.
+    var showsCoach: Bool {
+        !coachDismissed && !connections.isEmpty && arrival == nil
+    }
+
+    private(set) var coachDismissed = false
+
+    func dismissCoach() {
+        coachDismissed = true
+        defaults.set(true, forKey: Self.coachKey)
+    }
+
     // MARK: Order (O2, plus dragging)
 
     /// Pinned people first in the order placed, then new people, then everyone
@@ -239,6 +256,8 @@ final class LiveStore {
     func resetOrder() {
         pinnedOrder = []
         defaults.removeObject(forKey: Self.pinnedOrderKey)
+        defaults.removeObject(forKey: Self.coachKey)
+        coachDismissed = false
         reorderByRecency()
     }
 

@@ -54,6 +54,7 @@ The owner explicitly chose **Yo** after rejecting the earlier cobalt-card design
 - After the server's pacing limit (10 a minute to one person), the band dims and reads "Try again in 0:42"; taps are ignored until then.
 - Offline, notifications off and ended connections appear as a full-width dark strip under the wordmark, never as a pop-up.
 - Home order: pinned people first (anyone you placed by holding and dragging a band onto another), then everyone else most recent first. The recency order refreshes only when home appears, never while you're tapping, so a band never moves under a finger. VoiceOver offers Move up / Move down. Settings → People can reset to most recent. The placed order stays on the phone.
+- The first time home has someone to tap, a one-time dark overlay shows a tapping hand: "Tap a band to psst" / "Hold to move someone or remove them". Any tap only dismisses it; it never sends.
 - The notification's button reads "Psst back".
 - Same moment: when both people psst each other within 10 seconds by the server's clock, both phones show your purple half above their colour with a white SAME MOMENT label, for about 2.5 seconds. At most one per pair per minute. Tapping closes it without sending.
 - The shared invite reads: "I want to be able to psst you. Tap to join me (code K7QX4MPA)." plus the link. An invite link opens the I HAVE A CODE step with the code filled in.

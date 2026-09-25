@@ -209,6 +209,27 @@ class BackendTests(unittest.TestCase):
         with self.fails("invalid_sound", 422):
             emre.rpc("set_notification_sound", "../evil.caf")
 
+    def test_daily_metrics_are_aggregate_counts(self):
+        ada, emre, sam = new_user("Ada"), new_user("Emre"), new_user("Sam")
+        conn = connect(ada, emre)
+        connect(ada, sam)
+        ada.rpc("send_signal", uuid.uuid4(), conn, "psst")
+        self.assertIsNone(admin("select first_two_way_at from public.connections where id = %s", conn)[0][0])
+        emre.rpc("send_signal", uuid.uuid4(), conn, "psst")
+        self.assertIsNotNone(admin("select first_two_way_at from public.connections where id = %s", conn)[0][0])
+        emre.rpc("set_notification_status", False)
+        ada.rpc("set_notification_status", True)
+        sam.rpc("block_user", ada.user_id)
+
+        admin("select private.snapshot_metrics(current_date)")
+        admin("select private.snapshot_metrics(current_date)")  # re-running replaces the day
+        row = admin("""select accepted_invites >= 2, signals >= 2, two_way_pairs >= 1, first_two_way_pairs >= 1,
+                              blocks >= 1, notifications_off >= 1, notifications_reported >= 2
+                       from private.metrics_daily where day = current_date""")
+        self.assertEqual(row, [(True, True, True, True, True, True, True)])
+        with self.assertRaises(errors.InsufficientPrivilege):
+            ada.rows("select * from private.metrics_daily")
+
     def test_same_moment_within_ten_seconds(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         conn = connect(ada, emre)

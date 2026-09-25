@@ -28,6 +28,11 @@ on:
       - "scripts/export_screenshots.py"
       - ".github/workflows/ios.yml"
   workflow_dispatch:
+    inputs:
+      appstore:
+        description: "App Store screenshots (full-size 6.9\" PNGs) instead of the review set"
+        type: boolean
+        default: false
 
 # One iOS run per branch at a time: a newer push or manual run cancels the
 # older one, so macOS runners never stack up.
@@ -57,7 +62,7 @@ jobs:
 
   # One shard per phone and text size, in parallel.
   screenshots:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && !inputs.appstore
     runs-on: macos-15
     timeout-minutes: 25
     strategy:
@@ -81,7 +86,8 @@ jobs:
           TEST_RUNNER_PSST_SIZE_LABEL="${SIZE##*:}" xcodebuild test \
             -project Psst.xcodeproj -scheme Psst \
             -destination "id=$UDID" \
-            -only-testing:PsstUITests \
+            -only-testing:PsstUITests/ScreenshotTests \
+            -only-testing:PsstUITests/LiveScreenshotTests \
             -resultBundlePath results.xcresult \
             CODE_SIGNING_ALLOWED=NO || status=1
           # Export whatever was captured, even if a later step failed.
@@ -103,10 +109,47 @@ jobs:
           if-no-files-found: warn
           retention-days: 1
 
+  # Full-resolution App Store screenshots on the 6.9" iPhone, with Apple's
+  # clean status bar (9:41, full battery).
+  appstore-screenshots:
+    if: github.event_name == 'workflow_dispatch' && inputs.appstore
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 26
+        run: scripts/select_xcode.sh
+      - name: Capture App Store screenshots
+        run: |
+          set -o pipefail
+          UDID=$(python3 scripts/pick_simulators.py large)
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl ui "$UDID" content_size large
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 \
+            --wifiBars 3 --cellularMode active --cellularBars 4 --operatorName ""
+          xcodebuild test \
+            -project Psst.xcodeproj -scheme Psst \
+            -destination "id=$UDID" \
+            -only-testing:PsstUITests/AppStoreScreenshotTests \
+            -resultBundlePath appstore.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+          python3 scripts/export_screenshots.py appstore.xcresult exported
+          mkdir -p appstore
+          for f in exported/*.png; do
+            cp "$f" "appstore/$(basename "$f" | sed 's/^appstore__6.9__//')"
+          done
+          sips -g pixelWidth -g pixelHeight appstore/*.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appstore
+          path: appstore
+          retention-days: 1
+
   # Replaces the single commit on the `screenshots` branch, so old images never
   # pile up in history or on main.
   publish-screenshots:
-    needs: screenshots
+    needs: [screenshots, appstore-screenshots]
     if: always() && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -114,10 +157,16 @@ jobs:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
+        if: ${{ !inputs.appstore }}
         with:
           pattern: review-*
           path: review
           merge-multiple: true
+      - uses: actions/download-artifact@v4
+        if: ${{ inputs.appstore }}
+        with:
+          name: appstore
+          path: review/appstore
       - name: Force-push the screenshots branch
         run: |
           [ -d review ] && [ -n "$(ls -A review)" ] || { echo "No screenshots to publish."; exit 0; }

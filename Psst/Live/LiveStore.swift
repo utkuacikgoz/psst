@@ -414,6 +414,17 @@ final class LiveStore {
 
     // MARK: Notifications
 
+    @ObservationIgnored private var reportedNotificationStatus: Bool?
+
+    /// Measurement (docs/METRICS.md): tells the server whether notifications
+    /// are on, only when it changes. Nothing else about the device is sent.
+    func reportNotificationStatus(enabled: Bool) async {
+        guard enabled != reportedNotificationStatus, api.isSignedIn else { return }
+        if (try? await api.setNotificationStatus(enabled)) != nil {
+            reportedNotificationStatus = enabled
+        }
+    }
+
     func registerDeviceToken(_ token: String) async {
         guard token != lastRegisteredToken, api.isSignedIn, defaults.bool(forKey: Self.profileKey) else { return }
         if (try? await api.registerDeviceToken(token, environment: AppConfig.pushEnvironment)) != nil {

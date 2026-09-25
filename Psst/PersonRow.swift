@@ -28,11 +28,15 @@ struct PersonRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(minHeight: nameSize * 1.15)
                 }
-                HStack(spacing: Tokens.Space.s) {
-                    if isBusy { ProgressView().tint(.white) }
-                    else if let statusSymbol { Image(systemName: statusSymbol) }
-                    Text(status).fixedSize(horizontal: false, vertical: true)
-                }.font(.subheadline.weight(.medium))
+                // Yo classic: the line appears only when something happened.
+                if isBusy || !status.isEmpty {
+                    HStack(spacing: Tokens.Space.s) {
+                        if isBusy { ProgressView().tint(.white) }
+                        else if let statusSymbol { Image(systemName: statusSymbol) }
+                        Text(status).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.subheadline.weight(.medium))
+                }
             }
             .multilineTextAlignment(.center)
             .foregroundStyle(.white)

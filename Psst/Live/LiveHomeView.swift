@@ -50,11 +50,18 @@ struct LiveHomeView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         notices.padding(.horizontal, inset)
                         if store.connections.isEmpty {
-                            if store.hasLoadedConnections { emptyState }
-                        } else {
-                            ForEach(store.connections) { connection in
-                                row(connection, minHeight: store.connections.count == 1 ? max(160, proxy.size.height * 0.38) : 144)
+                            if store.hasLoadedConnections {
+                                emptyState
+                                addBand(minHeight: Tokens.personRowMinHeight)
                             }
+                        } else {
+                            // Yo classic (H2): people and the + band share the screen
+                            // equally; with many people each keeps a minimum and scrolls.
+                            let bandHeight = Self.bandHeight(available: proxy.size.height, people: store.connections.count)
+                            ForEach(store.connections) { connection in
+                                row(connection, minHeight: bandHeight)
+                            }
+                            addBand(minHeight: bandHeight)
                         }
                         if dynamicTypeSize.isAccessibilitySize { settingsButton }
                     }
@@ -121,18 +128,31 @@ struct LiveHomeView: View {
                 .foregroundStyle(Color.onCanvas)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
-            Button {
-                showingInvite = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(.title3, weight: .semibold))
-                    .foregroundStyle(Color.onCanvas)
-                    .frame(width: Tokens.minTouch, height: Tokens.minTouch)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel("Invite someone")
         }
         .padding(.vertical, Tokens.Space.l)
+    }
+
+    /// Splits the space below the header and above Settings between the people
+    /// and the + band, but never below the band minimum.
+    static func bandHeight(available: CGFloat, people: Int) -> CGFloat {
+        let chrome: CGFloat = 150 // header and Settings footer, approximately
+        let share = (available - chrome) / CGFloat(people + 1)
+        return max(Tokens.personRowMinHeight, share)
+    }
+
+    /// The gold + band that ends the list, as in Yo. Opens the invite sheet.
+    private func addBand(minHeight: CGFloat) -> some View {
+        Button {
+            showingInvite = true
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: Tokens.Band.wordmarkSize, weight: .light))
+                .foregroundStyle(Color.onCanvas)
+                .frame(maxWidth: .infinity, minHeight: minHeight)
+                .background(Color.addBand)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Invite someone")
     }
 
     @ViewBuilder private var notices: some View {
@@ -159,9 +179,8 @@ struct LiveHomeView: View {
                 .font(.body)
                 .foregroundStyle(Color.onCanvas)
                 .fixedSize(horizontal: false, vertical: true)
-            PrimaryButton(title: "Invite someone") { showingInvite = true }
         }
-        .padding(.top, Tokens.Space.xl)
+        .padding(.vertical, Tokens.Space.xl)
         .padding(.horizontal, Tokens.Space.xl)
     }
 
@@ -195,14 +214,15 @@ struct LiveHomeView: View {
 
     static func text(for status: LiveRowStatus) -> String {
         switch status {
-        case .ready(let signal): "Tap to send \(signal.title)"
+        // Yo classic: a band shows a line only when something happened.
+        case .ready: ""
         case .sending: "Sending…"
         case .sent: "Sent"
         case .notSent: "Not sent · Retry"
         case .paused: "Paused after several taps · Retry later"
         case .seen(let signal): "\(signal.title) · seen"
         case .sentEarlier(let signal): "\(signal.title) · sent"
-        case .received(let name, let signal): "\(name) sent \(signal.title)"
+        case .received(let name, let signal): "\(name) sent a \(signal.title)"
         }
     }
 

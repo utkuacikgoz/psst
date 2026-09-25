@@ -63,6 +63,7 @@ struct SettingsSheet: View {
                                     .foregroundStyle(.tertiary)
                             }
                         }
+                        .tint(.primary)
                         .accessibilityLabel("Manage \(connection.otherName)")
                     }
                     if !store.pinnedOrder.isEmpty {

@@ -99,7 +99,10 @@ final class LiveScreenshotTests: XCTestCase {
         wait(0.6)
         shot("live-13-settings")
 
-        app.buttons["Manage Ada"].tap()
+        // At the largest text sizes the people are below the fold.
+        let manageAda = app.buttons["Manage Ada"]
+        for _ in 0..<4 where !manageAda.isHittable { app.swipeUp() }
+        manageAda.tap()
         XCTAssertTrue(app.buttons["Remove Ada"].waitForExistence(timeout: 5))
         wait(0.6)
         shot("live-08-person")

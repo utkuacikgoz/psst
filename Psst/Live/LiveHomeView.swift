@@ -154,10 +154,20 @@ struct LiveHomeView: View {
             updateVisibility()
             // A code that arrived before home existed (e.g. during onboarding).
             if store.pendingInviteCode != nil { showingInvite = true }
+            if store.plusRequested { showingPlus = true; store.plusRequested = false }
         }
         .onDisappear { store.isHomeVisible = false }
         .onChange(of: anySheet) { updateVisibility() }
         .onChange(of: scenePhase) { updateVisibility() }
+        .onChange(of: store.plusRequested) { _, requested in
+            if requested { showingPlus = true; store.plusRequested = false }
+        }
+        // Keep the home-screen widget's people, colours and Psst+ state current.
+        .task(id: widgetSignature) {
+            WidgetBridge.publish(
+                WidgetBridge.people(from: store.orderedConnections) { personalization.colorHex(for: $0, name: $1) },
+                unlocked: purchases.isUnlocked)
+        }
         .onChange(of: store.pendingInviteCode) { _, code in
             if code != nil { showingInvite = true }
         }
@@ -166,6 +176,12 @@ struct LiveHomeView: View {
         .manageConnection(menuFor: $managing, confirming: $confirming)
         .sheet(isPresented: $showingPlus) { PsstPlusSheet() }
         .sheet(item: $colouring) { ColourSheet(connection: $0) }
+    }
+
+    private var widgetSignature: String {
+        let people = store.orderedConnections.prefix(3)
+            .map { "\($0.id)|\($0.otherName)|\(personalization.colorHex(for: $0.id, name: $0.otherName))" }
+        return people.joined(separator: ",") + "|\(purchases.isUnlocked)"
     }
 
     /// Settings, and Psst+ beside it (PP2): always there, never in the way.

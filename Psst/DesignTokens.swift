@@ -81,9 +81,13 @@ extension Color {
 extension Color {
     /// Stable name-derived colours: reordering contacts does not change their identity.
     static func personBand(_ name: String) -> Color {
+        Color(hex: personBandHex(name))
+    }
+
+    static func personBandHex(_ name: String) -> UInt32 {
         let palette: [UInt32] = [0x2476AA, 0x187F69, 0xB34F2B, 0xAC3E68, 0x5F61AE]
         let seed = name.lowercased().unicodeScalars.reduce(0) { ($0 + Int($1.value)) % palette.count }
-        return Color(hex: palette[seed])
+        return palette[seed]
     }
     static let addBand = Color(hex: 0xB87500)
     /// Shade for the bar that follows a band (opens the picker, never sends).

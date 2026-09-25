@@ -6,7 +6,18 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A10000000000000000000072 /* PsstWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A10000000000000000000060 /* PsstWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		A10000000000000000000069 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000062;
+			remoteInfo = PsstWidget;
+		};
 		A10000000000000000000019 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A10000000000000000000001 /* Project object */;
@@ -23,7 +34,25 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		A10000000000000000000071 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A10000000000000000000072 /* PsstWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		A10000000000000000000060 /* PsstWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PsstWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000073 /* Widget.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Widget.xcconfig; sourceTree = "<group>"; };
+		A10000000000000000000074 /* PsstWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PsstWidget.entitlements; sourceTree = "<group>"; };
+		A10000000000000000000075 /* PsstWidget-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PsstWidget-Info.plist"; sourceTree = "<group>"; };
 		A10000000000000000000004 /* Psst.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Psst.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000005 /* PsstTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PsstTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000031 /* PsstUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PsstUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -34,6 +63,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		A10000000000000000000061 /* PsstWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PsstWidget;
+			sourceTree = "<group>";
+		};
 		A10000000000000000000006 /* Psst */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Psst;
@@ -52,6 +86,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A10000000000000000000064 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A10000000000000000000013 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -80,6 +121,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000006 /* Psst */,
+				A10000000000000000000061 /* PsstWidget */,
 				A10000000000000000000050 /* Config */,
 				A10000000000000000000007 /* PsstTests */,
 				A10000000000000000000032 /* PsstUITests */,
@@ -93,6 +135,7 @@
 				A10000000000000000000004 /* Psst.app */,
 				A10000000000000000000005 /* PsstTests.xctest */,
 				A10000000000000000000031 /* PsstUITests.xctest */,
+				A10000000000000000000060 /* PsstWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -104,6 +147,9 @@
 				A10000000000000000000054 /* Secrets.example.xcconfig */,
 				A10000000000000000000052 /* Info.plist */,
 				A10000000000000000000053 /* Psst.entitlements */,
+				A10000000000000000000073 /* Widget.xcconfig */,
+				A10000000000000000000075 /* PsstWidget-Info.plist */,
+				A10000000000000000000074 /* PsstWidget.entitlements */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -111,6 +157,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		A10000000000000000000062 /* PsstWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000000000000000000068 /* Build configuration list for PBXNativeTarget "PsstWidget" */;
+			buildPhases = (
+				A10000000000000000000063 /* Sources */,
+				A10000000000000000000064 /* Frameworks */,
+				A10000000000000000000065 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A10000000000000000000061 /* PsstWidget */,
+			);
+			name = PsstWidget;
+			packageProductDependencies = (
+			);
+			productName = PsstWidget;
+			productReference = A10000000000000000000060 /* PsstWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		A10000000000000000000010 /* Psst */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A10000000000000000000023 /* Build configuration list for PBXNativeTarget "Psst" */;
@@ -118,10 +186,12 @@
 				A10000000000000000000012 /* Sources */,
 				A10000000000000000000013 /* Frameworks */,
 				A10000000000000000000014 /* Resources */,
+				A10000000000000000000071 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A10000000000000000000070 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A10000000000000000000006 /* Psst */,
@@ -189,6 +259,9 @@
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					A10000000000000000000062 = {
+						CreatedOnToolsVersion = 16.0;
+					};
 					A10000000000000000000010 = {
 						CreatedOnToolsVersion = 16.0;
 					};
@@ -219,11 +292,19 @@
 				A10000000000000000000010 /* Psst */,
 				A10000000000000000000011 /* PsstTests */,
 				A10000000000000000000033 /* PsstUITests */,
+				A10000000000000000000062 /* PsstWidget */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		A10000000000000000000065 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A10000000000000000000014 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -248,6 +329,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		A10000000000000000000063 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A10000000000000000000012 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -272,6 +360,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		A10000000000000000000070 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000062 /* PsstWidget */;
+			targetProxy = A10000000000000000000069 /* PBXContainerItemProxy */;
+		};
 		A10000000000000000000018 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = A10000000000000000000010 /* Psst */;
@@ -285,6 +378,50 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		A10000000000000000000066 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000073 /* Widget.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Psst;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A10000000000000000000067 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000073 /* Widget.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Psst;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		A10000000000000000000021 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -481,6 +618,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A10000000000000000000068 /* Build configuration list for PBXNativeTarget "PsstWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000066 /* Debug */,
+				A10000000000000000000067 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A10000000000000000000020 /* Build configuration list for PBXProject "Psst" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -510,7 +510,11 @@ final class LiveParsingTests: XCTestCase {
 
     func testInviteLinks() {
         XCTAssertEqual(InviteLink.code(from: URL(string: "psst://invite/abcd-efgh")!), "ABCDEFGH")
-        XCTAssertEqual(CreatedInvite(code: "ABCDEFGH", expiresAt: Date()).link.absoluteString, "psst://invite/ABCDEFGH")
+        XCTAssertEqual(CreatedInvite(code: "ABCDEFGH", expiresAt: Date()).link.absoluteString, "https://psstapp.fun/invite/ABCDEFGH")
+        XCTAssertEqual(InviteLink.code(from: URL(string: "https://psstapp.fun/invite/k7qx4mpa")!), "K7QX4MPA")
+        XCTAssertEqual(InviteLink.code(from: URL(string: "https://www.psstapp.fun/invite/K7QX-4MPA")!), "K7QX4MPA")
+        XCTAssertNil(InviteLink.code(from: URL(string: "https://psstapp.fun/privacy")!))
+        XCTAssertNil(InviteLink.code(from: URL(string: "https://example.com/invite/ABCD")!))
         XCTAssertEqual(CreatedInvite(code: "ABCDEFGH", expiresAt: Date()).displayCode, "ABCD EFGH")
         XCTAssertNil(InviteLink.code(from: URL(string: "psst://other/ABCD")!))
         XCTAssertNil(InviteLink.code(from: URL(string: "https://invite/ABCD")!))
@@ -548,5 +552,38 @@ final class PsstPlusTests: XCTestCase {
 
         reloaded.setColor(nil, for: ada)
         XCTAssertNil(Personalization(defaults: defaults).colors[ada])
+    }
+}
+
+@MainActor
+final class WidgetTests: XCTestCase {
+    func testWidgetLinks() {
+        let id = UUID()
+        guard case .psst(let parsed)? = WidgetLink(URL(string: "psst://psst/\(id.uuidString)")!) else {
+            return XCTFail("psst link")
+        }
+        XCTAssertEqual(parsed, id)
+        guard case .plus? = WidgetLink(URL(string: "psst://plus")!) else { return XCTFail("plus link") }
+        XCTAssertNil(WidgetLink(URL(string: "psst://psst/not-a-uuid")!))
+        XCTAssertNil(WidgetLink(URL(string: "psst://invite/ABCDEFGH")!), "invites are handled elsewhere")
+    }
+
+    func testWidgetGetsTheFirstThreePeopleAndOnlyChangesOnChange() throws {
+        let suite = "WidgetTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let people = ["Zoe", "Mia", "Ava", "Lily"].map {
+            ConnectionSummary(connectionId: UUID(), otherId: UUID(), otherName: $0, lastEventId: nil, lastFromMe: nil,
+                              lastEffect: nil, lastCreatedAt: nil, lastSeenAt: nil, unseenCount: 0)
+        }
+        let shown = WidgetBridge.people(from: people) { _, name in name == "Mia" ? 0xC2185B : 0x2476AA }
+        XCTAssertEqual(shown.map(\.name), ["Zoe", "Mia", "Ava"])
+        XCTAssertEqual(shown[1].color, 0xC2185B)
+
+        WidgetBridge.publish(shown, unlocked: true, to: defaults)
+        let stored = try JSONDecoder().decode([WidgetBridge.Person].self,
+                                              from: XCTUnwrap(defaults.data(forKey: WidgetBridge.peopleKey)))
+        XCTAssertEqual(stored, shown)
+        XCTAssertTrue(defaults.bool(forKey: WidgetBridge.unlockedKey))
     }
 }

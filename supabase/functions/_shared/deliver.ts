@@ -38,7 +38,9 @@ export function buildPayload(targets: PushTargets) {
         title: targets.sender_name,
         body: EFFECT_TITLES[targets.effect_id] ?? "Signal",
       },
-      sound: "default",
+      // Bundled in the app (Psst/psst.wav). iOS falls back to the default
+      // sound if the file is missing; silent mode and Focus still apply.
+      sound: "psst.wav",
       category: "SIGNAL",
       "thread-id": targets.connection_id,
     },

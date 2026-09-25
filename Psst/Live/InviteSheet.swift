@@ -135,7 +135,7 @@ struct InviteSheet: View {
             if let invite {
                 ShareLink(
                     item: invite.link,
-                    message: Text("Connect with me on Psst. Open this link, or enter the code \(invite.code).")
+                    message: Text("I want to be able to psst you. Tap to join me (code \(invite.code)).")
                 ) {
                     Label("Share invite", systemImage: "square.and.arrow.up")
                         .font(.body.weight(.semibold))

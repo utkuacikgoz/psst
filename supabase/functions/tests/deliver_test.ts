@@ -39,6 +39,7 @@ Deno.test("payload names the sender first and carries routing data", () => {
   const payload = buildPayload(targets());
   assertEquals(payload.aps.alert, { title: "Ada", body: "Psst" });
   assertEquals(payload.aps.category, "SIGNAL");
+  assertEquals(payload.aps.sound, "psst.wav"); // bundled in the app
   assertEquals(payload.psst.event_id, EVENT);
   assertEquals(payload.psst.effect_id, "psst");
   // Well under APNs' 4 KB limit even with a 40-character name.

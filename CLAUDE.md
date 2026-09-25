@@ -12,6 +12,7 @@ This repository contains only Psst, a native iPhone one-tap social app. Build th
 - Sending is one tap on the person.
 - **One signal: Psst.** The owner removed Squeeze, Oi and Duck on 25 Sep 2026, along with choosing, previewing and per-connection favourite signals. Don't reintroduce other signals or a signal picker without the owner's approval.
 - Receivers control sound and notifications.
+- **Monetization (owner pick, 25 Sep 2026):** one optional "Psst+" one-time unlock with personal extras only: custom band colours, alternate app icons, a choice of whisper sounds, and later the widget. Sending, receiving, Psst back and invites stay free. The price is a hypothesis ($2.99–$4.99). Build it with StoreKit 2 and sandbox testing only, and ideally after TestFlight shows people returning.
 - First prototype: one person, four signals, and the receiving/replying experience.
 - Mobile app first, concise updates, careful token use, and exceptional execution without template clutter.
 

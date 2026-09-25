@@ -55,6 +55,8 @@ The terms are a plain-language draft, not legal advice. Have them reviewed, incl
 
 ## Before submission
 
+- App Review: follow `docs/APP_REVIEW_NOTES.md`. Make two fresh invite codes on your phone and paste the notes with them. You psst back during review.
+
 - Create the in-app purchase in App Store Connect: non-consumable, product ID `psstplus.unlock`, reference name "Psst+ unlock", with a price tier (the $2.99 hypothesis is unvalidated). Sandbox purchases in TestFlight need it; `Config/PsstPlus.storekit` covers local Xcode runs (Scheme → Run → Options → StoreKit Configuration).
 
 - Deploy `site/` on Vercel (see above), and make support@psstapp.fun receive mail.

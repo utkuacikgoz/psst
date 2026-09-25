@@ -16,7 +16,7 @@ This repository contains only Psst, a native iPhone one-tap social app. Build th
 - First prototype: one person, four signals, and the receiving/replying experience.
 - Mobile app first, concise updates, careful token use, and exceptional execution without template clutter.
 
-“Psst” remains a working name. The owner chose the original Yo as the visual reference after rejecting the cobalt-card design. Follow the revised colour-band direction in DESIGN.md. Paid pack prices remain hypotheses. No revenue or retention assumptions have been validated.
+“Psst” is the brand and home-screen name. The App Store listing is **Psst Back: Thinking of You** (owner pick, 25 Sep 2026), because “Psst” alone is taken. Spell it psst, never pst. The owner chose the original Yo as the visual reference after rejecting the cobalt-card design. Follow the revised colour-band direction in DESIGN.md. Paid pack prices remain hypotheses. No revenue or retention assumptions have been validated.
 
 ## Existing implementation
 Open `Psst.xcodeproj`. It is a native SwiftUI iPhone app, targeting iOS 17+, with no third-party packages. It runs in one of two modes:

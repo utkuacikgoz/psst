@@ -1,18 +1,42 @@
 name: iOS build and tests
 
+# Unit tests run on pushes to main and on pull requests that touch the app.
+# Screenshots are costly (four simulator runs), so they run only when asked
+# for (Actions → iOS build and tests → Run workflow).
 on:
   push:
+    branches: [main]
+    paths:
+      - "Psst/**"
+      - "PsstTests/**"
+      - "PsstUITests/**"
+      - "Psst.xcodeproj/**"
+      - "Config/**"
+      - "scripts/select_xcode.sh"
+      - "scripts/pick_simulators.py"
+      - "scripts/export_screenshots.py"
+      - ".github/workflows/ios.yml"
   pull_request:
+    paths:
+      - "Psst/**"
+      - "PsstTests/**"
+      - "PsstUITests/**"
+      - "Psst.xcodeproj/**"
+      - "Config/**"
+      - "scripts/select_xcode.sh"
+      - "scripts/pick_simulators.py"
+      - "scripts/export_screenshots.py"
+      - ".github/workflows/ios.yml"
   workflow_dispatch:
 
 concurrency:
-  group: ios-${{ github.ref }}
+  group: ios-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
   unit-tests:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26
@@ -27,53 +51,76 @@ jobs:
             -only-testing:PsstTests \
             CODE_SIGNING_ALLOWED=NO
 
+  # One shard per phone and text size, in parallel.
   screenshots:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15
-    timeout-minutes: 45
-    permissions:
-      contents: write
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        phone: [compact, large]
+        size: ["large:standard", "accessibility-extra-extra-extra-large:ax-xxxl"]
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26
         run: scripts/select_xcode.sh
-      - name: Capture screenshots on a compact and a large iPhone
+      - name: Capture screenshots
         run: |
           set -o pipefail
+          SIZE="${{ matrix.size }}"
+          UDID=$(python3 scripts/pick_simulators.py "${{ matrix.phone }}")
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl ui "$UDID" content_size "${SIZE%%:*}"
           status=0
-          for kind in compact large; do
-            UDID=$(python3 scripts/pick_simulators.py "$kind")
-            xcrun simctl boot "$UDID" || true
-            xcrun simctl bootstatus "$UDID" -b
-            for size in large:standard accessibility-extra-extra-extra-large:ax-xxxl; do
-              xcrun simctl ui "$UDID" content_size "${size%%:*}"
-              TEST_RUNNER_PSST_SIZE_LABEL="${size##*:}" xcodebuild test \
-                -project Psst.xcodeproj -scheme Psst \
-                -destination "id=$UDID" \
-                -only-testing:PsstUITests \
-                -resultBundlePath "results-$kind-${size##*:}.xcresult" \
-                CODE_SIGNING_ALLOWED=NO || status=1
-              # Export whatever was captured, even if a later step failed.
-              python3 scripts/export_screenshots.py "results-$kind-${size##*:}.xcresult" screenshots || true
-            done
+          TEST_RUNNER_PSST_SIZE_LABEL="${SIZE##*:}" xcodebuild test \
+            -project Psst.xcodeproj -scheme Psst \
+            -destination "id=$UDID" \
+            -only-testing:PsstUITests \
+            -resultBundlePath results.xcresult \
+            CODE_SIGNING_ALLOWED=NO || status=1
+          # Export whatever was captured, even if a later step failed.
+          python3 scripts/export_screenshots.py results.xcresult screenshots || true
+          # Small JPEG review copies; the PNGs are discarded.
+          mkdir -p review
+          for f in screenshots/*.png; do
+            [ -e "$f" ] || continue
+            name=$(basename "${f%.png}" | tr ' ' '-' | tr -d '()')
+            sips -s format jpeg -s formatOptions 70 --resampleWidth 540 "$f" --out "review/$name.jpg" >/dev/null \
+              || echo "::warning::Skipped unreadable image $f"
           done
           exit $status
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: screenshots
-          path: screenshots
+          name: review-${{ matrix.phone }}-${{ strategy.job-index }}
+          path: review
           if-no-files-found: warn
-      - name: Commit review copies (manual runs only)
-        if: always() && github.event_name == 'workflow_dispatch'
+          retention-days: 1
+
+  # Replaces the single commit on the `screenshots` branch, so old images never
+  # pile up in history or on main.
+  publish-screenshots:
+    needs: screenshots
+    if: always() && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: review-*
+          path: review
+          merge-multiple: true
+      - name: Force-push the screenshots branch
         run: |
-          rm -rf docs/screenshots && mkdir -p docs/screenshots
-          for f in screenshots/*.png; do
-            name=$(basename "${f%.png}" | tr ' ' '-' | tr -d '()')
-            sips -s format jpeg -s formatOptions 70 --resampleWidth 540 "$f" --out "docs/screenshots/$name.jpg" >/dev/null \
-              || echo "::warning::Skipped unreadable image $f"
-          done
+          [ -d review ] && [ -n "$(ls -A review)" ] || { echo "No screenshots to publish."; exit 0; }
+          cd review
+          git init -q -b screenshots
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/screenshots
-          git diff --cached --quiet || git commit -m "Update screenshots from CI [skip ci]"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git add -A
+          git commit -q -m "Screenshots for ${GITHUB_SHA::7} [skip ci]"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" screenshots

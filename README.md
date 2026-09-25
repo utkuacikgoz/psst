@@ -37,7 +37,7 @@ xcodebuild test -project Psst.xcodeproj -scheme Psst \
   -destination 'platform=iOS Simulator,name=iPhone 16' \
   -only-testing:PsstTests CODE_SIGNING_ALLOWED=NO
 ```
-`.github/workflows/ios.yml` runs the unit tests on every push, and runs `PsstUITests` on a compact and a large iPhone at standard and accessibility text sizes. The screenshots are uploaded as a `screenshots` artifact. `.github/workflows/backend.yml` runs the database and edge-function tests.
+`.github/workflows/ios.yml` runs the unit tests on pushes to `main` and on pull requests that change the app. Screenshots run only when started by hand (Actions → iOS build and tests → Run workflow): four parallel shards (compact and large iPhone × standard and largest accessibility text), with JPEG review copies force-pushed as the single commit on the `screenshots` branch. Their artifacts expire after a day, and `.github/workflows/cleanup.yml` sweeps older artifacts and runs weekly. `.github/workflows/backend.yml` runs the database and edge-function tests.
 
 - `PsstTests/LocalExchangeTests.swift`: the local preview rules (every tap is Psst, unique IDs, idempotent retry, tap coalescing, burst pause, receipt only after display, tap-back).
 - `PsstTests/LiveStoreTests.swift`: live rules against a fake API (onboarding phases, sign-out, retry reusing the event ID, taps ignored while sending, rate-limit and ended-connection handling, acking only while visible, idempotent notification reply, account deletion), and parsing of Postgres timestamps, rows, errors, push payloads and invite links.
@@ -68,4 +68,4 @@ PsstTests/, PsstUITests/
 ## Visual direction
 The owner-selected reference is the original Yo: edge-to-edge colour bands, oversized contact names, and direct tap feedback. Demo, recipient view, and live contact rows share the revised language. The app has one signal, Psst. Existing networking, authorization, notification, and exchange state logic is retained. See `DESIGN.md`.
 
-Validation for the Yo-inspired revision: 34 existing unit tests passed, the final simulator build succeeded, and local send → effect selection → recipient → tap-back was checked in the running iPhone 17 Pro simulator. The checked-in `docs/screenshots` images predate this visual revision. Physical-device push delivery and the deployed backend remain unverified.
+Validation for the Yo-inspired revision: 34 existing unit tests passed, the final simulator build succeeded, and local send → effect selection → recipient → tap-back was checked in the running iPhone 17 Pro simulator. Physical-device push delivery and the deployed backend remain unverified.

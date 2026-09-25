@@ -2,7 +2,7 @@ name: TestFlight
 
 # Manual only: builds a signed release pointed at the chosen backend and uploads
 # it to App Store Connect for TestFlight (and, from there, App Store release).
-# Production reads PROD_SUPABASE_PROJECT_REF (and PROD_SUPABASE_ACCESS_TOKEN if
+# Production reads SUPABASE_PROJECT_REF_PROD (and SUPABASE_ACCESS_TOKEN_PROD if
 # set); see deploy-backend.yml.
 #
 # Repository secrets needed, besides the backend ones already set:
@@ -31,14 +31,14 @@ jobs:
     environment: ${{ inputs.target }}
     env:
       TARGET: ${{ inputs.target }}
-      PROD_REF: ${{ secrets.PROD_SUPABASE_PROJECT_REF }}
+      PROD_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
       TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
       BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
-      SUPABASE_ACCESS_TOKEN: ${{ inputs.target == 'production' && secrets.PROD_SUPABASE_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_PROJECT_REF: ${{ inputs.target == 'production' && secrets.PROD_SUPABASE_PROJECT_REF || secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_ACCESS_TOKEN: ${{ inputs.target == 'production' && secrets.SUPABASE_ACCESS_TOKEN_PROD || secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ inputs.target == 'production' && secrets.SUPABASE_PROJECT_REF_PROD || secrets.SUPABASE_PROJECT_REF }}
       BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +54,7 @@ jobs:
             if [ -z "${!name}" ]; then echo "::error::Secret for $name is not set"; missing=1; fi
           done
           if [ "$TARGET" = production ] && [ -z "$PROD_REF" ]; then
-            echo "::error::PROD_SUPABASE_PROJECT_REF is not set; a production build must not point at development."
+            echo "::error::SUPABASE_PROJECT_REF_PROD is not set; a production build must not point at development."
             missing=1
           fi
           exit $missing

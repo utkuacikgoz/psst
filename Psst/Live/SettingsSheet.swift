@@ -13,6 +13,7 @@ struct SettingsSheet: View {
     @State private var isDeleting = false
     @State private var deleteError: String?
     @State private var managing: ConnectionSummary?
+    @State private var confirming: ConnectionAction?
 
     var body: some View {
         // Option S3: the standard grouped iPhone list.
@@ -110,9 +111,9 @@ struct SettingsSheet: View {
             notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
             blocked = (try? await store.api.listBlocked()) ?? []
         }
-        .sheet(item: $managing, onDismiss: {
+        .manageConnection(menuFor: $managing, confirming: $confirming) {
             Task { blocked = (try? await store.api.listBlocked()) ?? blocked }
-        }) { ConnectionSheet(connection: $0) }
+        }
         .confirmationDialog("Delete your account?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete account", role: .destructive, action: deleteAccount)
             Button("Cancel", role: .cancel) {}

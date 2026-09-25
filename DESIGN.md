@@ -48,7 +48,8 @@ The owner explicitly chose **Yo** after rejecting the earlier cobalt-card design
 - Purple canvas (`#713F93`); white type on strong blue, teal, orange, pink, and violet bands. Contact colour is stable for a name, not a network status.
 - Header uses a bold 40-point “psst” wordmark. Contact names begin at 52 points and scale with Dynamic Type. Long names wrap instead of clipping.
 - No rounded contact cards, perimeter gutters, outlines, persistent decorative symbols, or large explanatory paragraphs.
-- The entire person band sends a Psst, the only signal. Nothing else lives inside the band. Removing or blocking a person is a separate action: Settings → People, a long press on the band, or the VoiceOver "Manage" action.
+- The entire person band sends a Psst, the only signal. Nothing else lives inside the band. Remove, Block and Report are separate: a long press on the band (the iPhone context menu), Settings → People or the VoiceOver "Manage" action (the standard action sheet). Each asks for confirmation with a one-line explanation before anything happens. Report also blocks.
+- Before anyone accepts, home is a single gold band: INVITE YOUR FIRST PERSON.
 - A single connection gets a larger band; multiple connections become a scrollable stack. Never invent contacts to fill space.
 - In the local demo, one concise notice identifies the fictional contact and local-only exchange. Do not repeat the full disclaimer in every control. Preserve honest statuses and VoiceOver hints.
 - There is no signal picker: the owner reduced the app to one signal, Psst (25 Sep 2026).

@@ -45,6 +45,17 @@ final class LiveScreenshotTests: XCTestCase {
         wait(1.2)
         shot("live-07-not-sent")
 
+        app.buttons["Emre"].press(forDuration: 1.0)
+        XCTAssertTrue(app.buttons["Report Emre"].waitForExistence(timeout: 5))
+        wait(0.4)
+        shot("live-09-long-press")
+        app.buttons["Report Emre"].tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
+        wait(0.3)
+        shot("live-09b-report-confirm")
+        app.alerts.firstMatch.buttons["Cancel"].tap()
+        wait(0.6)
+
         app.buttons["Invite someone"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Share my invite"].waitForExistence(timeout: 5))
         wait(0.4)

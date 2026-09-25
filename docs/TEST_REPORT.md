@@ -8,7 +8,7 @@ As of 25 September 2026, `main`. "Automated" runs on every push in GitHub Action
 |---|---|---|
 | Local preview rules | 12 unit tests (`LocalExchangeTests`): every tap is Psst, unique IDs, idempotent retry, tap coalescing, burst pause and resume, receipt only after display, tap-back | Pass |
 | Live app rules | 22 unit tests (`LiveStoreTests`, `LiveParsingTests`) against a fake API: onboarding phases, sign-out, retry reuses the event ID, taps ignored while sending, rate-limit and ended-connection handling, acknowledge only while visible, idempotent notification reply, account deletion, timestamp / row / error / payload / invite-link parsing | Pass |
-| Database authorization | 23 tests on real Postgres with row-level security: invite statuses (pending, own, used, already connected, revoked, expired, invalid), mutual connection, send only on your own connection, event-ID hijack refused, unknown or paid effect refused, rate limits, recipient-only acknowledgement, per-side favorites, other pairs invisible, direct writes denied, anonymous role denied, push functions server-only, block / unblock, remove, device-token move and cleanup, token cap, cascading deletion, 30-day purge | Pass |
+| Database authorization | 24 tests on real Postgres with row-level security: invite statuses (pending, own, used, already connected, revoked, expired, invalid), mutual connection, send only on your own connection, event-ID hijack refused, unknown or paid effect refused, rate limits, recipient-only acknowledgement, per-side favorites, other pairs invisible, direct writes denied, anonymous role denied, push functions server-only, block / unblock, report (records once a day and blocks; unreadable by clients), remove, device-token move and cleanup, token cap, cascading deletion, 30-day purge | Pass |
 | Push function | 15 Deno tests: ES256 provider token verifies, token reuse window, APNs hosts and headers, error-reason parsing, dead-token classification, per-device outcomes, no re-push once accepted, handler auth and validation | Pass |
 | Deployed backend | `scripts/smoke_live.py`, 20 checks with throwaway accounts: unauthenticated send refused, invite create / preview / accept / used, send accepted with "no devices" (never "delivered"), same-ID retry is a duplicate, stranger can't send or see, recipient-only seen, account deletion | Pass |
 | Screens | UI tests on iPhone SE and iPhone 17 Pro Max at standard and largest accessibility text: local demo (10 states) and live screens against a Debug-only scripted backend (14 states). Images in `docs/screenshots/` | Pass, reviewed |
@@ -24,6 +24,6 @@ As of 25 September 2026, `main`. "Automated" runs on every push in GitHub Action
 
 ## Known gaps
 
-- There's no **report** action yet. Blocking exists, but App Store guideline 1.2 expects a way to report objectionable content for apps where people see each other's names.
+- **Reports** are stored and block the person, but nobody reviews them yet. Guideline 1.2 expects prompt action on reports before release.
 - The **app icon** is provisional (wordmark on purple).
 - Push delivery is only as good as APNs acceptance, which isn't device receipt. The app says "seen" only after the recipient's app displayed the signal.

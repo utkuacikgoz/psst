@@ -47,6 +47,8 @@ final class FakeAPI: PsstAPI {
     func listOpenInvites() async throws -> [OpenInvite] { [] }
     func revokeInvite(code: String) async throws {}
     func setNotificationSound(_ file: String) async throws {}
+    var reportedStatuses: [Bool] = []
+    func setNotificationStatus(_ enabled: Bool) async throws { reportedStatuses.append(enabled) }
     func registerDeviceToken(_ token: String, environment: String) async throws {}
     func deleteAccount() async throws { isSignedIn = false }
     func signOutLocally() { isSignedIn = false }
@@ -115,6 +117,13 @@ final class LiveStoreTests: XCTestCase {
         await store.acceptIntroInvite() // idempotent with the one finish started
         XCTAssertNil(store.invitedBy)
         XCTAssertNil(store.pendingInviteCode)
+    }
+
+    func testNotificationStatusIsReportedOnlyWhenItChanges() async {
+        await store.reportNotificationStatus(enabled: true)
+        await store.reportNotificationStatus(enabled: true)
+        await store.reportNotificationStatus(enabled: false)
+        XCTAssertEqual(api.reportedStatuses, [true, false])
     }
 
     func testExpiredSessionReturnsToName() async throws {

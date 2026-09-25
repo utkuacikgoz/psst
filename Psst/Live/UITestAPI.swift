@@ -11,6 +11,8 @@ final class UITestAPI: PsstAPI {
         case tour
         /// Signed in with no connections yet.
         case empty
+        /// The tour's people, already signed in, for App Store screenshots.
+        case store
     }
 
     static let defaultsSuite = "psst.uitest"
@@ -23,9 +25,12 @@ final class UITestAPI: PsstAPI {
               let defaults = UserDefaults(suiteName: defaultsSuite)
         else { return nil }
         defaults.removePersistentDomain(forName: defaultsSuite)
-        if scenario == .empty {
+        if scenario != .tour {
             defaults.set(true, forKey: LiveStore.profileKey)
             defaults.set(true, forKey: LiveStore.notificationChoiceKey)
+        }
+        if scenario == .store {
+            defaults.set(true, forKey: LiveStore.coachKey)
         }
         return LiveStore(api: UITestAPI(scenario: scenario), defaults: defaults)
     }
@@ -42,8 +47,8 @@ final class UITestAPI: PsstAPI {
     var isSignedIn: Bool
 
     init(scenario: Scenario) {
-        isSignedIn = scenario == .empty
-        guard scenario == .tour else { return }
+        isSignedIn = scenario != .tour
+        guard scenario != .empty else { return }
         names = [ada: "Ada", emre: "Emre", sam: "Sam"]
         last = [ada: (false, .psst, false), emre: (true, .psst, true)]
         unseen = [UnseenSignal(id: UUID(), connectionId: ada, senderId: UUID(), senderName: "Ada",
@@ -114,6 +119,7 @@ final class UITestAPI: PsstAPI {
     }
     func revokeInvite(code: String) async throws { openInvites.removeAll { $0 == code } }
     func setNotificationSound(_ file: String) async throws {}
+    func setNotificationStatus(_ enabled: Bool) async throws {}
     func registerDeviceToken(_ token: String, environment: String) async throws {}
     func deleteAccount() async throws { isSignedIn = false }
     func signOutLocally() { isSignedIn = false }

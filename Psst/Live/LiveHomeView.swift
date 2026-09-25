@@ -207,6 +207,8 @@ struct LiveHomeView: View {
     private func updateNotificationStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         notificationsOff = settings.authorizationStatus == .denied
+        await store.reportNotificationStatus(enabled: settings.authorizationStatus == .authorized
+                                             || settings.authorizationStatus == .provisional)
         if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
             UIApplication.shared.registerForRemoteNotifications()
         }

@@ -12,6 +12,19 @@
 4. **Sign-in required:** No. There's no login; the account is created anonymously.
 5. Contact information: your name, phone and email, so Apple can reach you if something's unclear.
 
+## Memorable codes (used for the 1.0 submission)
+
+The 1.0 submission used `PSSTTEAM` and `PSSTBACK`. They were created for the **Psst Team** profile in the production SQL editor, valid for 30 days:
+
+```sql
+insert into public.invites (code, inviter_id, expires_at)
+select v.code, p.id, now() + interval '30 days'
+from public.profiles p, (values ('PSSTTEAM'), ('PSSTBACK')) as v(code)
+where p.display_name = 'Psst Team';
+```
+
+For a later submission, pick two new unused codes; each works once.
+
 ## While in review
 
 - Keep your phone's notifications **on** for Psst. When the reviewer's Psst arrives, psst back within a few minutes. Try once to psst back within 10 seconds, so they can see SAME MOMENT.

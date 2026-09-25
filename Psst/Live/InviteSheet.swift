@@ -156,9 +156,9 @@ struct InviteSheet: View {
             } catch APIError.server(_, "too_many_invites") {
                 createError = "You have 5 open invites. Wait for one to be used or expire."
             } catch APIError.offline {
-                createError = "You're offline. Connect and try again."
+                createError = "No internet right now. Try again once you're online."
             } catch {
-                createError = "Couldn't create an invite. Try again."
+                createError = "That invite didn't happen. Try again?"
             }
             isCreating = false
         }
@@ -231,7 +231,7 @@ struct InviteSheet: View {
         case .alreadyConnected: "You're already connected with \(name)."
         case .revoked: "This invite was cancelled. Ask for a new one."
         case .expired: "This invite has expired. Ask for a new one."
-        case .invalid: "That code doesn't match an invite. Check it and try again."
+        case .invalid: "Hmm, that code doesn't match an invite. Check it and try again."
         }
     }
 
@@ -244,9 +244,9 @@ struct InviteSheet: View {
             do {
                 preview = try await store.api.previewInvite(code: trimmed)
             } catch APIError.offline {
-                enterError = "You're offline. Connect and try again."
+                enterError = "No internet right now. Try again once you're online."
             } catch {
-                enterError = "Couldn't check that code. Try again."
+                enterError = "That code didn't check out. Try again?"
             }
             isChecking = false
         }
@@ -260,11 +260,11 @@ struct InviteSheet: View {
                 _ = try await store.acceptInvite(code: code)
                 dismiss()
             } catch APIError.offline {
-                enterError = "You're offline. Connect and try again."
+                enterError = "No internet right now. Try again once you're online."
             } catch {
                 // The invite changed since it was checked; show its current state.
                 preview = try? await store.api.previewInvite(code: code)
-                if preview == nil { enterError = "Couldn't connect. Try again." }
+                if preview == nil { enterError = "That didn't connect. Try again?" }
             }
             isAccepting = false
         }

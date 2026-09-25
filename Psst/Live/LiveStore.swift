@@ -55,6 +55,8 @@ final class LiveStore {
     private(set) var latestEffect: EffectTrigger?
     /// A Psst that just arrived, shown full screen for a moment (R2).
     var arrival: Arrival?
+    /// MA2: the senders still to show, oldest first, so the newest comes last.
+    private(set) var arrivalQueue: [Arrival] = []
     private(set) var isOffline = false
     private(set) var hasLoadedConnections = false
     /// A short, factual message for the home screen (e.g. a connection that ended).
@@ -175,11 +177,21 @@ final class LiveStore {
         for (connectionID, signal) in newest where connections.contains(where: { $0.id == connectionID }) {
             play(EffectTrigger(id: signal.id, signal: signal.signal), on: connectionID)
         }
-        // One full-screen moment: the most recent sender.
-        if let latest = newest.values.filter({ s in connections.contains { $0.id == s.connectionId } })
-            .max(by: { $0.createdAt < $1.createdAt }) {
-            arrival = Arrival(id: latest.id, connectionID: latest.connectionId, senderName: latest.senderName,
-                              kind: latest.sameMoment == true ? .sameMoment : .signal)
+        // MA2: one full-screen moment per sender, one after another, newest last.
+        let senders = newest.values
+            .filter { s in connections.contains { $0.id == s.connectionId } }
+            .sorted { $0.createdAt < $1.createdAt }
+        let many = senders.count > 1
+        let moments = senders.enumerated().map { index, s in
+            Arrival(id: s.id, connectionID: s.connectionId, senderName: s.senderName,
+                    kind: s.sameMoment == true ? .sameMoment : .signal,
+                    position: many ? index + 1 : nil, total: many ? senders.count : nil)
+        }
+        if arrival == nil, let first = moments.first {
+            arrival = first
+            arrivalQueue = Array(moments.dropFirst())
+        } else {
+            arrivalQueue += moments
         }
         let shown = unseen.filter { signal in connections.contains { $0.id == signal.connectionId } }.map(\.id)
         if (try? await api.ackSignals(shown)) != nil, let updated = try? await api.listConnections() {
@@ -319,7 +331,7 @@ final class LiveStore {
             let name = connections.first { $0.id == connectionID }?.otherName
             sendStates[connectionID] = nil
             connections.removeAll { $0.id == connectionID }
-            notice = name.map { "You're no longer connected with \($0)." } ?? "That connection has ended."
+            notice = name.map { "\($0) isn't here any more." } ?? "That person isn't here any more."
         } catch APIError.server(429, _) {
             isOffline = false
             pausedUntil[connectionID] = now().addingTimeInterval(Self.pauseDuration)
@@ -380,10 +392,15 @@ final class LiveStore {
         }
     }
 
+    /// The current moment finished (or was tapped): show the next sender, if any.
+    func nextArrival() {
+        arrival = arrivalQueue.isEmpty ? nil : arrivalQueue.removeFirst()
+    }
+
     /// Tapping the arrival sends a Psst back to that person. Tapping a same
     /// moment just closes it: you've both already pssted.
     func psstBack(_ arrival: Arrival) {
-        self.arrival = nil
+        nextArrival()
         guard arrival.kind != .sameMoment else { return }
         if let connection = connections.first(where: { $0.id == arrival.connectionID }) {
             tap(connection)
@@ -417,6 +434,8 @@ final class LiveStore {
         defaults.removeObject(forKey: Self.pinnedOrderKey)
         pinnedOrder = []
         recencyOrder = []
+        arrival = nil
+        arrivalQueue = []
         pausedUntil = [:]
         connections = []
         sendStates = [:]

@@ -112,9 +112,9 @@ struct NameStepView: View {
             do {
                 try await store.createProfile(name: trimmed)
             } catch APIError.offline {
-                error = "You're offline. Connect to the internet and try again."
+                error = "No internet right now. Try again once you're back online."
             } catch {
-                self.error = "Couldn't save your name. Try again."
+                self.error = "That didn't save. Give it another go?"
             }
             isSaving = false
         }

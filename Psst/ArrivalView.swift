@@ -10,6 +10,9 @@ struct Arrival: Identifiable, Equatable {
     let connectionID: UUID?
     let senderName: String
     var kind: Kind = .signal
+    /// MA2: when several people pssted, each gets a moment; "2 of 3".
+    var position: Int? = nil
+    var total: Int? = nil
 }
 
 /// The person's colour fills the screen for a moment, then it settles back
@@ -22,6 +25,18 @@ struct ArrivalView: View {
 
     static let displayTime: Duration = .milliseconds(1800)
     static let sameMomentTime: Duration = .milliseconds(2600)
+    /// Each moment in a sequence is shorter, so three people don't take all day.
+    static let queuedTime: Duration = .milliseconds(1400)
+
+    private var holdTime: Duration {
+        if arrival.kind == .sameMoment { return Self.sameMomentTime }
+        return arrival.total == nil ? Self.displayTime : Self.queuedTime
+    }
+
+    private var countPrefix: String {
+        guard let position = arrival.position, let total = arrival.total else { return "" }
+        return "\(position) of \(total) · "
+    }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = 70
@@ -33,7 +48,7 @@ struct ArrivalView: View {
 
     private var announcement: String {
         switch arrival.kind {
-        case .signal: "Psst from \(name)"
+        case .signal: "\(countPrefix)Psst from \(name)"
         case .joined: "\(name) is in. You're connected."
         case .sameMoment: "Same moment. You and \(name) pssted each other at the same time."
         }
@@ -67,7 +82,7 @@ struct ArrivalView: View {
             AccessibilityNotification.Announcement(announcement).post()
             try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 150))
             trigger = arrival.id
-            try? await Task.sleep(for: arrival.kind == .sameMoment ? Self.sameMomentTime : Self.displayTime)
+            try? await Task.sleep(for: holdTime)
             guard !Task.isCancelled else { return }
             onDone()
         }
@@ -94,7 +109,7 @@ struct ArrivalView: View {
                     .tracking(Tokens.Band.titleTracking)
                     .opacity(0.9)
             }
-            Text(arrival.kind == .signal ? "Tap to psst back" : "Tap to send your first Psst")
+            Text(arrival.kind == .signal ? "\(countPrefix)Tap to psst back" : "Tap to send your first Psst")
                 .font(.subheadline.weight(.medium))
                 .padding(.top, Tokens.Space.l)
         }

@@ -56,6 +56,8 @@ The owner explicitly chose **Yo** after rejecting the earlier cobalt-card design
 - Home order: pinned people first (anyone you placed by holding and dragging a band onto another), then everyone else most recent first. The recency order refreshes only when home appears, never while you're tapping, so a band never moves under a finger. VoiceOver offers Move up / Move down. Settings → People can reset to most recent. The placed order stays on the phone.
 - When several people pssted while you were away, each gets their own full-screen moment in turn (about 1.4 s each, newest last), labelled "1 of 3 · Tap to psst back". Tapping one pssts that person back and moves on.
 - Problem lines are short, true and a bit playful: "Didn't make it · tap to try again", "Offline · taps won't get through", "Ada isn't here any more." Never blame the person, and never claim something was sent when it wasn't.
+- Settings lists your open invites (unused, not cancelled, not expired) with their code, time left and Cancel. Home shows people only.
+- After Delete account the app returns straight to the name screen.
 - Accounts are anonymous and live on one phone. On a new phone you choose your name again and re-invite your people (owner decision NP1).
 - The first time home has someone to tap, a one-time dark overlay shows a tapping hand: "Tap a band to psst" / "Hold to move someone or remove them". Any tap only dismisses it; it never sends.
 - The notification's button reads "Psst back".

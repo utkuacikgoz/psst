@@ -46,6 +46,16 @@ struct CreatedInvite: Decodable, Equatable {
     var displayCode: String { code.count == 8 ? "\(code.prefix(4)) \(code.suffix(4))" : code }
 }
 
+/// One of your own invites nobody has used yet (Settings → Open invites).
+struct OpenInvite: Decodable, Identifiable, Equatable {
+    let code: String
+    let createdAt: Date
+    let expiresAt: Date
+
+    var id: String { code }
+    var displayCode: String { code.count == 8 ? "\(code.prefix(4)) \(code.suffix(4))" : code }
+}
+
 struct InvitePreview: Decodable, Equatable {
     enum Status: String, Decodable {
         case pending, own, used, revoked, expired, invalid

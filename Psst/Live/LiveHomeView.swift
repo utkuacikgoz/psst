@@ -16,7 +16,11 @@ struct LiveRootView: View {
                     .background(Color.psstCanvas.ignoresSafeArea())
                     .accessibilityHidden(true)
             case .needsName:
-                NameStepView()
+                if let inviter = store.invitedBy, !store.introSeen {
+                    InvitedIntroView(inviter: inviter) { withAnimation { store.introSeen = true } }
+                } else {
+                    NameStepView()
+                }
             case .needsNotificationChoice:
                 NotificationStepView()
             case .ready:
@@ -24,6 +28,45 @@ struct LiveRootView: View {
             }
         }
         .task { await store.start() }
+        // An invite link opened before onboarding (IF2). Keyed on both, since a
+        // cold-start link can arrive before the phase is known.
+        .task(id: "\(store.phase)|\(store.pendingInviteCode ?? "")") {
+            if store.phase == .needsName, let code = store.pendingInviteCode {
+                await store.prepareInvitedIntro(code: code)
+            }
+        }
+    }
+}
+
+/// Option IF2: a newcomer's first screen is the person who invited them.
+struct InvitedIntroView: View {
+    let inviter: String
+    let onContinue: () -> Void
+
+    @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = 70
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: Tokens.Space.l) {
+                Text(inviter.uppercased())
+                    .bandTitle(inviter, size: nameSize, tracking: Tokens.Band.titleTracking)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("wants to psst you")
+                    .font(.title3.weight(.semibold))
+                Text("First, what should \(inviter) call you?")
+                    .font(.body)
+                    .padding(.top, Tokens.Space.xl)
+            }
+            .multilineTextAlignment(.center)
+            .foregroundStyle(Color.onCanvas)
+            .padding(Tokens.Space.xl)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityElement(children: .combine)
+
+            PrimaryButton(title: "Continue", action: onContinue)
+                .padding(Tokens.Space.xl)
+        }
+        .background(Color.personBand(inviter).ignoresSafeArea())
     }
 }
 
@@ -98,7 +141,11 @@ struct LiveHomeView: View {
                 try? await Task.sleep(for: LiveStore.refreshInterval)
             }
         }
-        .onAppear { updateVisibility() }
+        .onAppear {
+            updateVisibility()
+            // A code that arrived before home existed (e.g. during onboarding).
+            if store.pendingInviteCode != nil { showingInvite = true }
+        }
         .onDisappear { store.isHomeVisible = false }
         .onChange(of: anySheet) { updateVisibility() }
         .onChange(of: scenePhase) { updateVisibility() }

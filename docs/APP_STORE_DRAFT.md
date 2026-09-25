@@ -40,20 +40,24 @@ Based on what the backend stores (`supabase/migrations`) and what the app sends.
 - **Retention:** signals are deleted after 30 days, and finished invites 30 days after they end.
 - **Deletion:** in-app account deletion removes the account and cascades to name, connections, signals, invites and device tokens.
 
-## Privacy policy and support pages
+## Privacy policy, terms and support pages
 
-Ready to host in `site/`: `privacy.html`, `support.html` and a small `index.html`. They're grounded in the migrations as of 25 Sep 2026. Before publishing:
-1. Replace `SUPPORT_EMAIL` in `site/` with a real support address.
-2. Enable GitHub Pages (Settings → Pages → Source: GitHub Actions). This needs a public repository or a paid plan.
-3. Run the manual "Publish privacy and support pages" workflow. It refuses to publish while the placeholder remains.
+`site/` is deployed on Vercel at **psstapp.fun**. In the Vercel project, set Root Directory to `site`; `site/vercel.json` turns on clean URLs.
 
-Use the resulting …/privacy.html as the Privacy Policy URL and …/support.html as the Support URL. If you buy psstback.app, point it at the same pages.
+- Privacy Policy URL: **https://psstapp.fun/privacy**
+- Support URL: **https://psstapp.fun/support**
+- Terms of use: **https://psstapp.fun/terms**. It references Apple's standard EULA; you can also paste it in App Store Connect → App Information → License Agreement.
+- Marketing URL (optional): **https://psstapp.fun**
+
+Contact address on the pages: **support@psstapp.fun**. Set up forwarding for it at your domain or email provider before submission. The app links to all three pages from Settings → Privacy and help, and the Psst+ sheet links to terms and privacy.
+
+The terms are a plain-language draft, not legal advice. Have them reviewed, including which country's law applies, before launch.
 
 ## Before submission
 
 - Create the in-app purchase in App Store Connect: non-consumable, product ID `psstplus.unlock`, reference name "Psst+ unlock", with a price tier (the $2.99 hypothesis is unvalidated). Sandbox purchases in TestFlight need it; `Config/PsstPlus.storekit` covers local Xcode runs (Scheme → Run → Options → StoreKit Configuration).
 
-- Publish `site/` (see above) for the Support URL and Privacy Policy URL.
+- Deploy `site/` on Vercel (see above), and make support@psstapp.fun receive mail.
 - Reports: the owner reviews the `reports` table regularly (at least weekly) using `docs/REPORTS.md`. Reporting already blocks the person in the app. For the review notes: users can report and block from the long-press menu or Settings → People, and reports are reviewed by the developer.
 - The age rating questionnaire: the app lets connected people see each other's chosen names, with no free-text messaging.
 - A production Supabase project and a production TestFlight/App Store build pointed at it. TestFlight currently uses the development project.

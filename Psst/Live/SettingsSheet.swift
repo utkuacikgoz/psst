@@ -118,8 +118,11 @@ struct SettingsSheet: View {
                     Text("Psst stores your name, your connections, and signals from the last 30 days, plus your device's notification token. It doesn't read your contacts or location, and there are no messages to store.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    Link("Privacy policy", destination: AppConfig.privacyURL)
+                    Link("Terms of use", destination: AppConfig.termsURL)
+                    Link("Help and support", destination: AppConfig.supportURL)
                 } header: {
-                    Text("Privacy")
+                    Text("Privacy and help")
                 }
 
                 Section {

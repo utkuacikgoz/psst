@@ -103,6 +103,10 @@ struct PsstPlusSheet: View {
                     EmptyView()
                 }
                 Text("Pssting, replies and invites are always free.")
+                HStack(spacing: Tokens.Space.m) {
+                    Link("Terms of use", destination: AppConfig.termsURL)
+                    Link("Privacy policy", destination: AppConfig.privacyURL)
+                }
             }
         }
     }

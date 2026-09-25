@@ -69,3 +69,7 @@ PsstTests/, PsstUITests/
 The owner-selected reference is the original Yo: edge-to-edge colour bands, oversized contact names, and direct tap feedback. Demo, recipient view, and live contact rows share the revised language. The app has one signal, Psst. Existing networking, authorization, notification, and exchange state logic is retained. See `DESIGN.md`.
 
 Validation for the Yo-inspired revision: 34 existing unit tests passed, the final simulator build succeeded, and local send → effect selection → recipient → tap-back was checked in the running iPhone 17 Pro simulator. Physical-device push delivery and the deployed backend remain unverified.
+
+## Website
+
+`site/` holds the public pages served by Vercel at https://psstapp.fun: `/privacy`, `/terms` and `/support`, plus a small home page. In Vercel, set the project's Root Directory to `site`. The app links to these pages from Settings and from the Psst+ sheet.

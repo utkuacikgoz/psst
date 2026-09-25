@@ -25,8 +25,9 @@ enum WidgetBridge {
         connections.prefix(3).map { Person(id: $0.id, name: $0.otherName, color: colorHex($0.id, $0.otherName)) }
     }
 
-    static func publish(_ people: [Person], unlocked: Bool, to defaults: UserDefaults? = defaults) {
-        guard let defaults, let data = try? JSONEncoder().encode(people) else { return }
+    /// Writes to the shared App Group, or to `store` in tests.
+    static func publish(_ people: [Person], unlocked: Bool, to store: UserDefaults? = nil) {
+        guard let defaults = store ?? Self.defaults, let data = try? JSONEncoder().encode(people) else { return }
         guard data != defaults.data(forKey: peopleKey) || unlocked != defaults.bool(forKey: unlockedKey) else { return }
         defaults.set(data, forKey: peopleKey)
         defaults.set(unlocked, forKey: unlockedKey)

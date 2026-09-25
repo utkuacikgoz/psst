@@ -184,15 +184,15 @@ class BackendTests(unittest.TestCase):
         ada, emre = new_user("Ada"), new_user("Emre")
         conn = connect(ada, emre)
         event = uuid.uuid4()
-        first = ada.rpc("send_signal", event, conn, "squeeze")
+        first = ada.rpc("send_signal", event, conn, "psst")
         self.assertFalse(first["duplicate"])
         self.assertEqual(first["push_status"], "pending")
-        retry = ada.rpc("send_signal", event, conn, "squeeze")
+        retry = ada.rpc("send_signal", event, conn, "psst")
         self.assertTrue(retry["duplicate"])
         self.assertEqual(retry["created_at"], first["created_at"])
         self.assertEqual(len(emre.rows("select * from public.signal_events")), 1)
         unseen = emre.rows("select sender_name, effect_id from public.list_unseen()")
-        self.assertEqual(unseen, [("Ada", "squeeze")])
+        self.assertEqual(unseen, [("Ada", "psst")])
 
     def test_cannot_send_on_someone_elses_connection(self):
         ada, emre, sam = new_user("Ada"), new_user("Emre"), new_user("Sam")
@@ -223,35 +223,35 @@ class BackendTests(unittest.TestCase):
         ada, emre = new_user("Ada"), new_user("Emre")
         conn = connect(ada, emre)
         for _ in range(10):
-            ada.rpc("send_signal", uuid.uuid4(), conn, "oi")
+            ada.rpc("send_signal", uuid.uuid4(), conn, "psst")
         with self.fails("rate_limited", 429):
-            ada.rpc("send_signal", uuid.uuid4(), conn, "oi")
+            ada.rpc("send_signal", uuid.uuid4(), conn, "psst")
         # Emre can still reply: the limit is per sender.
-        emre.rpc("send_signal", uuid.uuid4(), conn, "oi")
+        emre.rpc("send_signal", uuid.uuid4(), conn, "psst")
         # A retry of an accepted event is not a new send and is never limited.
         admin("update public.signal_events set created_at = now() - interval '2 minutes'")
-        ada.rpc("send_signal", uuid.uuid4(), conn, "oi")
+        ada.rpc("send_signal", uuid.uuid4(), conn, "psst")
 
     def test_seen_only_by_recipient(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         conn = connect(ada, emre)
         event = uuid.uuid4()
-        ada.rpc("send_signal", event, conn, "duck")
+        ada.rpc("send_signal", event, conn, "psst")
         self.assertEqual(ada.rpc("ack_signals", [event]), 0)  # sender can't mark seen
         self.assertEqual(emre.rpc("ack_signals", [event]), 1)
         self.assertEqual(emre.rpc("ack_signals", [event]), 0)  # idempotent
         row = ada.rows("select last_from_me, last_seen_at is not null, unseen_count from public.list_connections()")
         self.assertEqual(row, [(True, True, 0)])
 
-    def test_favorite_is_per_side(self):
+    def test_only_psst_can_be_sent(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         conn = connect(ada, emre)
-        ada.rpc("set_favorite", conn, "duck")
-        self.assertEqual(ada.rows("select my_favorite from public.list_connections()"), [("duck",)])
-        self.assertEqual(emre.rows("select my_favorite from public.list_connections()"), [("psst",)])
-        sam = new_user("Sam")
-        with self.fails("not_connected", 403):
-            sam.rpc("set_favorite", conn, "oi")
+        for removed in ("squeeze", "oi", "duck"):
+            with self.fails("effect_unavailable", 403):
+                ada.rpc("send_signal", uuid.uuid4(), conn, removed)
+        self.assertFalse(ada.rpc("send_signal", uuid.uuid4(), conn, "psst")["duplicate"])
+        with self.assertRaises(errors.UndefinedFunction):
+            ada.rpc("set_favorite", conn, "psst")
 
     # Visibility ------------------------------------------------------------
 
@@ -308,7 +308,7 @@ class BackendTests(unittest.TestCase):
         emre.rpc("block_user", ada.user_id)
         self.assertEqual(ada.rows("select * from public.connections"), [])
         with self.fails("not_connected", 403):
-            ada.rpc("send_signal", uuid.uuid4(), conn, "oi")
+            ada.rpc("send_signal", uuid.uuid4(), conn, "psst")
         # Ada's new invite looks invalid to Emre and vice versa.
         code = ada.rpc("create_invite")["code"]
         self.assertEqual(emre.rpc("preview_invite", code), {"status": "invalid", "inviter_name": None})

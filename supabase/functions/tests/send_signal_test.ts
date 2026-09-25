@@ -4,7 +4,7 @@ import { handleSendSignal, SendSignalDeps } from "../send-signal/handler.ts";
 const BODY = {
   event_id: "11111111-1111-4111-8111-111111111111",
   connection_id: "22222222-2222-4222-8222-222222222222",
-  effect_id: "oi",
+  effect_id: "psst",
 };
 
 function request(body: unknown, auth: string | null = "Bearer user-jwt", method = "POST") {
@@ -46,7 +46,7 @@ Deno.test("forwards the caller's own token and reports push status separately", 
   });
   assertEquals(calls, [{
     auth: "Bearer user-jwt",
-    args: { p_event_id: BODY.event_id, p_connection_id: BODY.connection_id, p_effect_id: "oi" },
+    args: { p_event_id: BODY.event_id, p_connection_id: BODY.connection_id, p_effect_id: "psst" },
   }]);
 });
 

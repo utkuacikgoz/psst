@@ -7,12 +7,12 @@ Draft for review. Grounded in the code as of 25 September 2026. Nothing here has
 - **Name (store):** Psst – Tap a Friend (placeholder; "Psst" alone is taken). The home-screen name stays "Psst".
 - **Subtitle (30 chars):** One tap to say you're thinking
 - **Category:** Social Networking
-- **Keywords:** tap,nudge,yo,thinking of you,friends,couples,poke,hello,signal
+- **Keywords:** tap,nudge,yo,thinking of you,friends,couples,poke,hello,psst
 - **Description:**
 
   Tap a person. They get a small signal. They can send one back without typing a thing.
 
-  Psst has four signals: Psst (thinking of you), Squeeze (a little affection), Oi (hey, over here) and Duck (for no reason at all). Your usual signal is one tap. Choosing another is a separate step, and previewing never sends.
+  Every tap sends a Psst: a small signal that says you're thinking of them. There's nothing to type and nothing to choose.
 
   Connect with someone by sharing an invite link or code. Nothing is sent until you've both accepted. You can remove or block anyone at any time, and you can delete your account in Settings.
 

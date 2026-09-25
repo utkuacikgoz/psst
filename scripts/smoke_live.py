@@ -87,16 +87,20 @@ try:
     check("Sam sees the used invite as used", isinstance(body, dict) and body.get("status") == "used", body)
 
     event = str(uuid.uuid4())
-    status, body = ada.send(event, connection, "oi")
+    status, body = ada.send(event, connection, "psst")
     check("Ada's signal is accepted by the server", status == 200 and body.get("duplicate") is False, body)
     check("No device registered is reported, not delivery",
           isinstance(body, dict) and body.get("push_status") == "no_devices", body)
 
-    status, body = ada.send(event, connection, "oi")
+    status, body = ada.send(event, connection, "psst")
     check("Retrying the same event ID is a duplicate, not a new signal",
           status == 200 and body.get("duplicate") is True, body)
 
-    status, body = sam.send(str(uuid.uuid4()), connection, "duck")
+    status, body = ada.send(str(uuid.uuid4()), connection, "duck")
+    check("A removed signal (Duck) is refused",
+          status == 403 and isinstance(body, dict) and body.get("error") == "effect_unavailable", f"{status} {body}")
+
+    status, body = sam.send(str(uuid.uuid4()), connection, "psst")
     check("Sam cannot send on Ada and Emre's connection",
           status == 403 and isinstance(body, dict) and body.get("error") == "not_connected", f"{status} {body}")
 

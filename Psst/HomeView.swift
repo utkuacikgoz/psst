@@ -5,7 +5,6 @@ struct HomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var effect: EffectTrigger?
-    @State private var showingPicker = false
     @State private var showingInvite = false
     @State private var showingAlexPhone = false
 
@@ -20,13 +19,9 @@ struct HomeView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         PersonRow(name: exchange.partnerName, status: statusText,
-                                  signal: exchange.favorite, effect: effect,
-                                  accessibilityHint: "Plays \(exchange.favorite.title) locally. Nothing is sent.",
+                                  signal: .psst, effect: effect,
+                                  accessibilityHint: "Plays a Psst locally. Nothing is sent.",
                                   action: tapAlex, minHeight: max(160, proxy.size.height * 0.38))
-                            .accessibilityAction(named: "Choose signal") { showingPicker = true }
-                        ChangeSignalButton(title: exchange.favorite.title,
-                                           accessibilityLabel: "Signal for Alex: \(exchange.favorite.title)",
-                                           accessibilityHint: "Choose or preview a signal. Nothing is sent.") { showingPicker = true }
                         Button { showingInvite = true } label: {
                             Image(systemName: "plus").font(.system(size: Tokens.Band.wordmarkSize, weight: .light))
                                 .foregroundStyle(.white).frame(maxWidth: .infinity, minHeight: Tokens.Band.addBandMinHeight)
@@ -46,7 +41,6 @@ struct HomeView: View {
             try? await Task.sleep(for: .seconds(max(0, until.timeIntervalSinceNow)))
             exchange.clearExpiredPauses()
         }
-        .sheet(isPresented: $showingPicker) { SignalPickerSheet(personName: exchange.partnerName) }
         .sheet(isPresented: $showingInvite) { InviteUnavailableSheet() }
         .fullScreenCover(isPresented: $showingAlexPhone, onDismiss: showReplyIfAny) { AlexPhoneView() }
     }
@@ -71,7 +65,7 @@ struct HomeView: View {
         }
     }
     private func tapAlex() {
-        switch exchange.send(exchange.favorite, from: .me) {
+        switch exchange.send(.psst, from: .me) {
         case .played(let event): effect = EffectTrigger(id: event.id, signal: event.signal)
         case .paused: AccessibilityNotification.Announcement("Paused for a moment after several taps").post()
         case .tooSoon, .alreadyRecorded: break

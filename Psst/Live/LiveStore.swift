@@ -154,7 +154,7 @@ final class LiveStore {
         case nil: break
         }
         guard let last = connection.lastSignal, let fromMe = connection.lastFromMe else {
-            return .ready(connection.favorite)
+            return .ready(.psst)
         }
         if !fromMe { return .received(from: connection.otherName, last) }
         return connection.lastSeenAt == nil ? .sentEarlier(last) : .seen(last)
@@ -176,8 +176,7 @@ final class LiveStore {
                 return nil
             }
             lastTapAt[id] = now()
-            let signal = connection.favorite
-            return Task { await send(connectionID: id, eventID: UUID(), signal: signal) }
+            return Task { await send(connectionID: id, eventID: UUID(), signal: .psst) }
         }
     }
 
@@ -210,11 +209,6 @@ final class LiveStore {
     }
 
     // MARK: Connections
-
-    func setFavorite(_ signal: Signal, for connectionID: UUID) async throws {
-        try await api.setFavorite(connectionID: connectionID, signal: signal)
-        if let updated = try? await api.listConnections() { connections = updated }
-    }
 
     func remove(_ connection: ConnectionSummary) async throws {
         try await api.removeConnection(connection.id)

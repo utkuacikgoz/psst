@@ -11,20 +11,17 @@ The app has two modes:
 Read `CLAUDE.md`, then `DESIGN.md`. This folder is an independent repository with no dependency on another project.
 
 ## Try the local preview
-1. Tap **Alex** to play the selected signal on this phone.
-2. Tap the signal bar beneath Alex to pick another signal. The play button previews it in the sheet without sending anything. The choice is remembered on this device.
-3. Tap **Alex’s side** to see the recipient side: first who it's from, then the effect.
-4. Tap **You** on Alex's phone to tap back, then **Your phone** to return and see Alex's reply play on the row.
-
-VoiceOver users can also use the **Choose signal** action on the Alex row.
+1. Tap **Alex** to play a Psst on this phone.
+2. Tap **Alex’s side** to see the recipient side: first who it's from, then the effect.
+3. Tap **You** on Alex's phone to tap back, then **Your phone** to return and see Alex's reply play on the row.
 
 ## What the states mean
 | Row text | Meaning |
 |---|---|
 | Tap to psst | Nothing exchanged yet |
-| Squeeze · played locally | You tapped. Alex's simulated screen hasn't been opened since then |
-| Squeeze · seen in demo | Alex's simulated screen displayed it |
-| Oi back from Alex | Alex tapped back most recently |
+| Psst · played locally | You tapped. Alex's simulated screen hasn't been opened since then |
+| Psst · seen in demo | Alex's simulated screen displayed it |
+| Psst back from Alex | Alex tapped back most recently |
 | A little breather. Try again shortly. | More than 5 taps in 20 seconds; resumes after 20 seconds |
 
 Taps less than 0.8 s apart count as one. Each signal event has a unique ID, and retrying the same ID never creates a duplicate. These are the same rules the backend will have to enforce.
@@ -42,7 +39,7 @@ xcodebuild test -project Psst.xcodeproj -scheme Psst \
 ```
 `.github/workflows/ios.yml` runs the unit tests on every push, and runs `PsstUITests` on a compact and a large iPhone at standard and accessibility text sizes. The screenshots are uploaded as a `screenshots` artifact. `.github/workflows/backend.yml` runs the database and edge-function tests.
 
-- `PsstTests/LocalExchangeTests.swift`: the local preview rules (choosing never sends, unique IDs, idempotent retry, tap coalescing, burst pause, receipt only after display, tap-back).
+- `PsstTests/LocalExchangeTests.swift`: the local preview rules (every tap is Psst, unique IDs, idempotent retry, tap coalescing, burst pause, receipt only after display, tap-back).
 - `PsstTests/LiveStoreTests.swift`: live rules against a fake API (onboarding phases, sign-out, retry reusing the event ID, taps ignored while sending, rate-limit and ended-connection handling, acking only while visible, idempotent notification reply, account deletion), and parsing of Postgres timestamps, rows, errors, push payloads and invite links.
 - `supabase/tests`, `supabase/functions/tests`: see the backend README.
 
@@ -51,10 +48,10 @@ xcodebuild test -project Psst.xcodeproj -scheme Psst \
 Psst/
   PsstApp.swift            picks live or local preview
   DesignTokens.swift       spacing, radius, touch size, colours (single source)
-  Signal.swift             the four signals: copy, symbol, accent, motion, haptic
+  Signal.swift             the one signal, Psst: copy, symbol, colour, motion, haptic
   PersonRow.swift          the large tap target
   SignalGlyph.swift        row-local effect, Reduce Motion aware
-  SignalPickerSheet.swift  shared choose-and-preview content (never sends)
+  ViewHelpers.swift        sheet chrome, pinned footer
   LocalExchange.swift, HomeView.swift, AlexPhoneView.swift, InviteUnavailableSheet.swift
                            local preview
   Live/
@@ -69,6 +66,6 @@ PsstTests/, PsstUITests/
 ```
 
 ## Visual direction
-The owner-selected reference is the original Yo: edge-to-edge colour bands, oversized contact names, and direct tap feedback. Demo, signal picker, recipient view, and live contact rows share the revised language. Existing networking, authorization, notification, and exchange state logic is retained. See `DESIGN.md`.
+The owner-selected reference is the original Yo: edge-to-edge colour bands, oversized contact names, and direct tap feedback. Demo, recipient view, and live contact rows share the revised language. The app has one signal, Psst. Existing networking, authorization, notification, and exchange state logic is retained. See `DESIGN.md`.
 
 Validation for the Yo-inspired revision: 34 existing unit tests passed, the final simulator build succeeded, and local send → effect selection → recipient → tap-back was checked in the running iPhone 17 Pro simulator. The checked-in `docs/screenshots` images predate this visual revision. Physical-device push delivery and the deployed backend remain unverified.

@@ -19,7 +19,6 @@ protocol PsstAPI: AnyObject {
     func listUnseen() async throws -> [UnseenSignal]
     func ackSignals(_ ids: [UUID]) async throws
     func sendSignal(eventID: UUID, connectionID: UUID, signal: Signal) async throws -> SendResult
-    func setFavorite(connectionID: UUID, signal: Signal) async throws
     func createInvite() async throws -> CreatedInvite
     func previewInvite(code: String) async throws -> InvitePreview
     func acceptInvite(code: String) async throws -> AcceptedInvite
@@ -126,10 +125,6 @@ final class APIClient: PsstAPI {
             "connection_id": connectionID.uuidString.lowercased(),
             "effect_id": signal.rawValue,
         ])
-    }
-
-    func setFavorite(connectionID: UUID, signal: Signal) async throws {
-        try await rpcVoid("set_favorite", ["p_connection_id": connectionID.uuidString, "p_effect_id": signal.rawValue])
     }
 
     func createInvite() async throws -> CreatedInvite {

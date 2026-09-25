@@ -25,9 +25,6 @@ export interface DeliverDeps {
 
 const EFFECT_TITLES: Record<string, string> = {
   psst: "Psst",
-  squeeze: "Squeeze",
-  oi: "Oi",
-  duck: "Duck",
 };
 
 /** A signal is a moment, not a message: undelivered pushes are dropped after an hour. */

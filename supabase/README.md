@@ -169,13 +169,13 @@ different Apple ID or at least a different Psst account:
 
 ## Production
 
-Production is a separate Supabase project. Its secrets carry a `PROD_` prefix: add them as repository secrets, or on a GitHub environment named `production` (which can also require an approval before it runs).
-- `PROD_SUPABASE_PROJECT_REF`: the production project's ref (required).
-- `PROD_SUPABASE_DB_PASSWORD`: its database password (required).
-- `PROD_SUPABASE_ACCESS_TOKEN`: only if production is in a different Supabase account.
+Production is a separate Supabase project. Its secrets carry a `_PROD` suffix: add them as repository secrets, or on a GitHub environment named `production` (which can also require an approval before it runs).
+- `SUPABASE_PROJECT_REF_PROD`: the production project's ref (required).
+- `SUPABASE_DB_PASSWORD_PROD`: its database password (required).
+- `SUPABASE_ACCESS_TOKEN_PROD`: only if production is in a different Supabase account.
 
 The APNs key secrets are shared with development; APNs itself tells sandbox and production device tokens apart.
 
 - **Deploy:** Actions → Deploy backend → Run workflow → target **production**. It runs the backend tests, applies migrations (including the pg_cron purge and metrics jobs), sets the function secrets, deploys both functions and runs the smoke test. The smoke test creates and deletes its own throwaway accounts.
 - **Build:** Actions → TestFlight → Run workflow → target **production** (the default). The build reads the production anon key and points at the production project. Use **development** for test builds against the development backend.
-- A production run refuses to start if the `PROD_` secrets are missing, so it can never fall back to development.
+- A production run refuses to start if the `_PROD` secrets are missing, so it can never fall back to development.

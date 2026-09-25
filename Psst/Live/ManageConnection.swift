@@ -86,12 +86,12 @@ private struct ManageConnectionModifier: ViewModifier {
                 Text(action.explanation)
             }
             .alert(
-                "Couldn't update \(failedName ?? "this person")",
+                "That didn't work",
                 isPresented: Binding(get: { failedName != nil }, set: { if !$0 { failedName = nil } })
             ) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("Check your connection and try again.")
+                Text("Nothing changed with \(failedName ?? "them"). Check you're online and try again.")
             }
     }
 

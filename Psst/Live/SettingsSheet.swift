@@ -149,7 +149,7 @@ struct SettingsSheet: View {
                 nameMessage = "Saved. People you're connected with now see \(trimmed)."
                 name = ""
             } catch {
-                nameMessage = "Couldn't save. Names can be 1 to 40 characters."
+                nameMessage = "That didn't save. Names can be 1 to 40 characters."
             }
         }
     }
@@ -169,7 +169,7 @@ struct SettingsSheet: View {
                 try await store.deleteAccount()
                 dismiss()
             } catch {
-                deleteError = "Couldn't delete your account. Check your connection and try again."
+                deleteError = "Your account is still here: that didn't go through. Check you're online and try again."
             }
             isDeleting = false
         }

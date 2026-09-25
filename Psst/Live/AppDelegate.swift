@@ -84,8 +84,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     /// A failed background reply must not look sent.
     private static func postSendBackFailure(to name: String, signal: Signal) async {
         let content = UNMutableNotificationContent()
-        content.title = "Not sent"
-        content.body = "Your \(signal.title) to \(name) wasn't sent. Open Psst to try again."
+        content.title = "Didn't make it"
+        content.body = "Your \(signal.title) to \(name) didn't get through. Open Psst to try again."
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         try? await UNUserNotificationCenter.current().add(request)
     }

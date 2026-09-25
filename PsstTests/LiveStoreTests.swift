@@ -315,7 +315,7 @@ final class LiveStoreTests: XCTestCase {
         api.sendError = APIError.server(status: 403, code: "not_connected")
         await store.tap(ada)?.value
         XCTAssertTrue(store.connections.isEmpty)
-        XCTAssertEqual(store.notice, "You're no longer connected with Ada.")
+        XCTAssertEqual(store.notice, "Ada isn't here any more.")
         XCTAssertNil(store.effects[ada.id])
     }
 
@@ -351,6 +351,41 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(Set(api.acked), [older.id, newer.id], "Only signals for rows on screen")
         XCTAssertEqual(store.effects[ada.id], EffectTrigger(id: newer.id, signal: .psst))
         XCTAssertEqual(store.latestEffect?.id, newer.id)
+    }
+
+    func testSeveralSendersGetMomentsOneAfterAnotherNewestLast() async {
+        let ada = connection(name: "Ada"), emre = connection(name: "Emre")
+        api.connections = [ada, emre]
+        await store.refresh() // first load, hidden
+        func signal(_ c: ConnectionSummary, _ t: TimeInterval) -> UnseenSignal {
+            UnseenSignal(id: UUID(), connectionId: c.id, senderId: UUID(), senderName: c.otherName,
+                         effectId: "psst", createdAt: Date(timeIntervalSince1970: t))
+        }
+        api.unseen = [signal(emre, 5), signal(ada, 9)]
+        store.isHomeVisible = true
+        await store.showUnseenIfVisible()
+        XCTAssertEqual(store.arrival?.senderName, "Emre")
+        XCTAssertEqual(store.arrival?.position, 1)
+        XCTAssertEqual(store.arrival?.total, 2)
+
+        store.nextArrival()
+        XCTAssertEqual(store.arrival?.senderName, "Ada")
+        XCTAssertEqual(store.arrival?.position, 2)
+
+        // Tapping the last one sends to Ada and ends the sequence.
+        store.psstBack(store.arrival!)
+        XCTAssertNil(store.arrival)
+    }
+
+    func testASingleSenderHasNoCount() async {
+        let ada = connection()
+        api.connections = [ada]
+        await store.refresh()
+        api.unseen = [UnseenSignal(id: UUID(), connectionId: ada.id, senderId: UUID(), senderName: "Ada",
+                                   effectId: "psst", createdAt: Date())]
+        store.isHomeVisible = true
+        await store.showUnseenIfVisible()
+        XCTAssertNil(store.arrival?.total)
     }
 
     func testSendBackIsIdempotentAndAcksTheOriginal() async {

@@ -84,7 +84,7 @@ struct LiveHomeView: View {
             if let arrival = store.arrival {
                 ArrivalView(arrival: arrival,
                             onTap: { withAnimation { store.psstBack(arrival) } },
-                            onDone: { withAnimation { store.arrival = nil } })
+                            onDone: { withAnimation { store.nextArrival() } })
             }
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: store.arrival)
@@ -176,7 +176,7 @@ struct LiveHomeView: View {
 
     @ViewBuilder private var notices: some View {
         if store.isOffline {
-            NoticeView(symbol: "wifi.slash", text: "Offline · taps won't send")
+            NoticeView(symbol: "wifi.slash", text: "Offline · taps won't get through")
         }
         if notificationsOff {
             NoticeView(symbol: "bell.slash",
@@ -288,7 +288,7 @@ struct LiveHomeView: View {
         case .ready, .seen, .sentEarlier: ""
         case .sending: "Sending…"
         case .sent: "Sent"
-        case .notSent: "Not sent · Retry"
+        case .notSent: "Didn't make it · tap to try again"
         case .paused(_, let until): "Try again in \(countdown(until.timeIntervalSince(now)))"
         case .received(let name, let signal): "\(name) sent a \(signal.title)"
         }

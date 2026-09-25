@@ -92,13 +92,6 @@ jobs:
           CODE_SIGN_ENTITLEMENTS = Config/Psst.entitlements
           EOF
 
-      - name: Unit tests
-        run: |
-          UDID=$(python3 scripts/pick_simulators.py any)
-          set -o pipefail
-          xcodebuild test -project Psst.xcodeproj -scheme Psst \
-            -destination "id=$UDID" -only-testing:PsstTests CODE_SIGNING_ALLOWED=NO
-
       - name: Archive
         run: |
           set -o pipefail

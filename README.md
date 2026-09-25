@@ -37,7 +37,7 @@ xcodebuild test -project Psst.xcodeproj -scheme Psst \
   -destination 'platform=iOS Simulator,name=iPhone 16' \
   -only-testing:PsstTests CODE_SIGNING_ALLOWED=NO
 ```
-`.github/workflows/ios.yml` runs the unit tests on pushes to `main` and on pull requests that change the app. Screenshots run only when started by hand (Actions → iOS build and tests → Run workflow): four parallel shards (compact and large iPhone × standard and largest accessibility text), with JPEG review copies force-pushed as the single commit on the `screenshots` branch. Their artifacts expire after a day, and `.github/workflows/cleanup.yml` sweeps older artifacts and runs weekly. `.github/workflows/backend.yml` runs the database and edge-function tests.
+`.github/workflows/ios.yml` runs the unit tests on pushes to `main` that change the app, and on pull requests. Screenshots run only by hand (Actions → iOS → Run workflow): one job on the large iPhone, choose which UI tests and the text size; the images replace the single commit on the `screenshots` branch. `.github/workflows/cleanup.yml` sweeps old runs weekly. `.github/workflows/backend.yml` runs the database and edge-function tests.
 
 - `PsstTests/LocalExchangeTests.swift`: the local preview rules (every tap is Psst, unique IDs, idempotent retry, tap coalescing, burst pause, receipt only after display, tap-back).
 - `PsstTests/LiveStoreTests.swift`: live rules against a fake API (onboarding phases, sign-out, retry reusing the event ID, taps ignored while sending, rate-limit and ended-connection handling, acking only while visible, idempotent notification reply, account deletion), and parsing of Postgres timestamps, rows, errors, push payloads and invite links.

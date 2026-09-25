@@ -43,7 +43,7 @@ jobs:
       PROD_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
       PROD_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check that every secret is set
         env:

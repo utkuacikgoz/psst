@@ -17,6 +17,31 @@ enum Tokens {
     static let personRowMinHeight: CGFloat = 144
     static let sheetInset: CGFloat = 24
 
+    /// Yo-style colour-band layout (DESIGN.md §3).
+    enum Band {
+        static let wordmarkSize: CGFloat = 40
+        static let wordmarkTracking: CGFloat = -2
+        /// Contact names and received signal titles; scaled with Dynamic Type by callers.
+        static let titleSize: CGFloat = 52
+        static let titleTracking: CGFloat = -1.5
+        /// Signal names in the picker.
+        static let optionTitleSize: CGFloat = 30
+        static let optionTracking: CGFloat = -0.7
+        static let optionMinHeight: CGFloat = 90
+        static let labelTracking: CGFloat = 1
+        static let verticalPadding: CGFloat = 32
+        /// The darker "Change signal" bar under each person.
+        static let barMinHeight: CGFloat = 56
+        static let addBandMinHeight: CGFloat = 96
+        static let headerControlHeight: CGFloat = 48
+        static let pickerGlyphSize: CGFloat = 54
+        static let pickerStageHeight: CGFloat = 80
+        static let recipientGlyphSize: CGFloat = 64
+        static let recipientStageHeight: CGFloat = 90
+        /// Band colour while a finger is down. White text stays above 5:1.
+        static let pressedOpacity = 0.72
+    }
+
     /// 24 pt side inset, 20 pt on very narrow phones. Safe areas are excluded by the caller.
     static func sideInset(forWidth width: CGFloat) -> CGFloat {
         width < 360 ? 20 : 24
@@ -61,6 +86,8 @@ extension Color {
         return Color(hex: palette[seed])
     }
     static let addBand = Color(hex: 0xB87500)
+    /// Shade for the bar that follows a band (opens the picker, never sends).
+    static let bandShade = Color.black.opacity(0.15)
 }
 
 extension Text {

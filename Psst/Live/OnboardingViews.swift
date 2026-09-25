@@ -25,7 +25,7 @@ struct NameStepView: View {
                 .focused($focused)
                 .onSubmit(save)
                 .padding(.horizontal, Tokens.Space.l)
-                .frame(minHeight: 56)
+                .frame(minHeight: Tokens.Band.barMinHeight)
                 .background(RoundedRectangle(cornerRadius: Tokens.controlRadius).fill(Color.surface))
                 .accessibilityLabel("Your name")
                 .onChange(of: name) { _, new in
@@ -99,9 +99,10 @@ struct OnboardingLayout<Field: View, Actions: View>: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Tokens.Space.l) {
                         Text("psst")
-                            .font(.system(.title3, weight: .semibold))
+                            .font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy))
+                            .tracking(Tokens.Band.wordmarkTracking)
                             .foregroundStyle(Color.onCanvas)
-                            .padding(.bottom, Tokens.Space.xxl)
+                            .padding(.bottom, Tokens.Space.xl)
                         Text(title)
                             .font(.system(.title, weight: .semibold))
                             .foregroundStyle(Color.onCanvas)

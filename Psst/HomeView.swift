@@ -13,10 +13,10 @@ struct HomeView: View {
         GeometryReader { proxy in
             VStack(spacing: 0) {
                 HStack {
-                    Text("psst").font(.system(size: 40, weight: .heavy)).tracking(-2)
+                    Text("psst").font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy)).tracking(Tokens.Band.wordmarkTracking)
                     Spacer()
-                    Text("LOCAL DEMO").font(.footnote.weight(.semibold)).tracking(1)
-                }.foregroundStyle(.white).padding(.horizontal, 24).padding(.vertical, 22)
+                    Text("LOCAL DEMO").font(.footnote.weight(.semibold)).tracking(Tokens.Band.labelTracking)
+                }.foregroundStyle(.white).padding(.horizontal, Tokens.Space.xl).padding(.vertical, Tokens.Space.xl)
                 ScrollView {
                     VStack(spacing: 0) {
                         PersonRow(name: exchange.partnerName, status: statusText,
@@ -28,8 +28,8 @@ struct HomeView: View {
                                            accessibilityLabel: "Signal for Alex: \(exchange.favorite.title)",
                                            accessibilityHint: "Choose or preview a signal. Nothing is sent.") { showingPicker = true }
                         Button { showingInvite = true } label: {
-                            Image(systemName: "plus").font(.system(size: 40, weight: .light))
-                                .foregroundStyle(.white).frame(maxWidth: .infinity, minHeight: 94)
+                            Image(systemName: "plus").font(.system(size: Tokens.Band.wordmarkSize, weight: .light))
+                                .foregroundStyle(.white).frame(maxWidth: .infinity, minHeight: Tokens.Band.addBandMinHeight)
                                 .background(Color.addBand).contentShape(Rectangle())
                         }.accessibilityLabel("Invite someone")
                         if dynamicTypeSize.isAccessibilitySize { demoFooter }
@@ -51,15 +51,15 @@ struct HomeView: View {
         .fullScreenCover(isPresented: $showingAlexPhone, onDismiss: showReplyIfAny) { AlexPhoneView() }
     }
     private var demoFooter: some View {
-        VStack(spacing: 3) {
+        VStack(spacing: Tokens.Space.xs) {
             Button { showingAlexPhone = true } label: {
                 HStack { Text("Alex’s side"); Spacer(); Image(systemName: "arrow.right") }
-                    .font(.body.weight(.semibold)).frame(minHeight: 48)
+                    .font(.body.weight(.semibold)).frame(minHeight: Tokens.Band.headerControlHeight)
             }.accessibilityLabel("View Alex's phone (simulated)")
             Text("Fictional Alex. Nothing leaves this phone.")
                 .font(.footnote).foregroundStyle(Color.onCanvasSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-        }.foregroundStyle(.white).padding(.horizontal, 24).padding(.bottom, 20).padding(.top, 10)
+        }.foregroundStyle(.white).padding(.horizontal, Tokens.Space.xl).padding(.bottom, Tokens.Space.xl).padding(.top, Tokens.Space.m)
     }
     private var statusText: String {
         switch exchange.status(for: .me) {

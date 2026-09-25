@@ -12,23 +12,23 @@ struct PersonRow: View {
     var statusSymbol: String?
     var minHeight: CGFloat = Tokens.personRowMinHeight
 
-    @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = 52
+    @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = Tokens.Band.titleSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingEffect = false
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 12) {
+            VStack(spacing: Tokens.Space.m) {
                 if showingEffect, let effect {
                     SignalGlyph(signal: effect.signal, trigger: effect.id, baseSize: 52, tint: .white)
                         .frame(minHeight: nameSize * 1.15)
                 } else {
                     Text(name.uppercased())
-                        .bandTitle(name, size: nameSize, tracking: -1.5)
+                        .bandTitle(name, size: nameSize, tracking: Tokens.Band.titleTracking)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(minHeight: nameSize * 1.15)
                 }
-                HStack(spacing: 7) {
+                HStack(spacing: Tokens.Space.s) {
                     if isBusy { ProgressView().tint(.white) }
                     else if let statusSymbol { Image(systemName: statusSymbol) }
                     Text(status).fixedSize(horizontal: false, vertical: true)
@@ -36,7 +36,7 @@ struct PersonRow: View {
             }
             .multilineTextAlignment(.center)
             .foregroundStyle(.white)
-            .padding(.horizontal, 24).padding(.vertical, 30)
+            .padding(.horizontal, Tokens.Space.xl).padding(.vertical, Tokens.Band.verticalPadding)
             .frame(maxWidth: .infinity, minHeight: minHeight)
             .contentShape(Rectangle())
         }
@@ -59,7 +59,7 @@ struct PersonRow: View {
 private struct PersonBandStyle: ButtonStyle {
     let color: Color
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.background(color.opacity(configuration.isPressed ? 0.72 : 1))
+        configuration.label.background(color.opacity(configuration.isPressed ? Tokens.Band.pressedOpacity : 1))
             .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
     }
 }

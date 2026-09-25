@@ -11,24 +11,27 @@ final class AppStoreScreenshotTests: XCTestCase {
 
     func testAppStoreScreens() {
         let app = XCUIApplication()
-        app.launchArguments += ["-PsstUITestLive", "store"]
+        app.launchArguments += ["-PsstUITestLive", "store", "-PsstUITestHoldMoments"]
         app.launch()
 
         // Ada's Psst is waiting, so the app opens on her full-screen moment.
         // Wait for the moment itself: it only lasts about two seconds.
+        // Moments are held for 8 s in this run (-PsstUITestHoldMoments).
         XCTAssertTrue(app.buttons["Psst from Ada"].waitForExistence(timeout: 15))
         wait(0.4)
         shot("01-arrival")
 
-        XCTAssertTrue(app.buttons["Ada"].waitForExistence(timeout: 10))
-        wait(2.6)
+        let arrival = app.buttons["Psst from Ada"]
+        XCTAssertTrue(arrival.waitForNonExistence(timeout: 12))
+        wait(0.6)
         shot("02-home")
 
         // Answering right away is a same moment.
         app.buttons["Ada"].tap()
         wait(0.8)
         shot("03-same-moment")
-        wait(3.2)
+        XCTAssertTrue(app.buttons["Invite someone"].firstMatch.waitForExistence(timeout: 12))
+        wait(8.5)
 
         app.buttons["Invite someone"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Share my invite"].waitForExistence(timeout: 5))

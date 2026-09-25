@@ -324,6 +324,21 @@ class BackendTests(unittest.TestCase):
         emre.rpc("unblock_user", ada.user_id)
         self.assertEqual(emre.rpc("accept_invite", ada.rpc("create_invite")["code"])["status"], "accepted")
 
+    def test_report_records_and_blocks(self):
+        ada, emre = new_user("Ada"), new_user("Emre")
+        conn = connect(ada, emre)
+        emre.rpc("report_user", ada.user_id)
+        emre.rpc("report_user", ada.user_id)  # a repeat adds nothing
+        self.assertEqual(admin("select count(*) from public.reports where reported_id = %s", ada.user_id), [(1,)])
+        with self.fails("not_connected", 403):
+            ada.rpc("send_signal", uuid.uuid4(), conn, "psst")
+        self.assertEqual(emre.rows("select display_name from public.list_blocked()"), [("Ada",)])
+        # Neither side can read reports.
+        with self.assertRaises(errors.InsufficientPrivilege):
+            emre.rows("select * from public.reports")
+        with self.fails("invalid_user", 422):
+            emre.rpc("report_user", emre.user_id)
+
     def test_remove_connection(self):
         ada, emre, sam = new_user("Ada"), new_user("Emre"), new_user("Sam")
         conn = connect(ada, emre)

@@ -99,6 +99,7 @@ final class UITestAPI: PsstAPI {
     func removeConnection(_ id: UUID) async throws { names[id] = nil }
     func blockUser(_ id: UUID) async throws { names[id] = nil }
     func unblockUser(_ id: UUID) async throws {}
+    func reportUser(_ id: UUID) async throws { names[id] = nil }
     func listBlocked() async throws -> [BlockedPerson] { [] }
     func registerDeviceToken(_ token: String, environment: String) async throws {}
     func deleteAccount() async throws { isSignedIn = false }

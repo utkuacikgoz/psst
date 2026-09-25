@@ -25,6 +25,7 @@ protocol PsstAPI: AnyObject {
     func removeConnection(_ id: UUID) async throws
     func blockUser(_ id: UUID) async throws
     func unblockUser(_ id: UUID) async throws
+    func reportUser(_ id: UUID) async throws
     func listBlocked() async throws -> [BlockedPerson]
     func registerDeviceToken(_ token: String, environment: String) async throws
     func deleteAccount() async throws
@@ -145,6 +146,10 @@ final class APIClient: PsstAPI {
 
     func blockUser(_ id: UUID) async throws {
         try await rpcVoid("block_user", ["p_user_id": id.uuidString])
+    }
+
+    func reportUser(_ id: UUID) async throws {
+        try await rpcVoid("report_user", ["p_user_id": id.uuidString])
     }
 
     func unblockUser(_ id: UUID) async throws {

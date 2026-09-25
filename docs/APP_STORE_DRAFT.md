@@ -14,7 +14,7 @@ Draft for review. Grounded in the code as of 25 September 2026. Nothing here has
 
   Every tap sends a Psst: a small signal that says you're thinking of them. There's nothing to type and nothing to choose.
 
-  Connect with someone by sharing an invite link or code. Nothing is sent until you've both accepted. You can remove or block anyone at any time, and you can delete your account in Settings.
+  Connect with someone by sharing an invite link or code. Nothing is sent until you've both accepted. You can remove, block or report anyone at any time, and you can delete your account in Settings.
 
   No feed, no strangers, no contacts upload, no location.
 
@@ -46,7 +46,7 @@ A privacy policy URL is required before submission. This text needs a public hom
 >
 > - **Your display name**, shown to the people you're connected with.
 > - **An account ID**, created anonymously when you start. No email or phone number.
-> - **Your connections**, the invites you create, and anyone you've blocked.
+> - **Your connections**, the invites you create, anyone you've blocked, and any reports you make (who you reported and when; there is no message content to include).
 > - **Signals**: which signal was sent, to whom, when, and whether it was seen. Kept for 30 days.
 > - **Your device's notification token**, so we can send you notifications.
 >
@@ -60,7 +60,7 @@ A privacy policy URL is required before submission. This text needs a public hom
 
 - A support URL and support email.
 - A hosted privacy policy URL.
-- A **report** action for connections (guideline 1.2), alongside block.
+- A named person who reviews reports (the `reports` table) and acts on them promptly, as guideline 1.2 expects. Reporting already blocks the person in the app.
 - The age rating questionnaire: the app lets connected people see each other's chosen names, with no free-text messaging.
 - A production Supabase project and a production TestFlight/App Store build pointed at it. TestFlight currently uses the development project.
 - Real app icon and screenshots.

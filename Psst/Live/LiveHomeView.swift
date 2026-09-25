@@ -36,9 +36,11 @@ struct LiveHomeView: View {
     @State private var showingInvite = false
     @State private var showingSettings = false
     @State private var managing: ConnectionSummary?
+    @State private var confirming: ConnectionAction?
     @State private var notificationsOff = false
+    @ScaledMetric(relativeTo: .largeTitle) private var firstInviteTitleSize: CGFloat = 40
 
-    private var anySheet: Bool { showingInvite || showingSettings || managing != nil }
+    private var anySheet: Bool { showingInvite || showingSettings || managing != nil || confirming != nil }
 
     var body: some View {
         GeometryReader { proxy in
@@ -52,8 +54,7 @@ struct LiveHomeView: View {
                         notices.padding(.horizontal, inset)
                         if store.connections.isEmpty {
                             if store.hasLoadedConnections {
-                                emptyState
-                                addBand(minHeight: Tokens.personRowMinHeight)
+                                firstInviteBand(minHeight: Self.bandHeight(available: proxy.size.height, people: 0))
                             }
                         } else {
                             // Yo classic (H2): people and the + band share the screen
@@ -100,7 +101,7 @@ struct LiveHomeView: View {
         }
         .sheet(isPresented: $showingInvite) { InviteSheet() }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
-        .sheet(item: $managing) { ConnectionSheet(connection: $0) }
+        .manageConnection(menuFor: $managing, confirming: $confirming)
     }
 
     private var settingsButton: some View {
@@ -182,15 +183,30 @@ struct LiveHomeView: View {
         }
     }
 
-    private var emptyState: some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.l) {
-            Text("No one here yet. Invite someone you'd like to tap.")
-                .font(.body)
-                .foregroundStyle(Color.onCanvas)
-                .fixedSize(horizontal: false, vertical: true)
+    /// Option E2: before anyone accepts, home is one gold band.
+    private func firstInviteBand(minHeight: CGFloat) -> some View {
+        Button {
+            showingInvite = true
+        } label: {
+            VStack(spacing: Tokens.Space.m) {
+                Text("INVITE YOUR FIRST PERSON")
+                    .bandTitle("Invite your first person", size: firstInviteTitleSize, tracking: Tokens.Band.titleTracking)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("They'll appear here as a band")
+                    .font(.subheadline.weight(.medium))
+            }
+            .multilineTextAlignment(.center)
+            .foregroundStyle(Color.onCanvas)
+            .padding(Tokens.Space.xl)
+            .frame(maxWidth: .infinity, minHeight: minHeight)
+            .background(Color.addBand)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, Tokens.Space.xl)
-        .padding(.horizontal, Tokens.Space.xl)
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Invite someone")
+        .accessibilityHint("No one here yet. They'll appear here once they accept.")
+        .accessibilityAddTraits(.isButton)
     }
 
     private func row(_ connection: ConnectionSummary, minHeight: CGFloat) -> some View {
@@ -207,10 +223,17 @@ struct LiveHomeView: View {
                 statusSymbol: Self.symbol(for: status),
                 minHeight: minHeight
             )
-            // Remove and block live in a separate sheet: from here by long press or
-            // the VoiceOver action, and always from Settings → People.
+            // Remove, block and report: a long press here, the VoiceOver action,
+            // or Settings → People. Each explains itself before acting.
             .contextMenu {
-                Button("Manage \(connection.otherName)…", systemImage: "person.crop.circle") { managing = connection }
+                ForEach([ConnectionAction.Kind.remove, .block, .report], id: \.self) { kind in
+                    let action = ConnectionAction(kind: kind, connection: connection)
+                    Button(role: kind == .remove ? nil : .destructive) {
+                        confirming = action
+                    } label: {
+                        Label(action.menuTitle, systemImage: action.systemImage)
+                    }
+                }
             }
             .accessibilityAction(named: "Manage \(connection.otherName)") { managing = connection }
         }

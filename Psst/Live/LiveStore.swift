@@ -229,6 +229,13 @@ final class LiveStore {
         sendStates[connection.id] = nil
     }
 
+    /// Reporting also blocks, on the server.
+    func report(_ connection: ConnectionSummary) async throws {
+        try await api.reportUser(connection.otherId)
+        connections.removeAll { $0.id == connection.id }
+        sendStates[connection.id] = nil
+    }
+
     func acceptInvite(code: String) async throws -> UUID? {
         let result = try await api.acceptInvite(code: code)
         await refresh()

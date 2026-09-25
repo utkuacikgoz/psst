@@ -10,7 +10,7 @@ secret; credentials live in Supabase project secrets and in the git-ignored
 | `functions/send-signal` | Stores a signal as the caller, then hands it to APNs |
 | `functions/delete-account` | Deletes the caller's auth user; everything else cascades |
 | `functions/_shared` | APNs client (token auth), delivery logic, HTTP helpers |
-| `tests/test_backend.py` | 23 authorization, dedupe, invite, block, token and deletion tests |
+| `tests/test_backend.py` | 24 authorization, dedupe, invite, block, token and deletion tests |
 | `functions/tests` | 15 Deno tests for APNs signing, delivery outcomes, and the handler |
 | `config.toml` | Local CLI config (anonymous sign-ins on) |
 
@@ -22,6 +22,8 @@ secret; credentials live in Supabase project secrets and in the git-ignored
 - **connections**: one row per pair, with each side's favorite signal.
 - **blocks**: blocking deletes the connection and makes either person's invites
   look invalid to the other. The blocked person isn't told.
+- **reports**: reporter, reported person and time; `report_user` also blocks.
+  Clients can't read the table. Rows go when either account is deleted.
 - **signal_events**: the ID is generated on the sending phone and reused on
   retry, so a retry can never store a second copy. `created_at` is server time.
   `seen_at` is set only by the recipient's app after it displayed the signal.

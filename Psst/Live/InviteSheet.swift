@@ -1,84 +1,148 @@
 import SwiftUI
 
-/// Create and share an invite, or enter someone else's code.
+/// What the gold + band opens (option I2): two big bands, each leading to one step.
 struct InviteSheet: View {
     @Environment(LiveStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
+    private enum Mode { case choose, share, enter }
+
+    @State private var mode: Mode = .choose
+
+    // Share
     @State private var invite: CreatedInvite?
     @State private var isCreating = false
     @State private var createError: String?
 
+    // Enter
     @State private var code = ""
     @State private var preview: InvitePreview?
     @State private var isChecking = false
     @State private var isAccepting = false
     @State private var enterError: String?
+    @FocusState private var codeFocused: Bool
+
+    @ScaledMetric(relativeTo: .largeTitle) private var bandTitleSize: CGFloat = 36
+    @ScaledMetric(relativeTo: .largeTitle) private var codeSize: CGFloat = 40
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Tokens.Space.xl) {
-                    shareSection
-                    Divider()
-                    enterSection
-                }
-                .padding(Tokens.sheetInset)
+        VStack(spacing: 0) {
+            header
+            switch mode {
+            case .choose: chooser
+            case .share: shareStep
+            case .enter: enterStep
             }
-            .psstSheetChrome(title: "Invite someone") { dismiss() }
         }
-        .tint(Color.psstCanvas)
-        .environment(\.colorScheme, .light)
+        .foregroundStyle(Color.onCanvas)
+        .background(Color.psstCanvas.ignoresSafeArea())
+        .presentationBackground(Color.psstCanvas)
         .onAppear {
             if let pending = store.pendingInviteCode {
                 store.pendingInviteCode = nil
                 code = pending
+                mode = .enter
                 check()
             }
         }
     }
 
+    private var header: some View {
+        HStack {
+            Text("psst")
+                .font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy))
+                .tracking(Tokens.Band.wordmarkTracking)
+            Spacer()
+            Button(mode == .choose ? "Cancel" : "Back") {
+                if mode == .choose { dismiss() } else { withAnimation { mode = .choose } }
+            }
+            .font(.body.weight(.semibold))
+            .frame(minHeight: Tokens.minTouch)
+        }
+        .padding(.horizontal, Tokens.Space.xl)
+        .padding(.vertical, Tokens.Space.l)
+    }
+
+    // MARK: Choose
+
+    private var chooser: some View {
+        VStack(spacing: 0) {
+            chooserBand(title: "Share my invite", subtitle: "Send a link to one person", color: .addBand) {
+                withAnimation { mode = .share }
+                if invite == nil { create() }
+            }
+            chooserBand(title: "I have a code", subtitle: "Someone sent you one", color: Color(hex: 0x5F61AE)) {
+                withAnimation { mode = .enter }
+                codeFocused = true
+            }
+        }
+    }
+
+    private func chooserBand(title: String, subtitle: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: Tokens.Space.s) {
+                Text(title.uppercased())
+                    .bandTitle(title, size: bandTitleSize, tracking: Tokens.Band.titleTracking)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle)
+                    .font(.subheadline.weight(.medium))
+            }
+            .multilineTextAlignment(.center)
+            .padding(Tokens.Space.xl)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(color)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityHint(subtitle)
+        .accessibilityAddTraits(.isButton)
+    }
+
     // MARK: Share
 
-    private var shareSection: some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.m) {
-            Text("Send a link or code to one person. You can send each other signals once they accept.")
-                .font(.body)
-                .foregroundStyle(Color.ink)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if let invite {
-                VStack(alignment: .leading, spacing: Tokens.Space.s) {
+    private var shareStep: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: Tokens.Space.m) {
+                Text("YOUR CODE")
+                    .font(.subheadline.weight(.bold))
+                    .tracking(Tokens.Band.labelTracking * 2)
+                if let invite {
                     Text(invite.displayCode)
-                        .font(.system(.largeTitle, design: .monospaced, weight: .semibold))
-                        .foregroundStyle(Color.ink)
+                        .font(.system(size: codeSize, weight: .bold, design: .monospaced))
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
                         .textSelection(.enabled)
                         .accessibilityLabel("Invite code \(invite.code.map(String.init).joined(separator: " "))")
-                    Text("Works once. Expires \(invite.expiresAt.formatted(date: .abbreviated, time: .omitted)).")
-                        .font(.footnote)
-                        .foregroundStyle(Color.inkSecondary)
+                    Text("Works once · expires \(invite.expiresAt.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.subheadline.weight(.medium))
+                } else if let createError {
+                    Label(createError, systemImage: "exclamationmark.circle")
+                        .font(.subheadline.weight(.semibold))
+                    Button("Try again", action: create)
+                        .font(.body.weight(.semibold))
+                        .frame(minHeight: Tokens.minTouch)
+                } else {
+                    ProgressView().tint(.white)
                 }
+            }
+            .multilineTextAlignment(.center)
+            .padding(Tokens.Space.xl)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.addBand)
+
+            if let invite {
                 ShareLink(
                     item: invite.link,
                     message: Text("Connect with me on Psst. Open this link, or enter the code \(invite.code).")
                 ) {
                     Label("Share invite", systemImage: "square.and.arrow.up")
-                        .sheetButtonStyle(filled: true)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.ink)
+                        .frame(maxWidth: .infinity, minHeight: Tokens.Band.barMinHeight)
+                        .background(Color.surface)
                 }
-            } else {
-                Button(action: create) {
-                    ZStack {
-                        Text("Create invite").opacity(isCreating ? 0 : 1)
-                        if isCreating { ProgressView().tint(.white) }
-                    }
-                    .sheetButtonStyle(filled: true)
-                }
-                .disabled(isCreating)
-            }
-            if let createError {
-                Label(createError, systemImage: "exclamationmark.circle")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.ink)
             }
         }
     }
@@ -102,66 +166,61 @@ struct InviteSheet: View {
 
     // MARK: Enter
 
-    private var enterSection: some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.m) {
-            Text("Have a code?")
-                .font(.headline)
-                .foregroundStyle(Color.ink)
-            TextField("", text: $code, prompt: Text("ABCD EFGH").foregroundStyle(Color.inkSecondary))
-                .font(.system(.title3, design: .monospaced))
-                .foregroundStyle(Color.ink)
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-                .submitLabel(.go)
-                .onSubmit(check)
-                .padding(.horizontal, Tokens.Space.l)
-                .frame(minHeight: 52)
-                .background(RoundedRectangle(cornerRadius: Tokens.controlRadius).fill(Color.surfaceInset))
-                .accessibilityLabel("Invite code")
-                .onChange(of: code) { preview = nil; enterError = nil }
+    private var enterStep: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: Tokens.Space.m) {
+                Text("THEIR CODE")
+                    .font(.subheadline.weight(.bold))
+                    .tracking(Tokens.Band.labelTracking * 2)
+                TextField("", text: $code, prompt: Text("ABCD EFGH").foregroundStyle(Color.onCanvasSecondary))
+                    .font(.system(size: codeSize, weight: .bold, design: .monospaced))
+                    .multilineTextAlignment(.center)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .submitLabel(.go)
+                    .focused($codeFocused)
+                    .onSubmit(check)
+                    .minimumScaleFactor(0.5)
+                    .accessibilityLabel("Invite code")
+                    .onChange(of: code) { preview = nil; enterError = nil }
 
-            if let preview {
-                previewResult(preview)
-            } else {
-                Button(action: check) {
-                    ZStack {
-                        Text("Check code").opacity(isChecking ? 0 : 1)
-                        if isChecking { ProgressView() }
-                    }
-                    .sheetButtonStyle(filled: false)
+                if let preview {
+                    Text(Self.message(for: preview.status, name: preview.inviterName ?? "them"))
+                        .font(.body.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if let enterError {
+                    Label(enterError, systemImage: "exclamationmark.circle")
+                        .font(.subheadline.weight(.semibold))
                 }
-                .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || isChecking)
             }
-            if let enterError {
-                Label(enterError, systemImage: "exclamationmark.circle")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.ink)
+            .multilineTextAlignment(.center)
+            .padding(Tokens.Space.xl)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(hex: 0x5F61AE))
+
+            if let preview, preview.status == .pending {
+                whiteBand(title: "Connect with \(preview.inviterName ?? "them")", busy: isAccepting, action: accept)
+            } else if preview == nil {
+                whiteBand(title: "Check code", busy: isChecking, action: check)
+                    .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
     }
 
-    @ViewBuilder
-    private func previewResult(_ preview: InvitePreview) -> some View {
-        let name = preview.inviterName ?? "them"
-        switch preview.status {
-        case .pending:
-            Text("\(name) invited you.")
-                .font(.body)
-                .foregroundStyle(Color.ink)
-            Button(action: accept) {
-                ZStack {
-                    Text("Connect with \(name)").opacity(isAccepting ? 0 : 1)
-                    if isAccepting { ProgressView().tint(.white) }
-                }
-                .sheetButtonStyle(filled: true)
+    private func whiteBand(title: String, busy: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack {
+                Text(title).opacity(busy ? 0 : 1)
+                if busy { ProgressView().tint(Color.ink) }
             }
-            .disabled(isAccepting)
-        default:
-            Label(Self.message(for: preview.status, name: name), systemImage: "info.circle")
-                .font(.body)
-                .foregroundStyle(Color.ink)
-                .fixedSize(horizontal: false, vertical: true)
+            .font(.body.weight(.semibold))
+            .foregroundStyle(Color.ink)
+            .frame(maxWidth: .infinity, minHeight: Tokens.Band.barMinHeight)
+            .background(Color.surface)
+            .contentShape(Rectangle())
         }
+        .disabled(busy)
+        .accessibilityLabel(title)
     }
 
     static func message(for status: InvitePreview.Status, name: String) -> String {
@@ -209,23 +268,5 @@ struct InviteSheet: View {
             }
             isAccepting = false
         }
-    }
-}
-
-extension View {
-    /// Full-width 52 pt control for sheets: filled cobalt or outlined.
-    func sheetButtonStyle(filled: Bool) -> some View {
-        font(.body.weight(.semibold))
-            .foregroundStyle(filled ? Color.white : Color.psstCanvas)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .background(
-                RoundedRectangle(cornerRadius: Tokens.controlRadius)
-                    .fill(filled ? Color.psstCanvas : Color.clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Tokens.controlRadius)
-                    .stroke(Color.psstCanvas, lineWidth: filled ? 0 : 1.5)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: Tokens.controlRadius))
     }
 }

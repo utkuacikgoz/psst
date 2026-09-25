@@ -36,9 +36,9 @@ final class ScreenshotTests: XCTestCase {
         shot("07-alex-tapped-back", sizeName)
 
         app.buttons["Your phone"].tap()
-        wait(0.45)
-        shot("08-home-reply-effect", sizeName)
-        wait(1)
+        wait(0.7)
+        shot("08-home-reply-arrival", sizeName)
+        wait(2.2)
         shot("09-home-reply", sizeName)
 
         app.buttons["Invite someone"].tap()

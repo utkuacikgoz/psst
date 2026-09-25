@@ -15,84 +15,94 @@ struct SettingsSheet: View {
     @State private var managing: ConnectionSummary?
 
     var body: some View {
+        // Option S3: the standard grouped iPhone list.
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Tokens.Space.xl) {
-                    section("Your name") {
-                        HStack(spacing: Tokens.Space.s) {
-                            TextField("", text: $name, prompt: Text("New name").foregroundStyle(Color.inkSecondary))
-                                .foregroundStyle(Color.ink)
-                                .padding(.horizontal, Tokens.Space.m)
-                                .frame(minHeight: Tokens.minTouch)
-                                .background(RoundedRectangle(cornerRadius: Tokens.controlRadius).fill(Color.surfaceInset))
-                                .accessibilityLabel("New name")
-                            Button("Save", action: rename)
-                                .font(.body.weight(.semibold))
-                                .frame(minWidth: Tokens.minTouch, minHeight: Tokens.minTouch)
-                                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                        }
-                        if let nameMessage { caption(nameMessage) }
+            Form {
+                Section {
+                    HStack {
+                        TextField("New name", text: $name)
+                            .textContentType(.givenName)
+                            .submitLabel(.done)
+                            .onSubmit(rename)
+                            .accessibilityLabel("New name")
+                        Button("Save", action: rename)
+                            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
+                } header: {
+                    Text("Your name")
+                } footer: {
+                    if let nameMessage { Text(nameMessage) }
+                }
 
-                    section("Notifications") {
-                        caption(notificationText)
-                        Button("Open notification settings") {
-                            if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
-                                UIApplication.shared.open(url)
-                            }
+                Section {
+                    Button("Open notification settings") {
+                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                            UIApplication.shared.open(url)
                         }
-                        .font(.body.weight(.semibold))
-                        .frame(minHeight: Tokens.minTouch)
                     }
+                } header: {
+                    Text("Notifications")
+                } footer: {
+                    Text(notificationText)
+                }
 
-                    section("People") {
-                        if store.connections.isEmpty {
-                            caption("No one yet.")
-                        }
-                        ForEach(store.connections) { connection in
+                Section("People") {
+                    if store.connections.isEmpty {
+                        Text("No one yet.").foregroundStyle(.secondary)
+                    }
+                    ForEach(store.connections) { connection in
+                        Button {
+                            managing = connection
+                        } label: {
                             HStack {
-                                Text(connection.otherName).foregroundStyle(Color.ink)
+                                Text(connection.otherName).foregroundStyle(.primary)
                                 Spacer()
-                                Button("Manage") { managing = connection }
-                                    .font(.body.weight(.semibold))
-                                    .frame(minHeight: Tokens.minTouch)
-                                    .accessibilityLabel("Manage \(connection.otherName)")
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
                             }
                         }
-                    }
-
-                    section("Blocked") {
-                        if blocked.isEmpty {
-                            caption("No one.")
-                        }
-                        ForEach(blocked) { person in
-                            HStack {
-                                Text(person.displayName).foregroundStyle(Color.ink)
-                                Spacer()
-                                Button("Unblock") { unblock(person) }
-                                    .font(.body.weight(.semibold))
-                                    .frame(minHeight: Tokens.minTouch)
-                            }
-                        }
-                    }
-
-                    section("Privacy") {
-                        caption("Psst stores your name, your connections, and signals from the last 30 days, plus your device's notification token. It doesn't read your contacts or location, and there are no messages to store.")
-                    }
-
-                    section("Account") {
-                        Button(role: .destructive) { confirmingDelete = true } label: {
-                            if isDeleting { ProgressView() } else { Text("Delete account") }
-                        }
-                        .font(.body.weight(.semibold))
-                        .frame(minHeight: Tokens.minTouch)
-                        .disabled(isDeleting)
-                        if let deleteError { caption(deleteError) }
+                        .accessibilityLabel("Manage \(connection.otherName)")
                     }
                 }
-                .padding(Tokens.sheetInset)
+
+                Section("Blocked") {
+                    if blocked.isEmpty {
+                        Text("No one.").foregroundStyle(.secondary)
+                    }
+                    ForEach(blocked) { person in
+                        HStack {
+                            Text(person.displayName)
+                            Spacer()
+                            Button("Unblock") { unblock(person) }
+                        }
+                    }
+                }
+
+                Section {
+                    Text("Psst stores your name, your connections, and signals from the last 30 days, plus your device's notification token. It doesn't read your contacts or location, and there are no messages to store.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Privacy")
+                }
+
+                Section {
+                    Button(role: .destructive) { confirmingDelete = true } label: {
+                        if isDeleting { ProgressView() } else { Text("Delete account") }
+                    }
+                    .disabled(isDeleting)
+                } footer: {
+                    if let deleteError { Text(deleteError) }
+                }
             }
-            .psstSheetChrome(title: "Settings") { dismiss() }
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
         }
         .tint(Color.psstCanvas)
         .environment(\.colorScheme, .light)
@@ -120,23 +130,6 @@ struct SettingsSheet: View {
         default:
             "Not set up yet."
         }
-    }
-
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.s) {
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(Color.ink)
-                .accessibilityAddTraits(.isHeader)
-            content()
-        }
-    }
-
-    private func caption(_ text: String) -> some View {
-        Text(text)
-            .font(.subheadline)
-            .foregroundStyle(Color.inkSecondary)
-            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func rename() {

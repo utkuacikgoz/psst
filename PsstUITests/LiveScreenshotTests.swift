@@ -29,9 +29,10 @@ final class LiveScreenshotTests: XCTestCase {
         notNow.tap()
 
         XCTAssertTrue(app.buttons["Ada"].waitForExistence(timeout: 10))
-        wait(0.3)
-        shot("live-03-home-receiving")
-        wait(1.5)
+        // Ada's unseen Psst opens the full-screen arrival, which clears itself.
+        wait(0.4)
+        shot("live-03-arrival")
+        wait(2.2)
         shot("live-04-home")
 
         app.buttons["Emre"].tap()
@@ -45,18 +46,25 @@ final class LiveScreenshotTests: XCTestCase {
         shot("live-07-not-sent")
 
         app.buttons["Invite someone"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["Create invite"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Share my invite"].waitForExistence(timeout: 5))
         wait(0.4)
         shot("live-10-invite")
-        app.buttons["Create invite"].tap()
-        wait(0.8)
+        app.buttons["Share my invite"].tap()
+        XCTAssertTrue(app.buttons["Share invite"].waitForExistence(timeout: 5))
+        wait(0.4)
         shot("live-11-invite-created")
+        app.buttons["Back"].tap()
+        XCTAssertTrue(app.buttons["I have a code"].waitForExistence(timeout: 5))
+        app.buttons["I have a code"].tap()
         let code = app.textFields["Invite code"]
+        XCTAssertTrue(code.waitForExistence(timeout: 5))
         code.tap()
         code.typeText("K7QX4MPA\n")
         wait(0.8)
         shot("live-12-invite-preview")
-        app.buttons["Done"].tap()
+        app.buttons["Back"].tap()
+        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))
+        app.buttons["Cancel"].tap()
         wait(0.6)
 
         app.buttons["Settings"].tap()

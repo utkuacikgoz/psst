@@ -31,6 +31,10 @@ struct ArrivalView: View {
     static let queuedTime: Duration = .milliseconds(1400)
 
     private var holdTime: Duration {
+        #if DEBUG
+        // App Store screenshot runs hold each moment so it can be captured.
+        if ProcessInfo.processInfo.arguments.contains("-PsstUITestHoldMoments") { return .seconds(8) }
+        #endif
         if arrival.kind == .sameMoment { return Self.sameMomentTime }
         return arrival.total == nil ? Self.displayTime : Self.queuedTime
     }

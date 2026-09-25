@@ -158,12 +158,14 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         if: ${{ !inputs.appstore }}
+        continue-on-error: true
         with:
           pattern: review-*
           path: review
           merge-multiple: true
       - uses: actions/download-artifact@v4
         if: ${{ inputs.appstore }}
+        continue-on-error: true  # nothing to publish if the capture failed
         with:
           name: appstore
           path: review/appstore

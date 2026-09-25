@@ -29,12 +29,16 @@ on:
       - ".github/workflows/ios.yml"
   workflow_dispatch:
 
+# One iOS run per branch at a time: a newer push or manual run cancels the
+# older one, so macOS runners never stack up.
 concurrency:
-  group: ios-${{ github.ref }}-${{ github.event_name }}
+  group: ios-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   unit-tests:
+    # A manual run is for screenshots; its UI-test shards build the app anyway.
+    if: github.event_name != 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 25
     steps:

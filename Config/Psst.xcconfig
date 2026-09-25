@@ -4,7 +4,11 @@
 // To use a Supabase project, copy Secrets.example.xcconfig to Secrets.xcconfig
 // (git-ignored) and fill it in. See supabase/README.md.
 
-PRODUCT_BUNDLE_IDENTIFIER = app.psst.prototype
+// The app's bundle ID. Secrets.xcconfig sets your own; the widget derives
+// its ID and the shared App Group from it.
+PSST_APP_BUNDLE_ID = app.psst.prototype
+PRODUCT_BUNDLE_IDENTIFIER = $(PSST_APP_BUNDLE_ID)
+PSST_APP_GROUP = group.$(PSST_APP_BUNDLE_ID)
 PSST_SUPABASE_HOST =
 PSST_SUPABASE_ANON_KEY =
 
@@ -13,3 +17,7 @@ ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = AppIcon-Night AppIcon-Gold AppIc
 ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO
 
 #include? "Secrets.xcconfig"
+
+// Re-derive after Secrets, which may set PSST_APP_BUNDLE_ID.
+PRODUCT_BUNDLE_IDENTIFIER = $(PSST_APP_BUNDLE_ID)
+PSST_APP_GROUP = group.$(PSST_APP_BUNDLE_ID)

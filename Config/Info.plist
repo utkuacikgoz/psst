@@ -8,6 +8,8 @@
 	<string>$(PSST_SUPABASE_HOST)</string>
 	<key>PSSTSupabaseAnonKey</key>
 	<string>$(PSST_SUPABASE_ANON_KEY)</string>
+	<key>PSSTAppGroup</key>
+	<string>$(PSST_APP_GROUP)</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>InterTight-Medium.ttf</string>

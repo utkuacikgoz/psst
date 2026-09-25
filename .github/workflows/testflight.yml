@@ -88,7 +88,7 @@ jobs:
           PSST_SUPABASE_HOST = $SUPABASE_PROJECT_REF.supabase.co
           PSST_SUPABASE_ANON_KEY = $ANON
           DEVELOPMENT_TEAM = $TEAM_ID
-          PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID
+          PSST_APP_BUNDLE_ID = $BUNDLE_ID
           CODE_SIGN_ENTITLEMENTS = Config/Psst.entitlements
           EOF
 

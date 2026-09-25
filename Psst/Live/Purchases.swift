@@ -149,7 +149,11 @@ final class Personalization {
 
     /// Someone's band colour: your choice if you made one, else the usual one.
     func color(for id: UUID, name: String) -> Color {
-        colors[id].map { Color(hex: $0) } ?? .personBand(name)
+        Color(hex: colorHex(for: id, name: name))
+    }
+
+    func colorHex(for id: UUID, name: String) -> UInt32 {
+        colors[id] ?? Color.personBandHex(name)
     }
 
     func setColor(_ hex: UInt32?, for id: UUID) {

@@ -61,13 +61,15 @@ final class LiveStore {
     private(set) var hasLoadedConnections = false
     /// A short, factual message for the home screen (e.g. a connection that ended).
     var notice: String?
-    /// Set from a psst://invite link; the home screen opens the invite sheet with it.
+    /// Set from an invite link (https://psstapp.fun/invite/CODE or psst://invite/CODE); the home screen opens the invite sheet with it.
     var pendingInviteCode: String?
     /// IF2: someone new opened an invite link. Their start leads with the
     /// inviter; once they've chosen a name, the invite is accepted for them.
     private(set) var invitedBy: String?
     private(set) var introInviteCode: String?
     var introSeen = false
+    /// Set by the widget's Psst+ message (psst://plus); home opens Psst+.
+    var plusRequested = false
     /// True only while the home list is on screen in the foreground. Signals are
     /// acknowledged as seen only then, because only then were they displayed.
     var isHomeVisible = false
@@ -440,6 +442,15 @@ final class LiveStore {
         if let sender = connections.first(where: { $0.id == payload.connectionID }) {
             arrival = Arrival(id: payload.eventID, connectionID: sender.id, senderName: sender.otherName,
                               kind: payload.sameMoment ? .sameMoment : .signal)
+        }
+    }
+
+    /// A band tapped on the home-screen widget: send that person a Psst, the
+    /// same as tapping their band at home (same pacing and retry rules).
+    func psstFromWidget(_ connectionID: UUID) async {
+        if !connections.contains(where: { $0.id == connectionID }) { await refresh() }
+        if let connection = connections.first(where: { $0.id == connectionID }) {
+            await tap(connection)?.value
         }
     }
 

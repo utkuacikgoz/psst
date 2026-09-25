@@ -30,7 +30,7 @@ struct PsstPlusSheet: View {
                     perk("Choose each person's colour", symbol: "paintpalette.fill", tint: 0xAC3E68)
                     perk("Alternate app icons", symbol: "app.fill", tint: 0x2476AA)
                     perk("Choose your whisper sound", symbol: "speaker.wave.2.fill", tint: 0x187F69)
-                    perk("Home-screen widget (coming)", symbol: "rectangle.grid.1x2.fill", tint: 0xB87500)
+                    perk("Home-screen widget", symbol: "rectangle.grid.1x2.fill", tint: 0xB87500)
                 }
 
                 if purchases.isUnlocked {

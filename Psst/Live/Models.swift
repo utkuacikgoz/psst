@@ -41,7 +41,10 @@ struct CreatedInvite: Decodable, Equatable {
     let code: String
     let expiresAt: Date
 
-    var link: URL { URL(string: "psst://invite/\(code)")! }
+    /// A web link, so it works for people who don't have Psst yet: with the app
+    /// installed it opens the app (universal link); without, a page on
+    /// psstapp.fun shows the code and where to get Psst.
+    var link: URL { URL(string: "https://\(InviteLink.webHost)/invite/\(code)")! }
     /// "ABCD EFGH" for reading aloud or typing.
     var displayCode: String { code.count == 8 ? "\(code.prefix(4)) \(code.suffix(4))" : code }
 }
@@ -116,10 +119,21 @@ extension UUID {
 }
 
 enum InviteLink {
-    /// Reads the code from psst://invite/ABCDEFGH.
+    static let webHost = "psstapp.fun"
+
+    /// Reads the code from https://psstapp.fun/invite/ABCDEFGH (a universal link)
+    /// or the older psst://invite/ABCDEFGH.
     static func code(from url: URL) -> String? {
-        guard url.scheme?.lowercased() == "psst", url.host?.lowercased() == "invite" else { return nil }
-        let code = url.pathComponents.dropFirst().first?
+        let scheme = url.scheme?.lowercased(), host = url.host?.lowercased()
+        var parts = url.pathComponents.filter { $0 != "/" }
+        if scheme == "psst", host == "invite" {
+            // psst://invite/CODE: the code is the whole path.
+        } else if scheme == "https", host == webHost || host == "www.\(webHost)", parts.first?.lowercased() == "invite" {
+            parts.removeFirst()
+        } else {
+            return nil
+        }
+        let code = parts.first?
             .uppercased()
             .filter { $0.isLetter || $0.isNumber }
         guard let code, !code.isEmpty else { return nil }

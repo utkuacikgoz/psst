@@ -1,0 +1,11 @@
+// The home-screen widget (Psst+). Shares the app's settings and team, with its
+// own bundle ID under the app's and the same App Group.
+#include "Psst.xcconfig"
+
+PRODUCT_BUNDLE_IDENTIFIER = $(PSST_APP_BUNDLE_ID).widget
+CODE_SIGN_ENTITLEMENTS = Config/PsstWidget.entitlements
+INFOPLIST_FILE = Config/PsstWidget-Info.plist
+ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES =
+ASSETCATALOG_COMPILER_APPICON_NAME =
+APPLICATION_EXTENSION_API_ONLY = YES
+SKIP_INSTALL = YES

@@ -1,16 +1,29 @@
-name: Deploy backend (development)
+name: Deploy backend
 
-# Manual only: deploying changes a live service.
-# Repository secrets needed (Settings → Secrets and variables → Actions):
+# Manual only: deploying changes a live service. Choose the target when running.
+#
+# Repository secrets (Settings → Secrets and variables → Actions) serve development:
 #   SUPABASE_ACCESS_TOKEN   personal access token from supabase.com/dashboard/account/tokens
 #   SUPABASE_PROJECT_REF    the xxxx in xxxx.supabase.co (development project)
 #   SUPABASE_DB_PASSWORD    that project's database password
 #   APNS_TEAM_ID, APNS_KEY_ID, APNS_BUNDLE_ID, APNS_PRIVATE_KEY (full .p8 contents)
+# Production uses its own secrets, with a PROD_ prefix, as repository secrets or
+# on the "production" environment (which can also require an approval):
+#   PROD_SUPABASE_PROJECT_REF, PROD_SUPABASE_DB_PASSWORD   (required)
+#   PROD_SUPABASE_ACCESS_TOKEN   (only if production is in another Supabase account)
+# A production run never falls back to the development project. The APNs key is
+# shared: APNs itself separates sandbox and production device tokens.
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Which backend to deploy
+        type: choice
+        options: [development, production]
+        default: development
 
 concurrency:
-  group: deploy-backend-development
+  group: deploy-backend-${{ inputs.target }}
   cancel-in-progress: false
 
 jobs:
@@ -20,11 +33,15 @@ jobs:
   deploy:
     needs: tests
     runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
     timeout-minutes: 20
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      TARGET: ${{ inputs.target }}
+      SUPABASE_ACCESS_TOKEN: ${{ inputs.target == 'production' && secrets.PROD_SUPABASE_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ inputs.target == 'production' && secrets.PROD_SUPABASE_PROJECT_REF || secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_DB_PASSWORD: ${{ inputs.target == 'production' && secrets.PROD_SUPABASE_DB_PASSWORD || secrets.SUPABASE_DB_PASSWORD }}
+      PROD_REF: ${{ secrets.PROD_SUPABASE_PROJECT_REF }}
+      PROD_PASSWORD: ${{ secrets.PROD_SUPABASE_DB_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,8 +55,14 @@ jobs:
           missing=0
           for name in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF SUPABASE_DB_PASSWORD \
                       APNS_TEAM_ID APNS_KEY_ID APNS_BUNDLE_ID APNS_PRIVATE_KEY; do
-            if [ -z "${!name}" ]; then echo "::error::Repository secret $name is not set"; missing=1; fi
+            if [ -z "${!name}" ]; then echo "::error::Secret $name is not set for ${{ inputs.target }}"; missing=1; fi
           done
+          # Production must never fall back to the development project.
+          if [ "$TARGET" = production ]; then
+            if [ -z "$PROD_REF" ]; then echo "::error::PROD_SUPABASE_PROJECT_REF is not set"; missing=1; fi
+            if [ -z "$PROD_PASSWORD" ]; then echo "::error::PROD_SUPABASE_DB_PASSWORD is not set"; missing=1; fi
+          fi
+          echo "Deploying to $TARGET."
           # Accept the whole .p8 file or just its base64 body; reject anything else.
           body=$(sed '/-----/d' <<<"$APNS_PRIVATE_KEY" | tr -d ' \r\n\t')
           if ! [[ "$body" =~ ^[A-Za-z0-9+/]+=*$ ]] || [ ${#body} -lt 150 ] || [ ${#body} -gt 400 ]; then

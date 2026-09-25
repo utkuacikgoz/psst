@@ -1,7 +1,9 @@
 name: TestFlight
 
-# Manual only: builds a signed release pointed at the development backend and
-# uploads it to App Store Connect for TestFlight.
+# Manual only: builds a signed release pointed at the chosen backend and uploads
+# it to App Store Connect for TestFlight (and, from there, App Store release).
+# Production reads PROD_SUPABASE_PROJECT_REF (and PROD_SUPABASE_ACCESS_TOKEN if
+# set); see deploy-backend.yml.
 #
 # Repository secrets needed, besides the backend ones already set:
 #   ASC_KEY_ID      App Store Connect API key ID
@@ -11,6 +13,12 @@ name: TestFlight
 #         SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF (to read the anon key).
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Which backend the build talks to
+        type: choice
+        options: [production, development]
+        default: production
 
 concurrency:
   group: testflight
@@ -20,14 +28,17 @@ jobs:
   upload:
     runs-on: macos-15
     timeout-minutes: 60
+    environment: ${{ inputs.target }}
     env:
+      TARGET: ${{ inputs.target }}
+      PROD_REF: ${{ secrets.PROD_SUPABASE_PROJECT_REF }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
       TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
       BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_ACCESS_TOKEN: ${{ inputs.target == 'production' && secrets.PROD_SUPABASE_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ inputs.target == 'production' && secrets.PROD_SUPABASE_PROJECT_REF || secrets.SUPABASE_PROJECT_REF }}
       BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +53,10 @@ jobs:
                       SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF; do
             if [ -z "${!name}" ]; then echo "::error::Secret for $name is not set"; missing=1; fi
           done
+          if [ "$TARGET" = production ] && [ -z "$PROD_REF" ]; then
+            echo "::error::PROD_SUPABASE_PROJECT_REF is not set; a production build must not point at development."
+            missing=1
+          fi
           exit $missing
 
       - name: Write the App Store Connect key
@@ -56,7 +71,7 @@ jobs:
           chmod 600 "$KEY_PATH"
           echo "KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
-      - name: Point the build at the development backend
+      - name: Point the build at the ${{ inputs.target }} backend
         run: |
           # One Management API call instead of installing the Supabase CLI.
           ANON=$(curl -sf -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
@@ -122,7 +137,7 @@ jobs:
             -authenticationKeyPath "$KEY_PATH" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
-          echo "Uploaded build $BUILD_NUMBER. It appears in TestFlight after Apple finishes processing (usually 5–30 minutes)."
+          echo "Uploaded build $BUILD_NUMBER ($TARGET backend). It appears in TestFlight after Apple finishes processing (usually 5–30 minutes)."
 
       - name: Remove the key
         if: always()

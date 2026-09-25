@@ -9,9 +9,9 @@ This repository contains only Psst, a native iPhone one-tap social app. Build th
 ## Owner decisions
 - Revive Yo’s simple one-tap contact idea under a new name.
 - **An inside joke between people who care about each other:** warm by default, with optional mischief. Neither an exclusively romantic app nor an exclusively comic app.
-- Ordinary send stays one tap on the person. Choosing and previewing another signal is a separate deliberate action.
-- Four free starter signals: **Psst, Squeeze, Oi, Duck**.
-- Remember a favorite signal per connection. Receivers control sound and notifications.
+- Sending is one tap on the person.
+- **One signal: Psst.** The owner removed Squeeze, Oi and Duck on 25 Sep 2026, along with choosing, previewing and per-connection favourite signals. Don't reintroduce other signals or a signal picker without the owner's approval.
+- Receivers control sound and notifications.
 - First prototype: one person, four signals, and the receiving/replying experience.
 - Mobile app first, concise updates, careful token use, and exceptional execution without template clutter.
 
@@ -20,7 +20,7 @@ This repository contains only Psst, a native iPhone one-tap social app. Build th
 ## Existing implementation
 Open `Psst.xcodeproj`. It is a native SwiftUI iPhone app, targeting iOS 17+, with no third-party packages. It runs in one of two modes:
 
-- **Local preview** (no configuration): Alex is an explicitly fictional demo connection. The user can choose a signal, trigger a local sender reaction, switch to Alex's recipient preview, and tap back. It must remain visibly labeled local preview and does not establish remote delivery.
+- **Local preview** (no configuration): Alex is an explicitly fictional demo connection. The user can trigger a local sender reaction, switch to Alex's recipient preview, and tap back. It must remain visibly labeled local preview and does not establish remote delivery.
 - **Live** (when `Config/Secrets.xcconfig` names a Supabase project): anonymous account plus display name, invites, mutual connections, authenticated send through the `send-signal` edge function, APNs push, notification "Send back", seen acknowledgements, block/remove, and account deletion. The backend is in `supabase/` with migrations and tests. The development backend is deployed through `.github/workflows/deploy-backend.yml` (manual) and passes its live server checks: invites, sending, idempotent retry, authorization refusal, acknowledgement and account deletion. The app has not yet been run against it on physical devices. Treat push delivery as unverified until the two-device checklist in `supabase/README.md` passes.
 
 There are no purchases, custom audio, or production effect animations yet. The four effects are represented with SF Symbols, accent colours, and basic native motion. Do not claim a generated notification or “delivered” status.
@@ -36,7 +36,7 @@ Support close friends and couples without assigning relationship categories. The
 - A compact home screen of accepted connections with large, tactile tap targets.
 - Minimal identity and onboarding. Explain what happens before requesting notifications.
 - Invite link and code flow, including pending, accepted, expired/revoked, and wrong-account cases. Mutual acceptance is required before messages can be sent.
-- Four free starter signals: Psst (thinking of you), Squeeze (affection), Oi (playful attention), and Duck (absurd humour). Keep a normal send to one tap. Allow a separate, deliberate way to choose effects.
+- One free signal, Psst (thinking of you). A normal send is one tap.
 - Real push notifications, actionable reciprocation where supported, and a usable in-app inbox/state when notification permission is denied.
 - Distinguish sending, server acceptance, failure, and actual observed receipt. APNs acceptance is not proof of device delivery. Never animate a successful remote receipt without evidence.
 - Handle offline operation, retry, idempotency, duplicate taps, stale device tokens, account/device changes, blocked users, and notification deep links.
@@ -69,7 +69,7 @@ Use StoreKit 2 with localized prices, verified entitlements, restoration, pendin
 Measure accepted invites, first two-way exchanges, repeat voluntary exchanges, failures, notification opt-out, blocks, and actual purchase cohorts. Avoid contact/message content in analytics and disclose actual collection. Downloads alone are not evidence of a business.
 
 ## Execution
-1. Refine the included local prototype: all four signals, deliberate selection/preview, sender and recipient states, reciprocal action, and accessible/reduced-motion behavior. Label every simulated step honestly.
+1. Refine the included local prototype: sender and recipient states, reciprocal action, and accessible/reduced-motion behavior. Label every simulated step honestly.
 2. Deliver the real vertical slice: two accounts on two installations, mutual connection, authenticated send, actual push receipt, notification-open routing, and tap-back. Test on physical devices for push behavior that simulator testing cannot establish.
 3. Complete recovery, offline/retry behavior, abuse controls, preferences, deletion, and effect design. Introduce one premium collection only after the free exchange works.
 4. Verify StoreKit, accessibility, privacy, and release artifacts. Optional widgets and gift purchases follow later.

@@ -48,10 +48,10 @@ The owner explicitly chose **Yo** after rejecting the earlier cobalt-card design
 - Purple canvas (`#713F93`); white type on strong blue, teal, orange, pink, and violet bands. Contact colour is stable for a name, not a network status.
 - Header uses a bold 40-point “psst” wordmark. Contact names begin at 52 points and scale with Dynamic Type. Long names wrap instead of clipping.
 - No rounded contact cards, perimeter gutters, outlines, persistent decorative symbols, or large explanatory paragraphs.
-- The entire person band sends. The following darker bar explicitly opens the effect picker; it is a separate action and never sends.
+- The entire person band sends a Psst, the only signal. Nothing else lives inside the band. Removing or blocking a person is a separate action: Settings → People, a long press on the band, or the VoiceOver "Manage" action.
 - A single connection gets a larger band; multiple connections become a scrollable stack. Never invent contacts to fill space.
 - In the local demo, one concise notice identifies the fictional contact and local-only exchange. Do not repeat the full disclaimer in every control. Preserve honest statuses and VoiceOver hints.
-- Picker: one preview stage, four full-width coloured choices, a checkmark for selection, and a distinct accessible preview button. Choosing or previewing must never send.
+- There is no signal picker: the owner reduced the app to one signal, Psst (25 Sep 2026).
 - Recipient view uses the received signal’s colour, large signal name, sender identity, and a clear reply band.
 - Press feedback is a brief local colour change. On success, the signal can briefly replace the contact name before the name returns. Do not imply remote delivery.
 - Keep safe areas, Dynamic Type, reduced motion, readable contrast, and minimum touch targets. At accessibility sizes, allow the content to scroll and stack controls.

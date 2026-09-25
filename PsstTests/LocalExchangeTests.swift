@@ -28,20 +28,12 @@ final class LocalExchangeTests: XCTestCase {
         return LocalExchange(defaults: defaults, now: { clock.time })
     }
 
-    func testChoosingASignalNeverSends() {
+    func testEveryTapSendsPsst() {
         let exchange = makeExchange()
-        for signal in Signal.allCases { exchange.setFavorite(signal) }
+        XCTAssertEqual(exchange.tapSignal(for: .me), .psst)
+        XCTAssertEqual(exchange.tapSignal(for: .alex), .psst)
         XCTAssertTrue(exchange.events.isEmpty)
-        XCTAssertEqual(exchange.status(for: .me), .ready(.duck))
-    }
-
-    func testFavoriteIsRememberedPerDevice() {
-        makeExchange().setFavorite(.oi)
-        XCTAssertEqual(makeExchange().favorite, .oi)
-    }
-
-    func testDefaultFavoriteIsPsst() {
-        XCTAssertEqual(makeExchange().favorite, .psst)
+        XCTAssertEqual(exchange.status(for: .me), .ready(.psst))
     }
 
     func testEachSendHasAUniqueID() {
@@ -56,77 +48,74 @@ final class LocalExchangeTests: XCTestCase {
     func testRetryWithSameIDDoesNotDuplicate() {
         let exchange = makeExchange()
         let id = UUID()
-        guard case .played(let first) = exchange.send(.squeeze, from: .me, id: id) else {
+        guard case .played(let first) = exchange.send(.psst, from: .me, id: id) else {
             return XCTFail("first send should play")
         }
         clock.advance(5)
-        XCTAssertEqual(exchange.send(.squeeze, from: .me, id: id), .alreadyRecorded(first))
+        XCTAssertEqual(exchange.send(.psst, from: .me, id: id), .alreadyRecorded(first))
         XCTAssertEqual(exchange.events.count, 1)
     }
 
     func testRapidRepeatTapIsCoalesced() {
         let exchange = makeExchange()
-        exchange.send(.oi, from: .me)
+        exchange.send(.psst, from: .me)
         clock.advance(0.3)
-        XCTAssertEqual(exchange.send(.oi, from: .me), .tooSoon)
+        XCTAssertEqual(exchange.send(.psst, from: .me), .tooSoon)
         XCTAssertEqual(exchange.events.count, 1)
     }
 
     func testBurstPausesThenResumes() {
         let exchange = makeExchange()
         for _ in 0..<LocalExchange.burstLimit {
-            guard case .played = exchange.send(.duck, from: .me) else { return XCTFail("should play") }
+            guard case .played = exchange.send(.psst, from: .me) else { return XCTFail("should play") }
             clock.advance(1)
         }
-        guard case .paused(let until) = exchange.send(.duck, from: .me) else {
+        guard case .paused(let until) = exchange.send(.psst, from: .me) else {
             return XCTFail("burst should pause")
         }
         XCTAssertEqual(exchange.status(for: .me), .paused(until: until))
         XCTAssertEqual(exchange.events.count, LocalExchange.burstLimit)
 
         clock.advance(LocalExchange.pauseDuration + 1)
-        guard case .played = exchange.send(.duck, from: .me) else { return XCTFail("should resume") }
+        guard case .played = exchange.send(.psst, from: .me) else { return XCTFail("should resume") }
     }
 
     func testPauseAppliesOnlyToTheSender() {
         let exchange = makeExchange()
         for _ in 0...LocalExchange.burstLimit {
-            exchange.send(.duck, from: .me)
+            exchange.send(.psst, from: .me)
             clock.advance(1)
         }
         XCTAssertNotNil(exchange.activePause(for: .me))
-        guard case .played = exchange.send(.duck, from: .alex) else { return XCTFail("Alex unaffected") }
+        guard case .played = exchange.send(.psst, from: .alex) else { return XCTFail("Alex unaffected") }
     }
 
     func testReceiptIsOnlyClaimedAfterTheOtherScreenShowsIt() {
         let exchange = makeExchange()
-        exchange.setFavorite(.squeeze)
-        exchange.send(.squeeze, from: .me)
-        XCTAssertEqual(exchange.status(for: .me), .playedLocally(.squeeze))
+        exchange.send(.psst, from: .me)
+        XCTAssertEqual(exchange.status(for: .me), .playedLocally(.psst))
 
         exchange.markSeen(by: .me) // opening your own screen proves nothing about Alex's
-        XCTAssertEqual(exchange.status(for: .me), .playedLocally(.squeeze))
+        XCTAssertEqual(exchange.status(for: .me), .playedLocally(.psst))
 
         exchange.markSeen(by: .alex)
-        XCTAssertEqual(exchange.status(for: .me), .shownToOther(.squeeze))
+        XCTAssertEqual(exchange.status(for: .me), .shownToOther(.psst))
     }
 
     func testAlexTapsBackWithWhatTheyReceived() {
         let exchange = makeExchange()
-        XCTAssertEqual(exchange.tapSignal(for: .alex), .psst)
-        exchange.send(.oi, from: .me)
-        XCTAssertEqual(exchange.tapSignal(for: .alex), .oi)
-        XCTAssertEqual(exchange.status(for: .alex), .received(.oi))
+        exchange.send(.psst, from: .me)
+        XCTAssertEqual(exchange.status(for: .alex), .received(.psst))
 
         clock.advance(1)
         exchange.send(exchange.tapSignal(for: .alex), from: .alex)
-        XCTAssertEqual(exchange.status(for: .me), .received(.oi))
+        XCTAssertEqual(exchange.status(for: .me), .received(.psst))
         XCTAssertEqual(exchange.unseenEvents(to: .me).count, 1)
-        XCTAssertEqual(exchange.status(for: .alex), .playedLocally(.oi))
+        XCTAssertEqual(exchange.status(for: .alex), .playedLocally(.psst))
 
         exchange.markSeen(by: .me)
         XCTAssertTrue(exchange.unseenEvents(to: .me).isEmpty)
-        XCTAssertEqual(exchange.status(for: .alex), .shownToOther(.oi))
+        XCTAssertEqual(exchange.status(for: .alex), .shownToOther(.psst))
     }
 
     func testSendingAgainReplacesReceivedStatus() {

@@ -6,7 +6,7 @@ As of 25 September 2026, `main`. "Automated" runs on every push in GitHub Action
 
 | Area | How | Result |
 |---|---|---|
-| Local preview rules | 12 unit tests (`LocalExchangeTests`): choosing never sends, unique IDs, idempotent retry, tap coalescing, burst pause and resume, receipt only after display, tap-back | Pass |
+| Local preview rules | 12 unit tests (`LocalExchangeTests`): every tap is Psst, unique IDs, idempotent retry, tap coalescing, burst pause and resume, receipt only after display, tap-back | Pass |
 | Live app rules | 22 unit tests (`LiveStoreTests`, `LiveParsingTests`) against a fake API: onboarding phases, sign-out, retry reuses the event ID, taps ignored while sending, rate-limit and ended-connection handling, acknowledge only while visible, idempotent notification reply, account deletion, timestamp / row / error / payload / invite-link parsing | Pass |
 | Database authorization | 23 tests on real Postgres with row-level security: invite statuses (pending, own, used, already connected, revoked, expired, invalid), mutual connection, send only on your own connection, event-ID hijack refused, unknown or paid effect refused, rate limits, recipient-only acknowledgement, per-side favorites, other pairs invisible, direct writes denied, anonymous role denied, push functions server-only, block / unblock, remove, device-token move and cleanup, token cap, cascading deletion, 30-day purge | Pass |
 | Push function | 15 Deno tests: ES256 provider token verifies, token reuse window, APNs hosts and headers, error-reason parsing, dead-token classification, per-device outcomes, no re-push once accepted, handler auth and validation | Pass |

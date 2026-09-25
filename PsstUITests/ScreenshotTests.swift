@@ -15,8 +15,6 @@ final class ScreenshotTests: XCTestCase {
 
     private func capture(sizeName: String) {
         let app = XCUIApplication()
-        // Argument-domain defaults: start every run from the same favorite.
-        app.launchArguments += ["-psst.demo-alex.favoriteSignal", "squeeze"]
         app.launch()
 
         let alex = app.buttons["Alex"]
@@ -28,16 +26,6 @@ final class ScreenshotTests: XCTestCase {
         shot("02-home-effect", sizeName)
         wait(1)
         shot("03-home-after-tap", sizeName)
-
-        app.buttons["Signal for Alex: Squeeze"].tap()
-        XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
-        wait(0.6)
-        shot("04-picker", sizeName)
-        app.buttons["Preview Oi"].tap()
-        wait(0.1)
-        shot("05-picker-preview", sizeName)
-        app.buttons["Done"].tap()
-        wait(0.6)
 
         app.buttons["View Alex's phone (simulated)"].tap()
         XCTAssertTrue(app.buttons["Your phone"].waitForExistence(timeout: 5))

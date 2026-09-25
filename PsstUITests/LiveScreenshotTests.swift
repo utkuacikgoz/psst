@@ -44,16 +44,6 @@ final class LiveScreenshotTests: XCTestCase {
         wait(1.2)
         shot("live-07-not-sent")
 
-        app.buttons["Signal for Ada: Squeeze"].tap()
-        XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
-        wait(0.6)
-        shot("live-08-connection")
-        app.swipeUp()
-        wait(0.4)
-        shot("live-09-connection-manage")
-        app.buttons["Done"].tap()
-        wait(0.6)
-
         app.buttons["Invite someone"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Create invite"].waitForExistence(timeout: 5))
         wait(0.4)
@@ -73,6 +63,11 @@ final class LiveScreenshotTests: XCTestCase {
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
         wait(0.6)
         shot("live-13-settings")
+
+        app.buttons["Manage Ada"].tap()
+        XCTAssertTrue(app.buttons["Remove Ada"].waitForExistence(timeout: 5))
+        wait(0.6)
+        shot("live-08-person")
     }
 
     func testLiveEmpty() {

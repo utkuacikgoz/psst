@@ -4,7 +4,6 @@ struct ConnectionSummary: Decodable, Identifiable, Equatable {
     let connectionId: UUID
     let otherId: UUID
     let otherName: String
-    let myFavorite: String
     let lastEventId: UUID?
     let lastFromMe: Bool?
     let lastEffect: String?
@@ -13,7 +12,6 @@ struct ConnectionSummary: Decodable, Identifiable, Equatable {
     let unseenCount: Int
 
     var id: UUID { connectionId }
-    var favorite: Signal { Signal(rawValue: myFavorite) ?? .psst }
     var lastSignal: Signal? { lastEffect.flatMap(Signal.init(rawValue:)) }
 }
 

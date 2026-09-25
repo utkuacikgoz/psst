@@ -55,12 +55,9 @@ final class LocalExchange {
     /// Equal to the window, so the burst has aged out when the pause ends.
     static let pauseDuration: TimeInterval = burstWindow
     static let retainedEvents = 50
-    static let favoriteKey = "psst.demo-alex.favoriteSignal"
 
     let partnerName = "Alex"
 
-    /// Your chosen signal for Alex. Persisted on this device.
-    private(set) var favorite: Signal
     private(set) var events: [SignalEvent] = []
     private(set) var seenEventIDs: Set<UUID> = []
     private(set) var pausedUntil: [Party: Date] = [:]
@@ -71,22 +68,10 @@ final class LocalExchange {
     init(defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init) {
         self.defaults = defaults
         self.now = now
-        favorite = defaults.string(forKey: Self.favoriteKey).flatMap(Signal.init(rawValue:)) ?? .psst
     }
 
-    /// Changes the default signal. Never sends anything.
-    func setFavorite(_ signal: Signal) {
-        favorite = signal
-        defaults.set(signal.rawValue, forKey: Self.favoriteKey)
-    }
-
-    /// The signal a plain tap sends from `party`. Alex mirrors what they last received.
-    func tapSignal(for party: Party) -> Signal {
-        switch party {
-        case .me: favorite
-        case .alex: latestEvent(to: .alex)?.signal ?? .psst
-        }
-    }
+    /// Every tap sends Psst, the only signal.
+    func tapSignal(for party: Party) -> Signal { .psst }
 
     @discardableResult
     func send(_ signal: Signal, from sender: Party, id: UUID = UUID()) -> SendOutcome {

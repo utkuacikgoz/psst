@@ -8,7 +8,7 @@ function targets(overrides: Partial<PushTargets> = {}): PushTargets {
   return {
     event_id: EVENT,
     connection_id: "22222222-2222-4222-8222-222222222222",
-    effect_id: "squeeze",
+    effect_id: "psst",
     push_status: "pending",
     sender_name: "Ada",
     tokens: [{ token: "t1", environment: "sandbox" }, { token: "t2", environment: "production" }],
@@ -37,10 +37,10 @@ function fakeDeps(t: PushTargets | null, results: Record<string, ApnsResult | Er
 
 Deno.test("payload names the sender first and carries routing data", () => {
   const payload = buildPayload(targets());
-  assertEquals(payload.aps.alert, { title: "Ada", body: "Squeeze" });
+  assertEquals(payload.aps.alert, { title: "Ada", body: "Psst" });
   assertEquals(payload.aps.category, "SIGNAL");
   assertEquals(payload.psst.event_id, EVENT);
-  assertEquals(payload.psst.effect_id, "squeeze");
+  assertEquals(payload.psst.effect_id, "psst");
   // Well under APNs' 4 KB limit even with a 40-character name.
   const size = new TextEncoder().encode(JSON.stringify(buildPayload(targets({ sender_name: "x".repeat(40) })))).length;
   assertEquals(size < 1024, true);

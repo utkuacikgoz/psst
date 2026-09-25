@@ -12,6 +12,7 @@ struct SettingsSheet: View {
     @State private var confirmingDelete = false
     @State private var isDeleting = false
     @State private var deleteError: String?
+    @State private var managing: ConnectionSummary?
 
     var body: some View {
         NavigationStack {
@@ -42,6 +43,22 @@ struct SettingsSheet: View {
                         }
                         .font(.body.weight(.semibold))
                         .frame(minHeight: Tokens.minTouch)
+                    }
+
+                    section("People") {
+                        if store.connections.isEmpty {
+                            caption("No one yet.")
+                        }
+                        ForEach(store.connections) { connection in
+                            HStack {
+                                Text(connection.otherName).foregroundStyle(Color.ink)
+                                Spacer()
+                                Button("Manage") { managing = connection }
+                                    .font(.body.weight(.semibold))
+                                    .frame(minHeight: Tokens.minTouch)
+                                    .accessibilityLabel("Manage \(connection.otherName)")
+                            }
+                        }
                     }
 
                     section("Blocked") {
@@ -83,6 +100,9 @@ struct SettingsSheet: View {
             notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
             blocked = (try? await store.api.listBlocked()) ?? []
         }
+        .sheet(item: $managing, onDismiss: {
+            Task { blocked = (try? await store.api.listBlocked()) ?? blocked }
+        }) { ConnectionSheet(connection: $0) }
         .confirmationDialog("Delete your account?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete account", role: .destructive, action: deleteAccount)
             Button("Cancel", role: .cancel) {}

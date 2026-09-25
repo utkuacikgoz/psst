@@ -171,7 +171,7 @@ struct LiveHomeView: View {
             PersonRow(
                 name: connection.otherName,
                 status: Self.text(for: status),
-                signal: connection.favorite,
+                signal: .psst,
                 effect: store.effects[connection.id],
                 accessibilityHint: Self.hint(for: status, connection: connection),
                 action: { store.tap(connection) },
@@ -179,13 +179,12 @@ struct LiveHomeView: View {
                 statusSymbol: Self.symbol(for: status),
                 minHeight: minHeight
             )
-            .accessibilityAction(named: "Choose signal") { managing = connection }
-
-            ChangeSignalButton(
-                title: connection.favorite.title,
-                accessibilityLabel: "Signal for \(connection.otherName): \(connection.favorite.title)",
-                accessibilityHint: "Choose a signal, preview it, or manage this connection."
-            ) { managing = connection }
+            // Remove and block live in a separate sheet: from here by long press or
+            // the VoiceOver action, and always from Settings → People.
+            .contextMenu {
+                Button("Manage \(connection.otherName)…", systemImage: "person.crop.circle") { managing = connection }
+            }
+            .accessibilityAction(named: "Manage \(connection.otherName)") { managing = connection }
         }
     }
 
@@ -218,7 +217,7 @@ struct LiveHomeView: View {
         switch status {
         case .notSent(let signal), .paused(let signal): "Retries \(signal.title)."
         case .sending: "Sending."
-        default: "Sends \(connection.favorite.title)."
+        default: "Sends a Psst."
         }
     }
 }

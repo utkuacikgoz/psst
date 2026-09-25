@@ -33,7 +33,6 @@ final class UITestAPI: PsstAPI {
     private let ada = UUID()
     private let emre = UUID()
     private let sam = UUID()
-    private var favorites: [UUID: Signal] = [:]
     private var last: [UUID: (fromMe: Bool, signal: Signal, seen: Bool)] = [:]
     private var unseen: [UnseenSignal] = []
     private var names: [UUID: String] = [:]
@@ -44,10 +43,9 @@ final class UITestAPI: PsstAPI {
         isSignedIn = scenario == .empty
         guard scenario == .tour else { return }
         names = [ada: "Ada", emre: "Emre", sam: "Sam"]
-        favorites = [ada: .squeeze, emre: .duck, sam: .psst]
-        last = [ada: (false, .oi, false), emre: (true, .duck, true)]
+        last = [ada: (false, .psst, false), emre: (true, .psst, true)]
         unseen = [UnseenSignal(id: UUID(), connectionId: ada, senderId: UUID(), senderName: "Ada",
-                               effectId: Signal.oi.rawValue, createdAt: Date())]
+                               effectId: Signal.psst.rawValue, createdAt: Date())]
     }
 
     func signUpAnonymously() async throws { isSignedIn = true }
@@ -59,7 +57,6 @@ final class UITestAPI: PsstAPI {
             let event = last[id]
             return ConnectionSummary(
                 connectionId: id, otherId: id, otherName: name,
-                myFavorite: (favorites[id] ?? .psst).rawValue,
                 lastEventId: event == nil ? nil : UUID(), lastFromMe: event?.fromMe,
                 lastEffect: event?.signal.rawValue, lastCreatedAt: event == nil ? nil : Date(),
                 lastSeenAt: event?.seen == true ? Date() : nil,
@@ -86,7 +83,6 @@ final class UITestAPI: PsstAPI {
         return SendResult(id: eventID, createdAt: Date(), pushStatus: "accepted", duplicate: false)
     }
 
-    func setFavorite(connectionID: UUID, signal: Signal) async throws { favorites[connectionID] = signal }
 
     func createInvite() async throws -> CreatedInvite {
         CreatedInvite(code: "K7QX4MPA", expiresAt: Date().addingTimeInterval(7 * 86_400))

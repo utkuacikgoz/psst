@@ -9,3 +9,4 @@ supabase/functions/.env
 .env
 Config/Secrets.xcconfig
 *.p8
+__pycache__/

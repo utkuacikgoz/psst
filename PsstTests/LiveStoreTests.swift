@@ -34,7 +34,6 @@ final class FakeAPI: PsstAPI {
         if let sendError { throw sendError }
         return SendResult(id: eventID, createdAt: Date(), pushStatus: "accepted", duplicate: false)
     }
-    func setFavorite(connectionID: UUID, signal: Signal) async throws {}
     func createInvite() async throws -> CreatedInvite { CreatedInvite(code: "ABCDEFGH", expiresAt: Date()) }
     func previewInvite(code: String) async throws -> InvitePreview { InvitePreview(status: .pending, inviterName: "Ada") }
     func acceptInvite(code: String) async throws -> AcceptedInvite { AcceptedInvite(status: "accepted", connectionId: nil) }
@@ -56,11 +55,11 @@ final class LiveStoreTests: XCTestCase {
     private var clock = Date(timeIntervalSince1970: 1_000_000)
 
     private func connection(
-        id: UUID = UUID(), name: String = "Ada", favorite: Signal = .squeeze,
+        id: UUID = UUID(), name: String = "Ada",
         last: Signal? = nil, fromMe: Bool? = nil, seen: Bool = false, unseen: Int = 0
     ) -> ConnectionSummary {
         ConnectionSummary(
-            connectionId: id, otherId: UUID(), otherName: name, myFavorite: favorite.rawValue,
+            connectionId: id, otherId: UUID(), otherName: name,
             lastEventId: last == nil ? nil : UUID(), lastFromMe: fromMe, lastEffect: last?.rawValue,
             lastCreatedAt: last == nil ? nil : Date(), lastSeenAt: seen ? Date() : nil, unseenCount: unseen)
     }
@@ -107,14 +106,14 @@ final class LiveStoreTests: XCTestCase {
 
     // MARK: Sending
 
-    func testTapSendsFavoriteAndPlaysEffectOnlyAfterAcceptance() async {
-        let ada = connection(favorite: .oi)
+    func testTapSendsPsstAndPlaysEffectOnlyAfterAcceptance() async {
+        let ada = connection()
         api.connections = [ada]
         await store.refresh()
 
         await store.tap(ada)?.value
         XCTAssertEqual(api.sentEventIDs.count, 1)
-        XCTAssertEqual(store.effects[ada.id]?.signal, .oi)
+        XCTAssertEqual(store.effects[ada.id]?.signal, .psst)
         XCTAssertEqual(store.effects[ada.id]?.id, api.sentEventIDs.first)
         XCTAssertNil(store.sendStates[ada.id], "Sent clears after its display time")
     }
@@ -125,7 +124,7 @@ final class LiveStoreTests: XCTestCase {
         api.holdSends = true
         let first = store.tap(ada)
         while api.pendingSendCount == 0 { await Task.yield() }
-        XCTAssertEqual(store.status(for: ada), .sending(.squeeze))
+        XCTAssertEqual(store.status(for: ada), .sending(.psst))
 
         clock += 5
         XCTAssertNil(store.tap(ada), "In-flight send blocks another")
@@ -148,7 +147,7 @@ final class LiveStoreTests: XCTestCase {
         let ada = connection()
         api.sendError = APIError.offline
         await store.tap(ada)?.value
-        XCTAssertEqual(store.status(for: ada), .notSent(.squeeze))
+        XCTAssertEqual(store.status(for: ada), .notSent(.psst))
         XCTAssertTrue(store.isOffline)
 
         api.sendError = nil
@@ -162,14 +161,14 @@ final class LiveStoreTests: XCTestCase {
         let ada = connection()
         api.sendError = APIError.server(status: 500, code: "unknown")
         await store.tap(ada)?.value
-        XCTAssertEqual(store.status(for: ada), .notSent(.squeeze))
+        XCTAssertEqual(store.status(for: ada), .notSent(.psst))
     }
 
     func testRateLimitedShowsPaused() async {
         let ada = connection()
         api.sendError = APIError.server(status: 429, code: "rate_limited")
         await store.tap(ada)?.value
-        XCTAssertEqual(store.status(for: ada), .paused(.squeeze))
+        XCTAssertEqual(store.status(for: ada), .paused(.psst))
     }
 
     func testEndedConnectionIsRemovedWithANotice() async {
@@ -186,9 +185,9 @@ final class LiveStoreTests: XCTestCase {
     // MARK: Status wording inputs
 
     func testRowStatusComesFromServerEvidence() {
-        XCTAssertEqual(store.status(for: connection(favorite: .duck)), .ready(.duck))
-        XCTAssertEqual(store.status(for: connection(last: .oi, fromMe: true)), .sentEarlier(.oi))
-        XCTAssertEqual(store.status(for: connection(last: .oi, fromMe: true, seen: true)), .seen(.oi))
+        XCTAssertEqual(store.status(for: connection()), .ready(.psst))
+        XCTAssertEqual(store.status(for: connection(last: .psst, fromMe: true)), .sentEarlier(.psst))
+        XCTAssertEqual(store.status(for: connection(last: .psst, fromMe: true, seen: true)), .seen(.psst))
         XCTAssertEqual(store.status(for: connection(last: .psst, fromMe: false)), .received(from: "Ada", .psst))
     }
 
@@ -198,9 +197,9 @@ final class LiveStoreTests: XCTestCase {
         let ada = connection()
         api.connections = [ada]
         let older = UnseenSignal(id: UUID(), connectionId: ada.id, senderId: UUID(), senderName: "Ada",
-                                 effectId: "oi", createdAt: Date(timeIntervalSince1970: 1))
+                                 effectId: "psst", createdAt: Date(timeIntervalSince1970: 1))
         let newer = UnseenSignal(id: UUID(), connectionId: ada.id, senderId: UUID(), senderName: "Ada",
-                                 effectId: "duck", createdAt: Date(timeIntervalSince1970: 2))
+                                 effectId: "psst", createdAt: Date(timeIntervalSince1970: 2))
         let stranger = UnseenSignal(id: UUID(), connectionId: UUID(), senderId: UUID(), senderName: "?",
                                     effectId: "psst", createdAt: Date())
         api.unseen = [newer, older, stranger]
@@ -213,12 +212,12 @@ final class LiveStoreTests: XCTestCase {
         store.isHomeVisible = true
         await store.refresh()
         XCTAssertEqual(Set(api.acked), [older.id, newer.id], "Only signals for rows on screen")
-        XCTAssertEqual(store.effects[ada.id], EffectTrigger(id: newer.id, signal: .duck))
+        XCTAssertEqual(store.effects[ada.id], EffectTrigger(id: newer.id, signal: .psst))
         XCTAssertEqual(store.latestEffect?.id, newer.id)
     }
 
     func testSendBackIsIdempotentAndAcksTheOriginal() async {
-        let payload = SignalPayload(eventID: UUID(), connectionID: UUID(), signal: .squeeze)
+        let payload = SignalPayload(eventID: UUID(), connectionID: UUID(), signal: .psst)
         let first = await store.sendBack(payload)
         let second = await store.sendBack(payload)
         XCTAssertTrue(first && second)
@@ -229,15 +228,15 @@ final class LiveStoreTests: XCTestCase {
 
     func testFailedSendBackReportsFailure() async {
         api.sendError = APIError.offline
-        let sent = await store.sendBack(SignalPayload(eventID: UUID(), connectionID: UUID(), signal: .oi))
+        let sent = await store.sendBack(SignalPayload(eventID: UUID(), connectionID: UUID(), signal: .psst))
         XCTAssertFalse(sent)
     }
 
     func testOpeningANotificationAcksAndPlaysIt() async {
-        let payload = SignalPayload(eventID: UUID(), connectionID: UUID(), signal: .oi)
+        let payload = SignalPayload(eventID: UUID(), connectionID: UUID(), signal: .psst)
         await store.openedNotification(payload)
         XCTAssertEqual(api.acked, [payload.eventID])
-        XCTAssertEqual(store.effects[payload.connectionID], EffectTrigger(id: payload.eventID, signal: .oi))
+        XCTAssertEqual(store.effects[payload.connectionID], EffectTrigger(id: payload.eventID, signal: .psst))
     }
 
     func testDeleteAccountResetsToOnboarding() async throws {
@@ -267,14 +266,13 @@ final class LiveParsingTests: XCTestCase {
           "last_created_at":null,"last_seen_at":null,"unseen_count":0},
          {"connection_id":"8f1c2d3e-4b5a-4c6d-8e7f-1a2b3c4d5e6f","other_id":"9f1c2d3e-4b5a-4c6d-8e7f-1a2b3c4d5e6f",
           "other_name":"Emre","my_favorite":"psst","last_event_id":"af1c2d3e-4b5a-4c6d-8e7f-1a2b3c4d5e6f",
-          "last_from_me":true,"last_effect":"oi","last_created_at":"2026-09-24T06:10:12.123456+00:00",
+          "last_from_me":true,"last_effect":"psst","last_created_at":"2026-09-24T06:10:12.123456+00:00",
           "last_seen_at":"2026-09-24T06:11:00+00:00","unseen_count":2}]
         """
         let rows = try APIClient.decoder.decode([ConnectionSummary].self, from: Data(json.utf8))
         XCTAssertEqual(rows.map(\.otherName), ["Ada", "Emre"])
-        XCTAssertEqual(rows[0].favorite, .duck)
         XCTAssertNil(rows[0].lastSignal)
-        XCTAssertEqual(rows[1].lastSignal, .oi)
+        XCTAssertEqual(rows[1].lastSignal, .psst)
         XCTAssertEqual(rows[1].unseenCount, 2)
         XCTAssertNotNil(rows[1].lastSeenAt)
     }
@@ -298,12 +296,16 @@ final class LiveParsingTests: XCTestCase {
             "aps": ["alert": ["title": "Ada", "body": "Oi"]],
             "psst": ["event_id": "6f1c2d3e-4b5a-4c6d-8e7f-1a2b3c4d5e6f",
                      "connection_id": "7f1c2d3e-4b5a-4c6d-8e7f-1a2b3c4d5e6f",
-                     "effect_id": "oi"],
+                     "effect_id": "psst"],
         ])
-        XCTAssertEqual(payload?.signal, .oi)
+        XCTAssertEqual(payload?.signal, .psst)
         XCTAssertEqual(payload?.eventID, UUID(uuidString: "6f1c2d3e-4b5a-4c6d-8e7f-1a2b3c4d5e6f"))
-        XCTAssertNil(SignalPayload(userInfo: ["psst": ["event_id": "x", "connection_id": "y", "effect_id": "oi"]]))
+        XCTAssertNil(SignalPayload(userInfo: ["psst": ["event_id": "x", "connection_id": "y", "effect_id": "psst"]]))
         XCTAssertNil(SignalPayload(userInfo: ["aps": [:]]))
+        // Signals removed from the app (Squeeze, Oi, Duck) are ignored, not misread.
+        XCTAssertNil(SignalPayload(userInfo: ["psst": ["event_id": "6f1c2d3e-4b5a-4c6d-8e7f-1a2b3c4d5e6f",
+                                                      "connection_id": "7f1c2d3e-4b5a-4c6d-8e7f-1a2b3c4d5e6f",
+                                                      "effect_id": "duck"]]))
     }
 
     func testInviteLinks() {

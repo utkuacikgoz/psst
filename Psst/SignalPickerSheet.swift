@@ -22,19 +22,19 @@ struct SignalChoiceContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 8) {
+            VStack(spacing: Tokens.Space.s) {
                 SignalGlyph(signal: preview?.signal ?? selected, trigger: preview?.id,
-                            baseSize: 54, tint: .white).frame(height: 80)
+                            baseSize: Tokens.Band.pickerGlyphSize, tint: .white).frame(height: Tokens.Band.pickerStageHeight)
                 Text(preview == nil ? "Choose below. Preview with ▶." : "Previewing \(preview!.signal.title) · not sent")
                     .font(.footnote).foregroundStyle(.white)
-            }.padding(.vertical, 18).frame(maxWidth: .infinity).background(Color.psstCanvas)
+            }.padding(.vertical, Tokens.Space.l).frame(maxWidth: .infinity).background(Color.psstCanvas)
             ForEach(Signal.allCases) { signal in
                 SignalOptionRow(signal: signal, isSelected: selected == signal,
                                 select: { onSelect(signal) }, preview: { play(signal) })
             }
             Text("Your next tap on \(personName) uses this signal.")
                 .font(.footnote).foregroundStyle(Color.inkSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading).padding(24)
+                .frame(maxWidth: .infinity, alignment: .leading).padding(Tokens.sheetInset)
         }.sensoryFeedback(trigger: preview) { _, new in new?.signal.haptic }
     }
     private func play(_ signal: Signal) {
@@ -59,23 +59,23 @@ private struct SignalOptionRow: View {
     let isSelected: Bool
     let select: () -> Void
     let preview: () -> Void
-    @ScaledMetric(relativeTo: .title) private var titleSize: CGFloat = 30
+    @ScaledMetric(relativeTo: .title) private var titleSize: CGFloat = Tokens.Band.optionTitleSize
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body: some View {
         let layout = dynamicTypeSize.isAccessibilitySize
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-            : AnyLayout(HStackLayout(spacing: 8))
+            : AnyLayout(HStackLayout(spacing: Tokens.Space.s))
         layout {
             Button(action: select) {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(signal.title.uppercased()).bandTitle(signal.title, size: titleSize, tracking: -0.7)
+                HStack(spacing: Tokens.Space.m) {
+                    VStack(alignment: .leading, spacing: Tokens.Space.xs) {
+                        Text(signal.title.uppercased()).bandTitle(signal.title, size: titleSize, tracking: Tokens.Band.optionTracking)
                         Text(signal.meaning).font(.subheadline)
                     }.fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                     if isSelected { Image(systemName: "checkmark").font(.title3.weight(.bold)) }
-                }.multilineTextAlignment(.leading).padding(.vertical, 22)
-                    .frame(maxWidth: .infinity, minHeight: 90, alignment: .leading).contentShape(Rectangle())
+                }.multilineTextAlignment(.leading).padding(.vertical, Tokens.Space.xl)
+                    .frame(maxWidth: .infinity, minHeight: Tokens.Band.optionMinHeight, alignment: .leading).contentShape(Rectangle())
             }.buttonStyle(.plain)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(signal.title), \(signal.meaning)")
@@ -83,8 +83,8 @@ private struct SignalOptionRow: View {
                 .accessibilityAddTraits(isSelected ? AccessibilityTraits([.isButton, .isSelected]) : .isButton)
             Button(action: preview) {
                 Image(systemName: "play.fill").font(.title3)
-                    .frame(width: 48, height: 52).contentShape(Rectangle())
+                    .frame(minWidth: Tokens.Band.headerControlHeight, minHeight: Tokens.Band.headerControlHeight).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel("Preview \(signal.title)")
-        }.foregroundStyle(.white).padding(.horizontal, 24).background(signal.accent)
+        }.foregroundStyle(.white).padding(.horizontal, Tokens.Space.xl).background(signal.accent)
     }
 }

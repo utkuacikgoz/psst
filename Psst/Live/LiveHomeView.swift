@@ -111,7 +111,7 @@ struct LiveHomeView: View {
     private var header: some View {
         HStack {
             Text("psst")
-                .font(.system(size: 40, weight: .heavy)).tracking(-2)
+                .font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy)).tracking(Tokens.Band.wordmarkTracking)
                 .foregroundStyle(Color.onCanvas)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
@@ -126,7 +126,7 @@ struct LiveHomeView: View {
             }
             .accessibilityLabel("Invite someone")
         }
-        .padding(.vertical, 18)
+        .padding(.vertical, Tokens.Space.l)
     }
 
     @ViewBuilder private var notices: some View {
@@ -156,7 +156,7 @@ struct LiveHomeView: View {
             PrimaryButton(title: "Invite someone") { showingInvite = true }
         }
         .padding(.top, Tokens.Space.xl)
-        .padding(.horizontal, 24)
+        .padding(.horizontal, Tokens.Space.xl)
     }
 
     private func row(_ connection: ConnectionSummary, minHeight: CGFloat) -> some View {

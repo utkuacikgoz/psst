@@ -43,7 +43,8 @@ enum Signal: String, CaseIterable, Identifiable, Codable {
         case .psst: Color(hex: 0x2476AA)
         case .squeeze: Color(hex: 0xAC3E68)
         case .oi: Color(hex: 0xB34F2B)
-        case .duck: Color(hex: 0x187F69)
+        // Mustard, so Duck never shares a colour with a contact band. 5.3:1 with white.
+        case .duck: Color(hex: 0x8A6500)
         }
     }
 

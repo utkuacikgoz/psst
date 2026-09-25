@@ -113,6 +113,7 @@ final class UITestAPI: PsstAPI {
         openInvites.map { OpenInvite(code: $0, createdAt: Date(), expiresAt: Date().addingTimeInterval(6 * 86_400)) }
     }
     func revokeInvite(code: String) async throws { openInvites.removeAll { $0 == code } }
+    func setNotificationSound(_ file: String) async throws {}
     func registerDeviceToken(_ token: String, environment: String) async throws {}
     func deleteAccount() async throws { isSignedIn = false }
     func signOutLocally() { isSignedIn = false }

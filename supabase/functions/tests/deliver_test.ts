@@ -40,6 +40,7 @@ Deno.test("payload names the sender first and carries routing data", () => {
   assertEquals(payload.aps.alert, { title: "Ada", body: "Psst" });
   assertEquals(payload.aps.category, "SIGNAL");
   assertEquals(payload.aps.sound, "psst.wav"); // bundled in the app
+  assertEquals(buildPayload(targets({ sound: "psst-soft.wav" })).aps.sound, "psst-soft.wav");
   assertEquals(payload.psst.event_id, EVENT);
   assertEquals(payload.psst.effect_id, "psst");
   assertEquals(payload.psst.same_moment, false);

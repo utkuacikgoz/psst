@@ -22,6 +22,8 @@ struct ArrivalView: View {
     let arrival: Arrival
     let onTap: () -> Void
     let onDone: () -> Void
+    /// The sender's band colour, if you chose one with Psst+.
+    var color: Color? = nil
 
     static let displayTime: Duration = .milliseconds(1800)
     static let sameMomentTime: Duration = .milliseconds(2600)
@@ -115,14 +117,14 @@ struct ArrivalView: View {
         }
         .padding(Tokens.Space.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.personBand(name).ignoresSafeArea())
+        .background((color ?? .personBand(name)).ignoresSafeArea())
     }
 
     /// Your half (the app's purple) above theirs, with SAME MOMENT across the seam.
     private var sameMoment: some View {
         VStack(spacing: 0) {
             half("You", color: .psstCanvas)
-            half(name, color: .personBand(name))
+            half(name, color: color ?? .personBand(name))
         }
         .overlay {
             Text("SAME MOMENT")

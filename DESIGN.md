@@ -60,6 +60,7 @@ The owner explicitly chose **Yo** after rejecting the earlier cobalt-card design
 - After Delete account the app returns straight to the name screen.
 - A newcomer who opens an invite link sees the inviter first: their colour, NAME / wants to psst you / First, what should Kim call you?, then name and notifications. The invite is accepted for them at the end and Kim's welcome plays. An unusable invite skips the intro and the invite sheet explains why.
 - The local demo's Alex's side uses the real full-screen arrival, under a LOCAL DEMO · ALEX'S SIDE label.
+- Psst+ (optional one-time unlock): home's footer reads Settings · Psst+ (PP2). The Psst+ sheet is a standard list (PS1): what's included, the App Store's local price, Unlock, Restore purchase, and "Pssting, replies and invites are always free." Once unlocked, the same sheet holds the app icon and whisper sound choices. A band's long-press menu has Colour… (BC1): eight colours, on your phone only. Without Psst+, Colour… opens the Psst+ sheet.
 - Accounts are anonymous and live on one phone. On a new phone you choose your name again and re-invite your people (owner decision NP1).
 - The first time home has someone to tap, a one-time dark overlay shows a tapping hand: "Tap a band to psst" / "Hold to move someone or remove them". Any tap only dismisses it; it never sends.
 - The notification's button reads "Psst back".

@@ -29,6 +29,7 @@ protocol PsstAPI: AnyObject {
     func listBlocked() async throws -> [BlockedPerson]
     func listOpenInvites() async throws -> [OpenInvite]
     func revokeInvite(code: String) async throws
+    func setNotificationSound(_ file: String) async throws
     func registerDeviceToken(_ token: String, environment: String) async throws
     func deleteAccount() async throws
     func signOutLocally()
@@ -168,6 +169,10 @@ final class APIClient: PsstAPI {
 
     func revokeInvite(code: String) async throws {
         try await rpcVoid("revoke_invite", ["p_code": code])
+    }
+
+    func setNotificationSound(_ file: String) async throws {
+        try await rpcVoid("set_notification_sound", ["p_sound": file])
     }
 
     func registerDeviceToken(_ token: String, environment: String) async throws {

@@ -46,6 +46,7 @@ final class FakeAPI: PsstAPI {
     func listBlocked() async throws -> [BlockedPerson] { [] }
     func listOpenInvites() async throws -> [OpenInvite] { [] }
     func revokeInvite(code: String) async throws {}
+    func setNotificationSound(_ file: String) async throws {}
     func registerDeviceToken(_ token: String, environment: String) async throws {}
     func deleteAccount() async throws { isSignedIn = false }
     func signOutLocally() { isSignedIn = false }
@@ -513,5 +514,30 @@ private extension ConnectionSummary {
         ConnectionSummary(connectionId: id, otherId: otherId, otherName: otherName, lastEventId: lastEventId,
                           lastFromMe: lastFromMe, lastEffect: lastEffect, lastCreatedAt: lastCreatedAt,
                           lastSeenAt: lastSeenAt, unseenCount: unseenCount)
+    }
+}
+
+@MainActor
+final class PsstPlusTests: XCTestCase {
+    func testOnlyAnUnrevokedPsstPlusTransactionUnlocks() {
+        XCTAssertTrue(Purchases.grants(productID: Purchases.productID, revocationDate: nil))
+        XCTAssertFalse(Purchases.grants(productID: Purchases.productID, revocationDate: Date()), "refunds lock again")
+        XCTAssertFalse(Purchases.grants(productID: "something.else", revocationDate: nil))
+    }
+
+    func testChosenColoursStayOnThisPhone() {
+        let suite = "PsstPlusTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let ada = UUID()
+        let personalization = Personalization(defaults: defaults)
+        XCTAssertNil(personalization.colors[ada])
+
+        personalization.setColor(0xC2185B, for: ada)
+        let reloaded = Personalization(defaults: defaults)
+        XCTAssertEqual(reloaded.colors[ada], 0xC2185B)
+
+        reloaded.setColor(nil, for: ada)
+        XCTAssertNil(Personalization(defaults: defaults).colors[ada])
     }
 }

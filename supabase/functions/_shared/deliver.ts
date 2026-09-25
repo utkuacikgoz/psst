@@ -8,6 +8,8 @@ export interface PushTargets {
   effect_id: string;
   /** Both people pssted within 10 seconds (server time). Optional for older databases. */
   same_moment?: boolean;
+  /** The recipient's chosen sound file, bundled in the app (Psst+). */
+  sound?: string;
   push_status: PushStatus;
   sender_name: string;
   tokens: { token: string; environment: ApnsEnvironment }[];
@@ -42,7 +44,7 @@ export function buildPayload(targets: PushTargets) {
       },
       // Bundled in the app (Psst/psst.wav). iOS falls back to the default
       // sound if the file is missing; silent mode and Focus still apply.
-      sound: "psst.wav",
+      sound: targets.sound ?? "psst.wav",
       category: "SIGNAL",
       "thread-id": targets.connection_id,
     },

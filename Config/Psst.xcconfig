@@ -8,4 +8,8 @@ PRODUCT_BUNDLE_IDENTIFIER = app.psst.prototype
 PSST_SUPABASE_HOST =
 PSST_SUPABASE_ANON_KEY =
 
+// Psst+ alternate app icons (Psst/Assets.xcassets/AppIcon-*.appiconset).
+ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = AppIcon-Night AppIcon-Gold AppIcon-Pink
+ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO
+
 #include? "Secrets.xcconfig"

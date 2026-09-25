@@ -58,6 +58,8 @@ A privacy policy URL is required before submission. This text needs a public hom
 
 ## Before submission
 
+- Create the in-app purchase in App Store Connect: non-consumable, product ID `psstplus.unlock`, reference name "Psst+ unlock", with a price tier (the $2.99 hypothesis is unvalidated). Sandbox purchases in TestFlight need it; `Config/PsstPlus.storekit` covers local Xcode runs (Scheme → Run → Options → StoreKit Configuration).
+
 - A support URL and support email.
 - A hosted privacy policy URL.
 - A named person who reviews reports (the `reports` table) and acts on them promptly, as guideline 1.2 expects. Reporting already blocks the person in the app.

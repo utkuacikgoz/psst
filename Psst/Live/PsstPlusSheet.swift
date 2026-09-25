@@ -70,12 +70,12 @@ struct PsstPlusSheet: View {
 
     @ViewBuilder private var buySection: some View {
         Section {
-            if let product = purchases.product {
+            if let price = purchases.displayPrice {
                 Button {
                     Task { await purchases.buy() }
                 } label: {
                     ZStack {
-                        Text("Unlock for \(product.displayPrice)")
+                        Text("Unlock for \(price)")
                             .opacity(purchases.state == .purchasing ? 0 : 1)
                         if purchases.state == .purchasing { ProgressView().tint(.white) }
                     }

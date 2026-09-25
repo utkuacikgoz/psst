@@ -50,6 +50,10 @@ The owner explicitly chose **Yo** after rejecting the earlier cobalt-card design
 - No rounded contact cards, perimeter gutters, outlines, persistent decorative symbols, or large explanatory paragraphs.
 - The entire person band sends a Psst, the only signal. Nothing else lives inside the band. Remove, Block and Report are separate: a long press on the band (the iPhone context menu), Settings → People or the VoiceOver "Manage" action (the standard action sheet). Each asks for confirmation with a one-line explanation before anything happens. Report also blocks.
 - Before anyone accepts, home is a single gold band: INVITE YOUR FIRST PERSON.
+- A band's line appears only while something is happening (Sending…, Sent, Not sent · Retry). Settled outcomes sit small in the band's bottom-right corner: "sent", or "seen ✓" once their app actually showed it.
+- After the server's pacing limit (10 a minute to one person), the band dims and reads "Try again in 0:42"; taps are ignored until then.
+- Offline, notifications off and ended connections appear as a full-width dark strip under the wordmark, never as a pop-up.
+- When someone new becomes tappable (you accepted, or they accepted yours), their colour fills the screen once: NAME / IS IN / Tap to send your first Psst. People already connected on first launch, or who have already exchanged a Psst, get no welcome.
 - A single connection gets a larger band; multiple connections become a scrollable stack. Never invent contacts to fill space.
 - In the local demo, one concise notice identifies the fictional contact and local-only exchange. Do not repeat the full disclaimer in every control. Preserve honest statuses and VoiceOver hints.
 - There is no signal picker: the owner reduced the app to one signal, Psst (25 Sep 2026).

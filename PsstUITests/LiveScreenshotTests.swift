@@ -44,6 +44,9 @@ final class LiveScreenshotTests: XCTestCase {
         app.buttons["Sam"].tap()
         wait(1.2)
         shot("live-07-not-sent")
+        app.buttons["Sam"].tap()
+        wait(1.2)
+        shot("live-07b-paused")
 
         app.buttons["Emre"].press(forDuration: 1.0)
         XCTAssertTrue(app.buttons["Report Emre"].waitForExistence(timeout: 5))
@@ -73,10 +76,11 @@ final class LiveScreenshotTests: XCTestCase {
         code.typeText("K7QX4MPA\n")
         wait(0.8)
         shot("live-12-invite-preview")
-        app.buttons["Back"].tap()
-        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))
-        app.buttons["Cancel"].tap()
-        wait(0.6)
+        app.buttons["Connect with Kim"].tap()
+        // The sheet closes and Kim gets the full-screen welcome.
+        wait(1.0)
+        shot("live-15-welcome")
+        wait(2.4)
 
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))

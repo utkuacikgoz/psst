@@ -51,7 +51,7 @@ struct LiveHomeView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        notices.padding(.horizontal, inset)
+                        notices
                         if store.connections.isEmpty {
                             if store.hasLoadedConnections {
                                 firstInviteBand(minHeight: Self.bandHeight(available: proxy.size.height, people: 0))
@@ -167,12 +167,12 @@ struct LiveHomeView: View {
 
     @ViewBuilder private var notices: some View {
         if store.isOffline {
-            NoticeView(symbol: "wifi.slash", text: "You're offline. Taps won't send until you're connected.")
+            NoticeView(symbol: "wifi.slash", text: "Offline · taps won't send")
         }
         if notificationsOff {
             NoticeView(symbol: "bell.slash",
-                       text: "Notifications are off. Signals still show here when you open Psst.",
-                       actionTitle: "Open Settings") {
+                       text: "Notifications off",
+                       actionTitle: "Turn on") {
                 if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
@@ -209,19 +209,33 @@ struct LiveHomeView: View {
         .accessibilityAddTraits(.isButton)
     }
 
+    @ViewBuilder
     private func row(_ connection: ConnectionSummary, minHeight: CGFloat) -> some View {
+        if Self.isPaused(store.status(for: connection)) {
+            // Re-read every second so the countdown moves and the band wakes up on time.
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                band(connection, minHeight: minHeight, now: context.date)
+            }
+        } else {
+            band(connection, minHeight: minHeight, now: .now)
+        }
+    }
+
+    private func band(_ connection: ConnectionSummary, minHeight: CGFloat, now: Date) -> some View {
         let status = store.status(for: connection)
         return VStack(alignment: .leading, spacing: 0) {
             PersonRow(
                 name: connection.otherName,
-                status: Self.text(for: status),
+                status: Self.text(for: status, now: now),
                 signal: .psst,
                 effect: store.effects[connection.id],
                 accessibilityHint: Self.hint(for: status, connection: connection),
                 action: { store.tap(connection) },
                 isBusy: Self.isBusy(status),
                 statusSymbol: Self.symbol(for: status),
-                minHeight: minHeight
+                minHeight: minHeight,
+                cornerMark: Self.cornerMark(for: status),
+                isDimmed: Self.isPaused(status)
             )
             // Remove, block and report: a long press here, the VoiceOver action,
             // or Settings → People. Each explains itself before acting.
@@ -244,37 +258,56 @@ struct LiveHomeView: View {
         return false
     }
 
-    static func text(for status: LiveRowStatus) -> String {
+    static func isPaused(_ status: LiveRowStatus) -> Bool {
+        if case .paused = status { return true }
+        return false
+    }
+
+    static func text(for status: LiveRowStatus, now: Date = .now) -> String {
         switch status {
         // Yo classic: a band shows a line only when something happened.
-        case .ready: ""
+        case .ready, .seen, .sentEarlier: ""
         case .sending: "Sending…"
         case .sent: "Sent"
         case .notSent: "Not sent · Retry"
-        case .paused: "Paused after several taps · Retry later"
-        case .seen(let signal): "\(signal.title) · seen"
-        case .sentEarlier(let signal): "\(signal.title) · sent"
+        case .paused(_, let until): "Try again in \(countdown(until.timeIntervalSince(now)))"
         case .received(let name, let signal): "\(name) sent a \(signal.title)"
         }
     }
 
+    /// Settled outcomes live in the band's corner (V2).
+    static func cornerMark(for status: LiveRowStatus) -> String? {
+        switch status {
+        case .seen: "seen"
+        case .sentEarlier: "sent"
+        default: nil
+        }
+    }
+
+    static func countdown(_ seconds: TimeInterval) -> String {
+        let whole = max(0, Int(seconds.rounded(.up)))
+        return String(format: "%d:%02d", whole / 60, whole % 60)
+    }
+
     static func symbol(for status: LiveRowStatus) -> String? {
         switch status {
-        case .notSent, .paused: "exclamationmark.circle"
+        case .notSent: "exclamationmark.circle"
+        case .paused: "hourglass"
         default: nil
         }
     }
 
     static func hint(for status: LiveRowStatus, connection: ConnectionSummary) -> String {
         switch status {
-        case .notSent(let signal), .paused(let signal): "Retries \(signal.title)."
+        case .notSent(let signal): "Retries \(signal.title)."
+        case .paused: "Paused after several taps, so nobody gets flooded."
         case .sending: "Sending."
         default: "Sends a Psst."
         }
     }
 }
 
-/// A small, actionable explanation. Never a full-screen error.
+/// Option B2: a full-width dark strip under the wordmark. Never a pop-up.
 struct NoticeView: View {
     let symbol: String
     let text: String
@@ -288,18 +321,17 @@ struct NoticeView: View {
             Spacer(minLength: 0)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.bold))
+                    .underline()
                     .frame(minHeight: Tokens.minTouch)
             }
         }
-        .font(.subheadline)
+        .font(.subheadline.weight(.semibold))
         .foregroundStyle(Color.onCanvas)
-        .padding(.horizontal, Tokens.Space.m)
-        .padding(.vertical, Tokens.Space.xs)
-        .overlay(
-            RoundedRectangle(cornerRadius: Tokens.controlRadius)
-                .stroke(Color.onCanvasSecondary, lineWidth: 1)
-        )
+        .padding(.horizontal, Tokens.Space.xl)
+        .padding(.vertical, Tokens.Space.s)
+        .frame(maxWidth: .infinity, minHeight: Tokens.minTouch, alignment: .leading)
+        .background(Color.black.opacity(0.28))
         .accessibilityElement(children: .combine)
     }
 }

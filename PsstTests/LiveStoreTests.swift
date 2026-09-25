@@ -44,6 +44,8 @@ final class FakeAPI: PsstAPI {
     func unblockUser(_ id: UUID) async throws {}
     func reportUser(_ id: UUID) async throws {}
     func listBlocked() async throws -> [BlockedPerson] { [] }
+    func listOpenInvites() async throws -> [OpenInvite] { [] }
+    func revokeInvite(code: String) async throws {}
     func registerDeviceToken(_ token: String, environment: String) async throws {}
     func deleteAccount() async throws { isSignedIn = false }
     func signOutLocally() { isSignedIn = false }

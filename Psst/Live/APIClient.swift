@@ -27,6 +27,8 @@ protocol PsstAPI: AnyObject {
     func unblockUser(_ id: UUID) async throws
     func reportUser(_ id: UUID) async throws
     func listBlocked() async throws -> [BlockedPerson]
+    func listOpenInvites() async throws -> [OpenInvite]
+    func revokeInvite(code: String) async throws
     func registerDeviceToken(_ token: String, environment: String) async throws
     func deleteAccount() async throws
     func signOutLocally()
@@ -158,6 +160,14 @@ final class APIClient: PsstAPI {
 
     func listBlocked() async throws -> [BlockedPerson] {
         try await rpc("list_blocked", [String: String]())
+    }
+
+    func listOpenInvites() async throws -> [OpenInvite] {
+        try await rpc("list_open_invites", [String: String]())
+    }
+
+    func revokeInvite(code: String) async throws {
+        try await rpcVoid("revoke_invite", ["p_code": code])
     }
 
     func registerDeviceToken(_ token: String, environment: String) async throws {

@@ -108,6 +108,11 @@ final class UITestAPI: PsstAPI {
     func unblockUser(_ id: UUID) async throws {}
     func reportUser(_ id: UUID) async throws { names[id] = nil }
     func listBlocked() async throws -> [BlockedPerson] { [] }
+    private var openInvites: [String] = ["K7QX4MPA"]
+    func listOpenInvites() async throws -> [OpenInvite] {
+        openInvites.map { OpenInvite(code: $0, createdAt: Date(), expiresAt: Date().addingTimeInterval(6 * 86_400)) }
+    }
+    func revokeInvite(code: String) async throws { openInvites.removeAll { $0 == code } }
     func registerDeviceToken(_ token: String, environment: String) async throws {}
     func deleteAccount() async throws { isSignedIn = false }
     func signOutLocally() { isSignedIn = false }

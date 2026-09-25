@@ -9,6 +9,7 @@ struct SettingsSheet: View {
     @State private var nameMessage: String?
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
     @State private var blocked: [BlockedPerson] = []
+    @State private var openInvites: [OpenInvite] = []
     @State private var confirmingDelete = false
     @State private var isDeleting = false
     @State private var deleteError: String?
@@ -75,6 +76,31 @@ struct SettingsSheet: View {
                     Text("Home puts whoever you pssted most recently first. Hold and drag a band to place someone yourself.")
                 }
 
+                // PI2: invites nobody has used yet, each cancellable.
+                if !openInvites.isEmpty {
+                    Section {
+                        ForEach(openInvites) { invite in
+                            HStack {
+                                Text(invite.displayCode)
+                                    .font(.body.monospaced())
+                                    .accessibilityLabel("Invite code \(invite.code.map(String.init).joined(separator: " "))")
+                                Spacer()
+                                Text(invite.expiresAt, format: .relative(presentation: .named))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityLabel("Expires \(invite.expiresAt.formatted(.relative(presentation: .named)))")
+                                Button("Cancel") { revoke(invite) }
+                                    .buttonStyle(.borderless)
+                                    .accessibilityLabel("Cancel invite \(invite.displayCode)")
+                            }
+                        }
+                    } header: {
+                        Text("Open invites")
+                    } footer: {
+                        Text("Each works once. Cancel one you sent to the wrong person.")
+                    }
+                }
+
                 Section("Blocked") {
                     if blocked.isEmpty {
                         Text("No one.").foregroundStyle(.secondary)
@@ -118,6 +144,7 @@ struct SettingsSheet: View {
         .task {
             notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
             blocked = (try? await store.api.listBlocked()) ?? []
+            openInvites = (try? await store.api.listOpenInvites()) ?? []
         }
         .manageConnection(menuFor: $managing, confirming: $confirming) {
             Task { blocked = (try? await store.api.listBlocked()) ?? blocked }
@@ -151,6 +178,15 @@ struct SettingsSheet: View {
             } catch {
                 nameMessage = "That didn't save. Names can be 1 to 40 characters."
             }
+        }
+    }
+
+    private func revoke(_ invite: OpenInvite) {
+        withAnimation { openInvites.removeAll { $0 == invite } }
+        Task {
+            try? await store.api.revokeInvite(code: invite.code)
+            // Show the server's truth, whether or not the cancel went through.
+            if let fresh = try? await store.api.listOpenInvites() { openInvites = fresh }
         }
     }
 

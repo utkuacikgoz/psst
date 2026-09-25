@@ -115,6 +115,20 @@ class BackendTests(unittest.TestCase):
 
     # Invites ---------------------------------------------------------------
 
+    def test_open_invites_lists_only_your_usable_ones(self):
+        ada, emre, sam = new_user("Ada"), new_user("Emre"), new_user("Sam")
+        used = ada.rpc("create_invite")["code"]
+        cancelled = ada.rpc("create_invite")["code"]
+        expired = ada.rpc("create_invite")["code"]
+        open_code = ada.rpc("create_invite")["code"]
+        emre.rpc("accept_invite", used)
+        ada.rpc("revoke_invite", cancelled)
+        admin("update public.invites set expires_at = now() - interval '1 minute' where code = %s", expired)
+        self.assertEqual([r[0] for r in ada.rows("select code from public.list_open_invites()")], [open_code])
+        self.assertEqual(sam.rows("select code from public.list_open_invites()"), [], "only your own")
+        ada.rpc("revoke_invite", open_code)
+        self.assertEqual(ada.rows("select code from public.list_open_invites()"), [])
+
     def test_invite_accept_creates_mutual_connection(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         code = ada.rpc("create_invite")["code"]

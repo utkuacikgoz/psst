@@ -98,7 +98,7 @@ struct ArrivalView: View {
         VStack(spacing: Tokens.Space.l) {
             if arrival.kind == .signal {
                 Text("FROM")
-                    .font(.subheadline.weight(.bold))
+                    .font(.psst(.subheadline, weight: .bold))
                     .tracking(Tokens.Band.labelTracking * 2)
             }
             Text(name.uppercased())
@@ -107,16 +107,16 @@ struct ArrivalView: View {
             if arrival.kind == .signal {
                 SignalGlyph(signal: .psst, trigger: trigger, baseSize: psstSize, tint: .white)
                 Text("Psst!")
-                    .font(.system(size: psstSize * 0.8, weight: .heavy))
+                    .font(.psst(size: psstSize * 0.8, weight: .heavy))
                     .opacity(0.9)
             } else {
                 Text("IS IN")
-                    .font(.system(size: psstSize * 0.8, weight: .heavy))
+                    .font(.psst(size: psstSize * 0.8, weight: .heavy))
                     .tracking(Tokens.Band.titleTracking)
                     .opacity(0.9)
             }
             Text(arrival.kind == .signal ? "\(countPrefix)Tap to psst back" : "Tap to send your first Psst")
-                .font(.subheadline.weight(.medium))
+                .font(.psst(.subheadline, weight: .medium))
                 .padding(.top, Tokens.Space.l)
         }
         .padding(Tokens.Space.xl)
@@ -132,7 +132,7 @@ struct ArrivalView: View {
         }
         .overlay {
             Text("SAME MOMENT")
-                .font(.system(size: labelSize, weight: .heavy))
+                .font(.psst(size: labelSize, weight: .heavy))
                 .tracking(Tokens.Band.titleTracking / 2)
                 .foregroundStyle(Color.ink)
                 .lineLimit(1)

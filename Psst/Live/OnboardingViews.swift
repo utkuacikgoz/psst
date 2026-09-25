@@ -20,13 +20,13 @@ struct NameStepView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("psst")
-                        .font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy))
+                        .font(.psst(size: Tokens.Band.wordmarkSize, weight: .heavy))
                         .tracking(Tokens.Band.wordmarkTracking)
                         .padding(.horizontal, inset)
                         .padding(.vertical, Tokens.Space.l)
 
                     Text("YOUR NAME")
-                        .font(.footnote.weight(.semibold))
+                        .font(.psst(.footnote, weight: .semibold))
                         .tracking(Tokens.Band.labelTracking)
                         .padding(.horizontal, inset)
                         .padding(.top, Tokens.Space.s)
@@ -37,7 +37,7 @@ struct NameStepView: View {
 
                     if let error {
                         Label(error, systemImage: "exclamationmark.circle")
-                            .font(.subheadline.weight(.semibold))
+                            .font(.psst(.subheadline, weight: .semibold))
                             .padding(.horizontal, inset)
                             .padding(.top, Tokens.Space.l)
                     }
@@ -63,7 +63,7 @@ struct NameStepView: View {
         return VStack(spacing: Tokens.Space.m) {
             ZStack {
                 TextField("", text: $name)
-                    .font(.system(size: titleSize, weight: .bold))
+                    .font(.psst(size: titleSize, weight: .bold))
                     .foregroundStyle(.clear)
                     .tint(.clear)
                     .multilineTextAlignment(.center)
@@ -92,7 +92,7 @@ struct NameStepView: View {
             .frame(minHeight: titleSize * 1.2)
 
             Text("This band is you on their phone")
-                .font(.subheadline.weight(.medium))
+                .font(.psst(.subheadline, weight: .medium))
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, inset)
@@ -154,14 +154,14 @@ struct NotificationStepView: View {
             let inset = Tokens.sideInset(forWidth: proxy.size.width)
             VStack(alignment: .leading, spacing: 0) {
                 Text("psst")
-                    .font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy))
+                    .font(.psst(size: Tokens.Band.wordmarkSize, weight: .heavy))
                     .tracking(Tokens.Band.wordmarkTracking)
                     .padding(.horizontal, inset)
                     .padding(.vertical, Tokens.Space.l)
 
                 ScrollView {
                     Text("Get a notification when someone taps you?")
-                        .font(.system(size: questionSize, weight: .heavy))
+                        .font(.psst(size: questionSize, weight: .heavy))
                         .tracking(Tokens.Band.titleTracking)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
@@ -176,7 +176,7 @@ struct NotificationStepView: View {
                     PrimaryButton(title: "Yes, notify me", isBusy: isAsking, isEnabled: true, action: allow)
                     Button { store.finishNotificationChoice() } label: {
                         Text("Not now")
-                            .font(.body.weight(.semibold))
+                            .font(.psst(.body, weight: .semibold))
                             .frame(maxWidth: .infinity, minHeight: Tokens.Band.barMinHeight)
                             .background(Color.bandShade)
                             .contentShape(Rectangle())
@@ -214,7 +214,7 @@ struct PrimaryButton: View {
                 Text(title).opacity(isBusy ? 0 : 1)
                 if isBusy { ProgressView().tint(Color.ink) }
             }
-            .font(.body.weight(.semibold))
+            .font(.psst(.body, weight: .semibold))
             .foregroundStyle(Color.ink)
             .frame(maxWidth: .infinity, minHeight: 52)
             .background(

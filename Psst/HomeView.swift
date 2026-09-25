@@ -13,9 +13,9 @@ struct HomeView: View {
         GeometryReader { proxy in
             VStack(spacing: 0) {
                 HStack {
-                    Text("psst").font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy)).tracking(Tokens.Band.wordmarkTracking)
+                    Text("psst").font(.psst(size: Tokens.Band.wordmarkSize, weight: .heavy)).tracking(Tokens.Band.wordmarkTracking)
                     Spacer()
-                    Text("LOCAL DEMO").font(.footnote.weight(.semibold)).tracking(Tokens.Band.labelTracking)
+                    Text("LOCAL DEMO").font(.psst(.footnote, weight: .semibold)).tracking(Tokens.Band.labelTracking)
                 }.foregroundStyle(.white).padding(.horizontal, Tokens.Space.xl).padding(.vertical, Tokens.Space.xl)
                 ScrollView {
                     VStack(spacing: 0) {
@@ -60,7 +60,7 @@ struct HomeView: View {
                     .font(.body.weight(.semibold)).frame(minHeight: Tokens.Band.headerControlHeight)
             }.accessibilityLabel("View Alex's phone (simulated)")
             Text("Fictional Alex. Nothing leaves this phone.")
-                .font(.footnote).foregroundStyle(Color.onCanvasSecondary)
+                .font(.psst(.footnote)).foregroundStyle(Color.onCanvasSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }.foregroundStyle(.white).padding(.horizontal, Tokens.Space.xl).padding(.bottom, Tokens.Space.xl).padding(.top, Tokens.Space.m)
     }
@@ -96,6 +96,6 @@ struct LocalPreviewNotice: View {
     let text: String
     var color: Color = .onCanvasSecondary
     var body: some View {
-        Text(text).font(.footnote).foregroundStyle(color).fixedSize(horizontal: false, vertical: true)
+        Text(text).font(.psst(.footnote)).foregroundStyle(color).fixedSize(horizontal: false, vertical: true)
     }
 }

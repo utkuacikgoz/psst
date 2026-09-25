@@ -17,10 +17,10 @@ struct AlexPhoneView: View {
                     : AnyLayout(HStackLayout())) {
                     Button { dismiss() } label: {
                         Label("Your phone", systemImage: "arrow.left")
-                            .font(.body.weight(.semibold)).frame(minHeight: Tokens.Band.headerControlHeight)
+                            .font(.psst(.body, weight: .semibold)).frame(minHeight: Tokens.Band.headerControlHeight)
                     }
                     if !dynamicTypeSize.isAccessibilitySize { Spacer() }
-                    Text("LOCAL DEMO · ALEX’S SIDE").font(.footnote.weight(.semibold)).tracking(Tokens.Band.labelTracking)
+                    Text("LOCAL DEMO · ALEX’S SIDE").font(.psst(.footnote, weight: .semibold)).tracking(Tokens.Band.labelTracking)
                 }.foregroundStyle(.white).padding(.horizontal, Tokens.Space.xl).padding(.vertical, Tokens.Space.m)
                 // DM2: Alex's side receives exactly like the real app (R2).
                 if let arrival {
@@ -32,7 +32,7 @@ struct AlexPhoneView: View {
                         VStack(spacing: 0) {
                             if exchange.latestEvent(to: .alex) == nil {
                                 Text("Nothing from you yet.")
-                                    .font(.title2.weight(.semibold)).foregroundStyle(.white)
+                                    .font(.psst(.title2, weight: .semibold)).foregroundStyle(.white)
                                     .frame(maxWidth: .infinity, minHeight: 220).padding(Tokens.Space.xl)
                             }
                             PersonRow(name: "You", status: replyStatusText,
@@ -41,7 +41,7 @@ struct AlexPhoneView: View {
                                       action: tapBack,
                                       minHeight: max(Tokens.personRowMinHeight, proxy.size.height * 0.5))
                             Text("Local demo. Nothing leaves this phone.")
-                                .font(.footnote).foregroundStyle(Color.onCanvasSecondary).padding(Tokens.Space.xl)
+                                .font(.psst(.footnote)).foregroundStyle(Color.onCanvasSecondary).padding(Tokens.Space.xl)
                         }
                     }
                 }

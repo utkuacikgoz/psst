@@ -1,9 +1,15 @@
+@font-face { font-family: "Inter Tight"; src: url("/fonts/InterTight-Medium.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Inter Tight"; src: url("/fonts/InterTight-SemiBold.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Inter Tight"; src: url("/fonts/InterTight-Bold.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Inter Tight"; src: url("/fonts/InterTight-ExtraBold.woff2") format("woff2"); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "Inter Tight"; src: url("/fonts/InterTight-Black.woff2") format("woff2"); font-weight: 900; font-style: normal; font-display: swap; }
+
 :root {
   --purple: #713F93; --purple-deep: #5A2F78;
   --indigo: #5F61AE; --blue: #2476AA; --green: #187F69;
   --pink: #AC3E68; --hot: #E63E8C; --gold: #B87500; --yellow: #FFD966;
   --cream: #FBF6EA; --ink: #241B2B; --muted: #5E5366; --line: #E9DFD0;
-  --display: -apple-system, "SF Pro Display", "Inter Tight", "Helvetica Neue", Arial, sans-serif;
+  --display: "Inter Tight", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   color-scheme: light;
 }
 * { box-sizing: border-box; }

@@ -49,9 +49,9 @@ final class UITestAPI: PsstAPI {
     init(scenario: Scenario) {
         isSignedIn = scenario != .tour
         guard scenario != .empty else { return }
-        names = [ada: "Ada", emre: "Emre", sam: "Sam"]
+        names = [ada: "Mia", emre: "Zoe", sam: "Ava"]
         last = [ada: (false, .psst, false), emre: (true, .psst, true)]
-        unseen = [UnseenSignal(id: UUID(), connectionId: ada, senderId: UUID(), senderName: "Ada",
+        unseen = [UnseenSignal(id: UUID(), connectionId: ada, senderId: UUID(), senderName: "Mia",
                                effectId: Signal.psst.rawValue, createdAt: Date())]
     }
 
@@ -77,7 +77,7 @@ final class UITestAPI: PsstAPI {
         unseen.removeAll { ids.contains($0.id) }
     }
 
-    /// Emre's sends take a moment (to show "Sending…"). Sam's first fails as if
+    /// Zoe's sends take a moment (to show "Sending…"). Ava's first fails as if
     /// offline; the next hits the pacing limit.
     func sendSignal(eventID: UUID, connectionID: UUID, signal: Signal) async throws -> SendResult {
         if connectionID == sam {
@@ -89,7 +89,7 @@ final class UITestAPI: PsstAPI {
             try await Task.sleep(for: .milliseconds(1500))
         }
         last[connectionID] = (true, signal, false)
-        // Ada pssted just before, so answering her is a same moment.
+        // Mia pssted just before, so answering her is a same moment.
         return SendResult(id: eventID, createdAt: Date(), pushStatus: "accepted", duplicate: false,
                           sameMoment: connectionID == ada)
     }
@@ -100,11 +100,11 @@ final class UITestAPI: PsstAPI {
     }
 
     func previewInvite(code: String) async throws -> InvitePreview {
-        InvitePreview(status: .pending, inviterName: "Kim")
+        InvitePreview(status: .pending, inviterName: "Lily")
     }
 
     func acceptInvite(code: String) async throws -> AcceptedInvite {
-        names[kim] = "Kim"
+        names[kim] = "Lily"
         return AcceptedInvite(status: "accepted", connectionId: kim)
     }
 

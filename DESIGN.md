@@ -63,6 +63,7 @@ The owner explicitly chose **Yo** after rejecting the earlier cobalt-card design
 - Psst+ (optional one-time unlock): home's footer reads Settings · Psst+ (PP2). The Psst+ sheet is a standard list (PS1): what's included, the App Store's local price, Unlock, Restore purchase, and "Pssting, replies and invites are always free." Once unlocked, the same sheet holds the app icon and whisper sound choices. A band's long-press menu has Colour… (BC1): eight colours, on your phone only. Without Psst+, Colour… opens the Psst+ sheet.
 - Accounts are anonymous and live on one phone. On a new phone you choose your name again and re-invite your people (owner decision NP1).
 - The first time home has someone to tap, a one-time dark overlay shows a tapping hand: "Tap a band to psst" / "Hold to move someone or remove them". Any tap only dismisses it; it never sends.
+- App icon (final, owner-approved 25 Sep 2026): the white lowercase "psst" wordmark on #713F93, matching the launch screen. Psst+ offers Night, Gold and Pink versions of the same mark.
 - The notification's button reads "Psst back".
 - Same moment: when both people psst each other within 10 seconds by the server's clock, both phones show your purple half above their colour with a white SAME MOMENT label, for about 2.5 seconds. At most one per pair per minute. Tapping closes it without sending.
 - The shared invite reads: "I want to be able to psst you. Tap to join me (code K7QX4MPA)." plus the link. An invite link opens the I HAVE A CODE step with the code filled in.

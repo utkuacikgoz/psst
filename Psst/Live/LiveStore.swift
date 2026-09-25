@@ -8,7 +8,8 @@ enum LiveRowStatus: Equatable {
     /// The server accepted and stored it. Not proof the other phone showed it.
     case sent(Signal)
     case notSent(Signal)
-    case paused(Signal)
+    /// The server's pacing limit; tapping works again at `until`.
+    case paused(Signal, until: Date)
     /// Their app reported displaying it.
     case seen(Signal)
     /// Stored on the server; no display report from them yet.
@@ -39,6 +40,9 @@ final class LiveStore {
 
     static let minimumTapInterval: TimeInterval = 0.8
     static let refreshInterval: Duration = .seconds(15)
+    /// The server allows 10 per rolling minute to one person, so a slot is free within a minute.
+    static let pauseDuration: TimeInterval = 60
+    static let welcomedKey = "psst.live.welcomedConnections"
 
     private(set) var phase: Phase = .loading
     private(set) var connections: [ConnectionSummary] = []
@@ -64,6 +68,7 @@ final class LiveStore {
     private let now: () -> Date
     private let sentDisplayDuration: Duration
     @ObservationIgnored private var lastTapAt: [UUID: Date] = [:]
+    private var pausedUntil: [UUID: Date] = [:]
     @ObservationIgnored private var lastRegisteredToken: String?
 
     static let profileKey = "psst.live.profileCreated"
@@ -125,8 +130,34 @@ final class LiveStore {
     }
 
     /// Plays each connection's newest unseen signal on its row, then reports them seen.
+    /// Then welcomes anyone new.
     func showUnseenIfVisible() async {
-        guard isHomeVisible, let unseen = try? await api.listUnseen(), !unseen.isEmpty else { return }
+        if isHomeVisible, let unseen = try? await api.listUnseen(), !unseen.isEmpty { await show(unseen) }
+        welcomeNewConnections()
+    }
+
+    /// Option J2: a person who just became tappable gets a full-screen welcome,
+    /// once, while home is on screen. People already there on first launch don't.
+    func welcomeNewConnections() {
+        guard hasLoadedConnections else { return }
+        let ids = connections.map(\.id.uuidString)
+        guard var welcomed = defaults.stringArray(forKey: Self.welcomedKey).map(Set.init) else {
+            defaults.set(ids, forKey: Self.welcomedKey)
+            return
+        }
+        // Anyone who already exchanged a signal needs no welcome.
+        for connection in connections where connection.lastEventId != nil {
+            welcomed.insert(connection.id.uuidString)
+        }
+        if isHomeVisible, arrival == nil,
+           let new = connections.last(where: { !welcomed.contains($0.id.uuidString) }) {
+            welcomed.insert(new.id.uuidString)
+            arrival = Arrival(id: new.id, connectionID: new.id, senderName: new.otherName, kind: .joined)
+        }
+        defaults.set(Array(welcomed), forKey: Self.welcomedKey)
+    }
+
+    private func show(_ unseen: [UnseenSignal]) async {
         var newest: [UUID: UnseenSignal] = [:]
         for signal in unseen where newest[signal.connectionId].map({ signal.createdAt > $0.createdAt }) ?? true {
             newest[signal.connectionId] = signal
@@ -157,7 +188,8 @@ final class LiveStore {
         case .sending(_, let signal): return .sending(signal)
         case .sent(_, let signal): return .sent(signal)
         case .failed(_, let signal, .retry): return .notSent(signal)
-        case .failed(_, let signal, .rateLimited): return .paused(signal)
+        case .failed(_, let signal, .rateLimited):
+            if let until = pausedUntil[connection.id], until > now() { return .paused(signal, until: until) }
         case nil: break
         }
         guard let last = connection.lastSignal, let fromMe = connection.lastFromMe else {
@@ -175,7 +207,8 @@ final class LiveStore {
         switch sendStates[id] {
         case .sending:
             return nil
-        case .failed(let eventID, let signal, _):
+        case .failed(let eventID, let signal, let reason):
+            if reason == .rateLimited, let until = pausedUntil[id], until > now() { return nil }
             lastTapAt[id] = now()
             return Task { await send(connectionID: id, eventID: eventID, signal: signal) }
         case .sent, nil:
@@ -205,6 +238,8 @@ final class LiveStore {
             connections.removeAll { $0.id == connectionID }
             notice = name.map { "You're no longer connected with \($0)." } ?? "That connection has ended."
         } catch APIError.server(429, _) {
+            isOffline = false
+            pausedUntil[connectionID] = now().addingTimeInterval(Self.pauseDuration)
             sendStates[connectionID] = .failed(eventID: eventID, signal: signal, reason: .rateLimited)
         } catch APIError.signedOut {
             sendStates[connectionID] = nil
@@ -292,6 +327,8 @@ final class LiveStore {
     private func resetLocalAccount() {
         api.signOutLocally()
         defaults.removeObject(forKey: Self.profileKey)
+        defaults.removeObject(forKey: Self.welcomedKey)
+        pausedUntil = [:]
         connections = []
         sendStates = [:]
         effects = [:]

@@ -33,6 +33,8 @@ final class UITestAPI: PsstAPI {
     private let ada = UUID()
     private let emre = UUID()
     private let sam = UUID()
+    private let kim = UUID()
+    private var samTaps = 0
     private var last: [UUID: (fromMe: Bool, signal: Signal, seen: Bool)] = [:]
     private var unseen: [UnseenSignal] = []
     private var names: [UUID: String] = [:]
@@ -52,7 +54,7 @@ final class UITestAPI: PsstAPI {
     func setDisplayName(_ name: String) async throws {}
 
     func listConnections() async throws -> [ConnectionSummary] {
-        [ada, emre, sam].compactMap { id in
+        [ada, emre, sam, kim].compactMap { id in
             guard let name = names[id] else { return nil }
             let event = last[id]
             return ConnectionSummary(
@@ -70,11 +72,13 @@ final class UITestAPI: PsstAPI {
         unseen.removeAll { ids.contains($0.id) }
     }
 
-    /// Emre's sends take a moment (to show "Sending…"); Sam's fail as if offline.
+    /// Emre's sends take a moment (to show "Sending…"). Sam's first fails as if
+    /// offline; the next hits the pacing limit.
     func sendSignal(eventID: UUID, connectionID: UUID, signal: Signal) async throws -> SendResult {
         if connectionID == sam {
+            samTaps += 1
             try await Task.sleep(for: .milliseconds(300))
-            throw APIError.offline
+            throw samTaps == 1 ? APIError.offline : APIError.server(status: 429, code: "rate_limited")
         }
         if connectionID == emre {
             try await Task.sleep(for: .milliseconds(1500))
@@ -93,7 +97,8 @@ final class UITestAPI: PsstAPI {
     }
 
     func acceptInvite(code: String) async throws -> AcceptedInvite {
-        AcceptedInvite(status: "accepted", connectionId: nil)
+        names[kim] = "Kim"
+        return AcceptedInvite(status: "accepted", connectionId: kim)
     }
 
     func removeConnection(_ id: UUID) async throws { names[id] = nil }

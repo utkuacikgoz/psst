@@ -11,6 +11,10 @@ struct PersonRow: View {
     var isBusy = false
     var statusSymbol: String?
     var minHeight: CGFloat = Tokens.personRowMinHeight
+    /// Option V2: a settled fact ("seen") sits quietly in the corner, not under the name.
+    var cornerMark: String?
+    /// Option T2: the band dims while sending is paused.
+    var isDimmed = false
 
     @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = Tokens.Band.titleSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -42,12 +46,24 @@ struct PersonRow: View {
             .foregroundStyle(.white)
             .padding(.horizontal, Tokens.Space.xl).padding(.vertical, Tokens.Band.verticalPadding)
             .frame(maxWidth: .infinity, minHeight: minHeight)
+            .overlay(alignment: .bottomTrailing) {
+                if let cornerMark, !showingEffect {
+                    HStack(spacing: Tokens.Space.xs) {
+                        Text(cornerMark)
+                        if cornerMark == "seen" { Image(systemName: "checkmark") }
+                    }
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(.horizontal, Tokens.Space.l)
+                    .padding(.vertical, Tokens.Space.m)
+                }
+            }
             .contentShape(Rectangle())
         }
-        .buttonStyle(PersonBandStyle(color: .personBand(name)))
+        .buttonStyle(PersonBandStyle(color: .personBand(name), isDimmed: isDimmed))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name)
-        .accessibilityValue(status)
+        .accessibilityValue([status, cornerMark.map { "Psst \($0)" } ?? ""].filter { !$0.isEmpty }.joined(separator: ", "))
         .accessibilityHint(accessibilityHint)
         .accessibilityAddTraits(.isButton)
         .task(id: effect?.id) {
@@ -62,8 +78,13 @@ struct PersonRow: View {
 
 private struct PersonBandStyle: ButtonStyle {
     let color: Color
+    var isDimmed = false
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.background(color.opacity(configuration.isPressed ? Tokens.Band.pressedOpacity : 1))
+        configuration.label
+            .background(color.opacity(configuration.isPressed ? Tokens.Band.pressedOpacity : 1)
+                .saturation(isDimmed ? 0.35 : 1)
+                .brightness(isDimmed ? -0.12 : 0))
+            .opacity(isDimmed ? 0.9 : 1)
             .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
     }
 }

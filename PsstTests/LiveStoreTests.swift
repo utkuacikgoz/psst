@@ -165,11 +165,64 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(store.status(for: ada), .notSent(.psst))
     }
 
-    func testRateLimitedShowsPaused() async {
+    func testRateLimitedPausesForAMinuteThenRetries() async {
         let ada = connection()
         api.sendError = APIError.server(status: 429, code: "rate_limited")
         await store.tap(ada)?.value
-        XCTAssertEqual(store.status(for: ada), .paused(.psst))
+        XCTAssertEqual(store.status(for: ada), .paused(.psst, until: clock.addingTimeInterval(LiveStore.pauseDuration)))
+
+        clock += 30
+        XCTAssertNil(store.tap(ada), "Taps during the pause are ignored")
+        XCTAssertEqual(api.sentEventIDs.count, 1)
+
+        clock += 31
+        api.sendError = nil
+        await store.tap(ada)?.value
+        XCTAssertEqual(api.sentEventIDs.count, 2)
+        XCTAssertEqual(api.sentEventIDs[0], api.sentEventIDs[1], "The retry reuses the event ID")
+    }
+
+    func testPauseCountdownText() {
+        XCTAssertEqual(LiveHomeView.countdown(42), "0:42")
+        XCTAssertEqual(LiveHomeView.countdown(59.2), "1:00")
+        XCTAssertEqual(LiveHomeView.countdown(-3), "0:00")
+    }
+
+    // MARK: Welcome (J2)
+
+    func testPeopleThereOnFirstLaunchAreNotWelcomed() async {
+        api.connections = [connection()]
+        store.isHomeVisible = true
+        await store.refresh()
+        XCTAssertNil(store.arrival)
+    }
+
+    func testANewPersonIsWelcomedOnceWhileHomeIsVisible() async {
+        let ada = connection()
+        api.connections = [ada]
+        await store.refresh()
+
+        let kim = connection(name: "Kim")
+        api.connections = [ada, kim]
+        await store.refresh() // home hidden: wait
+        XCTAssertNil(store.arrival)
+
+        store.isHomeVisible = true
+        await store.refresh()
+        XCTAssertEqual(store.arrival, Arrival(id: kim.id, connectionID: kim.id, senderName: "Kim", kind: .joined))
+
+        store.arrival = nil
+        await store.refresh()
+        XCTAssertNil(store.arrival, "A welcome shows once")
+    }
+
+    func testSomeoneWhoAlreadySentNeedsNoWelcome() async {
+        api.connections = []
+        await store.refresh()
+        api.connections = [connection(name: "Kim", last: .psst, fromMe: true)]
+        store.isHomeVisible = true
+        await store.refresh()
+        XCTAssertNil(store.arrival)
     }
 
     func testEndedConnectionIsRemovedWithANotice() async {

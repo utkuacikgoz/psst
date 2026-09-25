@@ -100,6 +100,22 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(restarted.phase, .ready)
     }
 
+    func testInviteLinkBeforeOnboardingLeadsWithTheInviterThenAccepts() async throws {
+        api.isSignedIn = false
+        await store.start()
+        await store.prepareInvitedIntro(code: "ABCDEFGH")
+        XCTAssertEqual(store.invitedBy, "Ada")
+        XCTAssertTrue(api.isSignedIn, "Previewing needs an anonymous session")
+        XCTAssertNil(store.pendingInviteCode)
+
+        try await store.createProfile(name: "Jo")
+        XCTAssertEqual(store.invitedBy, "Ada", "Not accepted until onboarding finishes")
+        store.finishNotificationChoice()
+        await store.acceptIntroInvite() // idempotent with the one finish started
+        XCTAssertNil(store.invitedBy)
+        XCTAssertNil(store.pendingInviteCode)
+    }
+
     func testExpiredSessionReturnsToName() async throws {
         try await store.createProfile(name: "Ada")
         store.finishNotificationChoice()

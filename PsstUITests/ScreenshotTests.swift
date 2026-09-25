@@ -31,6 +31,8 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(app.buttons["Your phone"].waitForExistence(timeout: 5))
         wait(0.5)
         shot("06-alex-incoming", sizeName)
+        // The arrival settles after a moment, leaving the You band to tap.
+        XCTAssertTrue(app.buttons["You"].waitForExistence(timeout: 5))
         app.buttons["You"].tap()
         wait(1)
         shot("07-alex-tapped-back", sizeName)

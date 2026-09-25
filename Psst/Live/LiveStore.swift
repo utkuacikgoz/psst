@@ -63,6 +63,11 @@ final class LiveStore {
     var notice: String?
     /// Set from a psst://invite link; the home screen opens the invite sheet with it.
     var pendingInviteCode: String?
+    /// IF2: someone new opened an invite link. Their start leads with the
+    /// inviter; once they've chosen a name, the invite is accepted for them.
+    private(set) var invitedBy: String?
+    private(set) var introInviteCode: String?
+    var introSeen = false
     /// True only while the home list is on screen in the foreground. Signals are
     /// acknowledged as seen only then, because only then were they displayed.
     var isHomeVisible = false
@@ -112,11 +117,46 @@ final class LiveStore {
         try await api.setDisplayName(name)
         defaults.set(true, forKey: Self.profileKey)
         phase = defaults.bool(forKey: Self.notificationChoiceKey) ? .ready : .needsNotificationChoice
+        await acceptIntroInvite()
     }
 
     func finishNotificationChoice() {
         defaults.set(true, forKey: Self.notificationChoiceKey)
         phase = .ready
+        Task { await acceptIntroInvite() }
+    }
+
+    /// Looks up an invite link opened before onboarding. Only a usable invite
+    /// gets the intro; anything else waits for the invite sheet to explain it.
+    func prepareInvitedIntro(code: String) async {
+        guard phase == .needsName, introInviteCode != code else { return }
+        do {
+            if !api.isSignedIn { try await api.signUpAnonymously() }
+            let preview = try await api.previewInvite(code: code)
+            guard preview.status == .pending, let name = preview.inviterName else { return }
+            invitedBy = name
+            introInviteCode = code
+            pendingInviteCode = nil
+        } catch {
+            // Keep the code; the invite sheet will try again after onboarding.
+        }
+    }
+
+    /// Accepts the intro's invite once onboarding is done. If it can't be
+    /// accepted any more, the invite sheet opens to say why.
+    func acceptIntroInvite() async {
+        guard phase == .ready, let code = introInviteCode else { return }
+        introInviteCode = nil
+        invitedBy = nil
+        // Make sure the inviter counts as new, so their welcome (J2) plays.
+        if defaults.stringArray(forKey: Self.welcomedKey) == nil {
+            defaults.set(connections.map(\.id.uuidString), forKey: Self.welcomedKey)
+        }
+        do {
+            _ = try await acceptInvite(code: code)
+        } catch {
+            pendingInviteCode = code
+        }
     }
 
     func rename(to name: String) async throws {

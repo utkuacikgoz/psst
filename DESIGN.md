@@ -58,6 +58,8 @@ The owner explicitly chose **Yo** after rejecting the earlier cobalt-card design
 - Problem lines are short, true and a bit playful: "Didn't make it · tap to try again", "Offline · taps won't get through", "Ada isn't here any more." Never blame the person, and never claim something was sent when it wasn't.
 - Settings lists your open invites (unused, not cancelled, not expired) with their code, time left and Cancel. Home shows people only.
 - After Delete account the app returns straight to the name screen.
+- A newcomer who opens an invite link sees the inviter first: their colour, NAME / wants to psst you / First, what should Kim call you?, then name and notifications. The invite is accepted for them at the end and Kim's welcome plays. An unusable invite skips the intro and the invite sheet explains why.
+- The local demo's Alex's side uses the real full-screen arrival, under a LOCAL DEMO · ALEX'S SIDE label.
 - Accounts are anonymous and live on one phone. On a new phone you choose your name again and re-invite your people (owner decision NP1).
 - The first time home has someone to tap, a one-time dark overlay shows a tapping hand: "Tap a band to psst" / "Hold to move someone or remove them". Any tap only dismisses it; it never sends.
 - The notification's button reads "Psst back".

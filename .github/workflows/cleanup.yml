@@ -1,0 +1,48 @@
+name: Clean up old artifacts
+
+# Artifacts already expire after a day (screenshots) or by GitHub's default;
+# this sweeps anything older than two days, plus runs older than 30 days, so
+# storage and the Actions list stay small.
+on:
+  schedule:
+    - cron: "17 4 * * 1"  # Mondays 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const day = 24 * 60 * 60 * 1000;
+            const artifactCutoff = Date.now() - 2 * day;
+            const runCutoff = Date.now() - 30 * day;
+
+            let artifacts = 0;
+            for await (const page of github.paginate.iterator(
+              github.rest.actions.listArtifactsForRepo, { owner, repo, per_page: 100 })) {
+              for (const a of page.data) {
+                if (!a.expired && new Date(a.created_at) < artifactCutoff) {
+                  await github.rest.actions.deleteArtifact({ owner, repo, artifact_id: a.id });
+                  artifacts++;
+                }
+              }
+            }
+
+            let runs = 0;
+            for await (const page of github.paginate.iterator(
+              github.rest.actions.listWorkflowRunsForRepo, { owner, repo, per_page: 100, status: "completed" })) {
+              for (const r of page.data) {
+                if (new Date(r.created_at) < runCutoff) {
+                  await github.rest.actions.deleteWorkflowRun({ owner, repo, run_id: r.id });
+                  runs++;
+                }
+              }
+            }
+            core.notice(`Deleted ${artifacts} artifacts and ${runs} old runs.`);

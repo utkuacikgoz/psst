@@ -10,7 +10,7 @@ struct LiveRootView: View {
             case .loading:
                 // Matches the launch screen, so startup has no visible jump.
                 Text("psst")
-                    .font(.system(size: 84, weight: .heavy))
+                    .font(.psst(size: 84, weight: .heavy))
                     .foregroundStyle(Color.onCanvas)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.psstCanvas.ignoresSafeArea())
@@ -52,9 +52,9 @@ struct InvitedIntroView: View {
                     .bandTitle(inviter, size: nameSize, tracking: Tokens.Band.titleTracking)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("wants to psst you")
-                    .font(.title3.weight(.semibold))
+                    .font(.psst(.title3, weight: .semibold))
                 Text("First, what should \(inviter) call you?")
-                    .font(.body)
+                    .font(.psst(.body))
                     .padding(.top, Tokens.Space.xl)
             }
             .multilineTextAlignment(.center)
@@ -190,7 +190,7 @@ struct LiveHomeView: View {
             .foregroundStyle(Color(hex: 0xFFD27A))
             .accessibilityHint(purchases.isUnlocked ? "Your colours, icons and sounds." : "An optional one-time unlock.")
         }
-        .font(.subheadline.weight(.semibold))
+        .font(.psst(.subheadline, weight: .semibold))
         .frame(maxWidth: .infinity)
     }
 
@@ -217,7 +217,7 @@ struct LiveHomeView: View {
     private var header: some View {
         HStack {
             Text("psst")
-                .font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy)).tracking(Tokens.Band.wordmarkTracking)
+                .font(.psst(size: Tokens.Band.wordmarkSize, weight: .heavy)).tracking(Tokens.Band.wordmarkTracking)
                 .foregroundStyle(Color.onCanvas)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
@@ -276,7 +276,7 @@ struct LiveHomeView: View {
                     .bandTitle("Invite your first person", size: firstInviteTitleSize, tracking: Tokens.Band.titleTracking)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("They'll appear here as a band")
-                    .font(.subheadline.weight(.medium))
+                    .font(.psst(.subheadline, weight: .medium))
             }
             .multilineTextAlignment(.center)
             .foregroundStyle(Color.onCanvas)
@@ -421,12 +421,12 @@ struct NoticeView: View {
             Spacer(minLength: 0)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .font(.subheadline.weight(.bold))
+                    .font(.psst(.subheadline, weight: .bold))
                     .underline()
                     .frame(minHeight: Tokens.minTouch)
             }
         }
-        .font(.subheadline.weight(.semibold))
+        .font(.psst(.subheadline, weight: .semibold))
         .foregroundStyle(Color.onCanvas)
         .padding(.horizontal, Tokens.Space.xl)
         .padding(.vertical, Tokens.Space.s)
@@ -451,11 +451,11 @@ struct CoachOverlay: View {
                     .scaleEffect(pressing ? 0.88 : 1)
                     .accessibilityHidden(true)
                 Text("Tap a band to psst")
-                    .font(.title2.weight(.heavy))
+                    .font(.psst(.title2, weight: .heavy))
                 Text("Hold to move someone or remove them")
-                    .font(.body.weight(.medium))
+                    .font(.psst(.body, weight: .medium))
                 Text("Tap anywhere to start")
-                    .font(.footnote.weight(.semibold))
+                    .font(.psst(.footnote, weight: .semibold))
                     .opacity(0.8)
                     .padding(.top, Tokens.Space.l)
             }

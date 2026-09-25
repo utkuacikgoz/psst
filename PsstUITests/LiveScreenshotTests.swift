@@ -28,8 +28,8 @@ final class LiveScreenshotTests: XCTestCase {
         shot("live-02-notifications")
         notNow.tap()
 
-        XCTAssertTrue(app.buttons["Ada"].waitForExistence(timeout: 10))
-        // Ada's unseen Psst opens the full-screen arrival, which clears itself.
+        XCTAssertTrue(app.buttons["Mia"].waitForExistence(timeout: 10))
+        // Mia's unseen Psst opens the full-screen arrival, which clears itself.
         wait(0.4)
         shot("live-03-arrival")
         wait(2.2)
@@ -41,30 +41,30 @@ final class LiveScreenshotTests: XCTestCase {
         wait(0.5)
         shot("live-04-home")
 
-        // Answering Ada right after her Psst is a same moment.
-        app.buttons["Ada"].tap()
+        // Answering Mia right after her Psst is a same moment.
+        app.buttons["Mia"].tap()
         wait(0.7)
         shot("live-04b-same-moment")
         wait(3.0)
 
-        app.buttons["Emre"].tap()
+        app.buttons["Zoe"].tap()
         wait(0.5)
         shot("live-05-sending")
         wait(1.4)
         shot("live-06-sent")
 
-        app.buttons["Sam"].tap()
+        app.buttons["Ava"].tap()
         wait(1.2)
         shot("live-07-not-sent")
-        app.buttons["Sam"].tap()
+        app.buttons["Ava"].tap()
         wait(1.2)
         shot("live-07b-paused")
 
-        app.buttons["Emre"].press(forDuration: 1.0)
-        XCTAssertTrue(app.buttons["Report Emre"].waitForExistence(timeout: 5))
+        app.buttons["Zoe"].press(forDuration: 1.0)
+        XCTAssertTrue(app.buttons["Report Zoe"].waitForExistence(timeout: 5))
         wait(0.4)
         shot("live-09-long-press")
-        app.buttons["Report Emre"].tap()
+        app.buttons["Report Zoe"].tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
         wait(0.3)
         shot("live-09b-report-confirm")
@@ -88,8 +88,8 @@ final class LiveScreenshotTests: XCTestCase {
         code.typeText("K7QX4MPA\n")
         wait(0.8)
         shot("live-12-invite-preview")
-        app.buttons["Connect with Kim"].tap()
-        // The sheet closes and Kim gets the full-screen welcome.
+        app.buttons["Connect with Lily"].tap()
+        // The sheet closes and Lily gets the full-screen welcome.
         wait(1.0)
         shot("live-15-welcome")
         wait(2.4)
@@ -100,10 +100,10 @@ final class LiveScreenshotTests: XCTestCase {
         shot("live-13-settings")
 
         // At the largest text sizes the people are below the fold.
-        let manageAda = app.buttons["Manage Ada"]
-        for _ in 0..<4 where !manageAda.isHittable { app.swipeUp() }
-        manageAda.tap()
-        XCTAssertTrue(app.buttons["Remove Ada"].waitForExistence(timeout: 5))
+        let manageMia = app.buttons["Manage Mia"]
+        for _ in 0..<4 where !manageMia.isHittable { app.swipeUp() }
+        manageMia.tap()
+        XCTAssertTrue(app.buttons["Remove Mia"].waitForExistence(timeout: 5))
         wait(0.6)
         shot("live-08-person")
     }

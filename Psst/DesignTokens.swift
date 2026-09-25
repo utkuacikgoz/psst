@@ -23,7 +23,7 @@ enum Tokens {
         static let wordmarkTracking: CGFloat = -2
         /// Contact names and received signal titles; scaled with Dynamic Type by callers.
         static let titleSize: CGFloat = 52
-        static let titleTracking: CGFloat = -1.5
+        static let titleTracking: CGFloat = -2.2
         /// Signal names in the picker.
         static let optionTitleSize: CGFloat = 30
         static let optionTracking: CGFloat = -0.7
@@ -95,9 +95,51 @@ extension Text {
     /// gets at most one line, and a word too wide for the band scales down instead.
     func bandTitle(_ text: String, size: CGFloat, tracking: CGFloat) -> some View {
         let words = max(1, text.split(whereSeparator: \.isWhitespace).count)
-        return font(.system(size: size, weight: .bold))
+        return font(.psst(size: size, weight: .black))
             .tracking(tracking)
             .lineLimit(words)
             .minimumScaleFactor(0.4)
+    }
+}
+
+/// Inter Tight, the brand face shared with psstapp.fun. Bundled (SIL Open Font
+/// License, Psst/Fonts/OFL-InterTight.txt) and registered in Config/Info.plist.
+enum PsstFont {
+    static func name(for weight: Font.Weight) -> String {
+        switch weight {
+        case .black, .heavy: "InterTight-Black"
+        case .bold: "InterTight-Bold"
+        case .semibold: "InterTight-SemiBold"
+        default: "InterTight-Medium"
+        }
+    }
+
+    /// Point sizes at the default (Large) text size; Dynamic Type scales them.
+    static func size(for style: Font.TextStyle) -> CGFloat {
+        switch style {
+        case .largeTitle: 34
+        case .title: 28
+        case .title2: 22
+        case .title3: 20
+        case .headline, .body: 17
+        case .callout: 16
+        case .subheadline: 15
+        case .footnote: 13
+        case .caption: 12
+        case .caption2: 11
+        @unknown default: 17
+        }
+    }
+}
+
+extension Font {
+    /// The brand face at a text style, scaling with Dynamic Type.
+    static func psst(_ style: Font.TextStyle = .body, weight: Font.Weight = .medium) -> Font {
+        .custom(PsstFont.name(for: weight), size: PsstFont.size(for: style), relativeTo: style)
+    }
+
+    /// The brand face at a size the caller already scales (e.g. with @ScaledMetric).
+    static func psst(size: CGFloat, weight: Font.Weight) -> Font {
+        .custom(PsstFont.name(for: weight), fixedSize: size)
     }
 }

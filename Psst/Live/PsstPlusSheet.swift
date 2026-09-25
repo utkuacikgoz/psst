@@ -127,7 +127,7 @@ private struct IconSection: View {
                 } label: {
                     HStack {
                         Text("psst")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.psst(size: 13, weight: .black))
                             .foregroundStyle(.white)
                             .frame(width: 40, height: 40)
                             .background(Color(hex: icon.preview), in: RoundedRectangle(cornerRadius: 9))

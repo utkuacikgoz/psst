@@ -8,6 +8,14 @@
 	<string>$(PSST_SUPABASE_HOST)</string>
 	<key>PSSTSupabaseAnonKey</key>
 	<string>$(PSST_SUPABASE_ANON_KEY)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>InterTight-Medium.ttf</string>
+		<string>InterTight-SemiBold.ttf</string>
+		<string>InterTight-Bold.ttf</string>
+		<string>InterTight-ExtraBold.ttf</string>
+		<string>InterTight-Black.ttf</string>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

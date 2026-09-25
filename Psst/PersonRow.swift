@@ -41,7 +41,7 @@ struct PersonRow: View {
                         else if let statusSymbol { Image(systemName: statusSymbol) }
                         Text(status).fixedSize(horizontal: false, vertical: true)
                     }
-                    .font(.subheadline.weight(.medium))
+                    .font(.psst(.subheadline, weight: .medium))
                 }
             }
             .multilineTextAlignment(.center)
@@ -54,7 +54,7 @@ struct PersonRow: View {
                         Text(cornerMark)
                         if cornerMark == "seen" { Image(systemName: "checkmark") }
                     }
-                    .font(.footnote.weight(.bold))
+                    .font(.psst(.footnote, weight: .bold))
                     .foregroundStyle(.white.opacity(0.9))
                     .padding(.horizontal, Tokens.Space.l)
                     .padding(.vertical, Tokens.Space.m)

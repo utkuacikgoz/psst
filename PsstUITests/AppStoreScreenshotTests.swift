@@ -14,20 +14,20 @@ final class AppStoreScreenshotTests: XCTestCase {
         app.launchArguments += ["-PsstUITestLive", "store", "-PsstUITestHoldMoments", "-PsstUITestPlusPrice"]
         app.launch()
 
-        // Ada's Psst is waiting, so the app opens on her full-screen moment.
+        // Mia's Psst is waiting, so the app opens on her full-screen moment.
         // Wait for the moment itself: it only lasts about two seconds.
         // Moments are held for 8 s in this run (-PsstUITestHoldMoments).
-        XCTAssertTrue(app.buttons["Psst from Ada"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["Psst from Mia"].waitForExistence(timeout: 15))
         wait(0.4)
         shot("01-arrival")
 
-        let arrival = app.buttons["Psst from Ada"]
+        let arrival = app.buttons["Psst from Mia"]
         XCTAssertTrue(arrival.waitForNonExistence(timeout: 12))
         wait(0.6)
         shot("02-home")
 
         // Answering right away is a same moment.
-        app.buttons["Ada"].tap()
+        app.buttons["Mia"].tap()
         wait(0.8)
         shot("03-same-moment")
         XCTAssertTrue(app.buttons["Invite someone"].firstMatch.waitForExistence(timeout: 12))
@@ -43,13 +43,13 @@ final class AppStoreScreenshotTests: XCTestCase {
         XCTAssertTrue(code.waitForExistence(timeout: 5))
         code.tap()
         code.typeText("K7QX4MPA\n")
-        XCTAssertTrue(app.buttons["Connect with Kim"].waitForExistence(timeout: 5))
-        app.buttons["Connect with Kim"].tap()
+        XCTAssertTrue(app.buttons["Connect with Lily"].waitForExistence(timeout: 5))
+        app.buttons["Connect with Lily"].tap()
         wait(1.1)
         shot("05-welcome")
 
         // Psst+ before buying: also the purchase's App Review screenshot.
-        XCTAssertTrue(app.buttons["Kim is in. You're connected."].waitForNonExistence(timeout: 12))
+        XCTAssertTrue(app.buttons["Lily is in. You're connected."].waitForNonExistence(timeout: 12))
         app.buttons["Psst+"].tap()
         XCTAssertTrue(app.buttons["Unlock for $2.99"].waitForExistence(timeout: 5))
         wait(0.6)
@@ -62,9 +62,9 @@ final class AppStoreScreenshotTests: XCTestCase {
         app.launchArguments += ["-PsstUITestLive", "store", "-PsstUITestPlusUnlocked"]
         app.launch()
 
-        let ada = app.buttons["Ada"]
-        XCTAssertTrue(ada.waitForExistence(timeout: 10))
-        // Let Ada's arrival play out before opening anything.
+        let mia = app.buttons["Mia"]
+        XCTAssertTrue(mia.waitForExistence(timeout: 10))
+        // Let Mia's arrival play out before opening anything.
         wait(3)
         app.buttons["Psst+"].tap()
         XCTAssertTrue(app.buttons["Play Whisper"].waitForExistence(timeout: 5))
@@ -73,7 +73,7 @@ final class AppStoreScreenshotTests: XCTestCase {
         app.buttons["Done"].tap()
         wait(0.8)
 
-        app.buttons["Emre"].press(forDuration: 1.0)
+        app.buttons["Zoe"].press(forDuration: 1.0)
         XCTAssertTrue(app.buttons["Colour…"].waitForExistence(timeout: 5))
         app.buttons["Colour…"].tap()
         XCTAssertTrue(app.staticTexts["Only your phone shows this."].waitForExistence(timeout: 5))

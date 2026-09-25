@@ -72,6 +72,8 @@ struct InvitedIntroView: View {
 
 struct LiveHomeView: View {
     @Environment(LiveStore.self) private var store
+    @Environment(Purchases.self) private var purchases
+    @Environment(Personalization.self) private var personalization
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -80,10 +82,14 @@ struct LiveHomeView: View {
     @State private var showingSettings = false
     @State private var managing: ConnectionSummary?
     @State private var confirming: ConnectionAction?
+    @State private var showingPlus = false
+    @State private var colouring: ConnectionSummary?
     @State private var notificationsOff = false
     @ScaledMetric(relativeTo: .largeTitle) private var firstInviteTitleSize: CGFloat = 40
 
-    private var anySheet: Bool { showingInvite || showingSettings || managing != nil || confirming != nil }
+    private var anySheet: Bool {
+        showingInvite || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -127,7 +133,10 @@ struct LiveHomeView: View {
             if let arrival = store.arrival {
                 ArrivalView(arrival: arrival,
                             onTap: { withAnimation { store.psstBack(arrival) } },
-                            onDone: { withAnimation { store.nextArrival() } })
+                            onDone: { withAnimation { store.nextArrival() } },
+                            color: arrival.connectionID.map {
+                                personalization.color(for: $0, name: arrival.senderName)
+                            })
             }
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: store.arrival)
@@ -155,18 +164,34 @@ struct LiveHomeView: View {
         .sheet(isPresented: $showingInvite) { InviteSheet() }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
         .manageConnection(menuFor: $managing, confirming: $confirming)
+        .sheet(isPresented: $showingPlus) { PsstPlusSheet() }
+        .sheet(item: $colouring) { ColourSheet(connection: $0) }
     }
 
+    /// Settings, and Psst+ beside it (PP2): always there, never in the way.
     private var settingsButton: some View {
-        Button {
-            showingSettings = true
-        } label: {
-            Label("Settings", systemImage: "gearshape")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.onCanvas)
-                .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
-                .contentShape(Rectangle())
+        HStack(spacing: Tokens.Space.l) {
+            Button {
+                showingSettings = true
+            } label: {
+                Label("Settings", systemImage: "gearshape")
+                    .frame(minHeight: Tokens.minTouch)
+                    .contentShape(Rectangle())
+            }
+            .foregroundStyle(Color.onCanvas)
+            Text("·").foregroundStyle(Color.onCanvasSecondary).accessibilityHidden(true)
+            Button {
+                showingPlus = true
+            } label: {
+                Text("Psst+")
+                    .frame(minHeight: Tokens.minTouch)
+                    .contentShape(Rectangle())
+            }
+            .foregroundStyle(Color(hex: 0xFFD27A))
+            .accessibilityHint(purchases.isUnlocked ? "Your colours, icons and sounds." : "An optional one-time unlock.")
         }
+        .font(.subheadline.weight(.semibold))
+        .frame(maxWidth: .infinity)
     }
 
     private func updateVisibility() {
@@ -291,7 +316,8 @@ struct LiveHomeView: View {
                 statusSymbol: Self.symbol(for: status),
                 minHeight: minHeight,
                 cornerMark: Self.cornerMark(for: status),
-                isDimmed: Self.isPaused(status)
+                isDimmed: Self.isPaused(status),
+                color: personalization.color(for: connection.id, name: connection.otherName)
             )
             // Remove, block and report: a long press here, the VoiceOver action,
             // or Settings → People. Each explains itself before acting.
@@ -303,6 +329,12 @@ struct LiveHomeView: View {
                     } label: {
                         Label(action.menuTitle, systemImage: action.systemImage)
                     }
+                }
+                // Psst+ (BC1). Without Psst+ it opens the Psst+ sheet instead.
+                Button {
+                    if purchases.isUnlocked { colouring = connection } else { showingPlus = true }
+                } label: {
+                    Label("Colour…", systemImage: "paintpalette")
                 }
             }
             .accessibilityAction(named: "Manage \(connection.otherName)") { managing = connection }

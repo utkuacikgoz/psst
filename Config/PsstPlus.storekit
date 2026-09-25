@@ -1,0 +1,34 @@
+{
+  "identifier" : "5C2E4B7A",
+  "nonRenewingSubscriptions" : [ ],
+  "products" : [
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "6760000001",
+      "localizations" : [
+        {
+          "description" : "Choose colours, app icons and whisper sounds. Pssting stays free.",
+          "displayName" : "Psst+",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "psstplus.unlock",
+      "referenceName" : "Psst+ unlock",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6760000000",
+    "_developerTeamID" : "XXXXXXXXXX",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [ ]
+  },
+  "subscriptionGroups" : [ ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Generates Psst/psst.wav, the notification sound: a soft whispered "psst".
+"""Generates the notification sounds: Psst/psst.wav, a soft whispered "psst",
+plus the Psst+ variants psst-soft.wav (quieter, slower) and psst-quick.wav.
 
 Filtered noise only (no recording, no licences): a short breathy "p", a
 rising "ss", and a light "t". About 0.55 s, 16-bit mono PCM, which iOS accepts
@@ -54,17 +55,23 @@ def centre(t):
     return 4_200
 
 
-length = int(RATE * 0.56)
-noise = [random.uniform(-1, 1) for _ in range(length)]
-shaped = [n * envelope(i / RATE) for i, n in enumerate(noise)]
-filtered = bandpass(shaped, centre, q=1.4)
-peak = max(abs(s) for s in filtered) or 1
-gain = 0.6 / peak  # leave headroom; notification sounds shouldn't be loud
+def render(filename, stretch=1.0, level=0.6, q=1.4, seed=7):
+    random.seed(seed)
+    length = int(RATE * 0.56 * stretch)
+    noise = [random.uniform(-1, 1) for _ in range(length)]
+    shaped = [n * envelope(i / RATE / stretch) for i, n in enumerate(noise)]
+    filtered = bandpass(shaped, lambda t: centre(t / stretch), q=q)
+    peak = max(abs(s) for s in filtered) or 1
+    gain = level / peak  # leave headroom; notification sounds shouldn't be loud
+    path = pathlib.Path(__file__).resolve().parents[1] / "Psst" / filename
+    with wave.open(str(path), "wb") as f:
+        f.setnchannels(1)
+        f.setsampwidth(2)
+        f.setframerate(RATE)
+        f.writeframes(b"".join(struct.pack("<h", int(max(-1, min(1, s * gain)) * 32767)) for s in filtered))
+    print(f"wrote {path} ({length / RATE:.2f} s)")
 
-path = pathlib.Path(__file__).resolve().parents[1] / "Psst" / "psst.wav"
-with wave.open(str(path), "wb") as f:
-    f.setnchannels(1)
-    f.setsampwidth(2)
-    f.setframerate(RATE)
-    f.writeframes(b"".join(struct.pack("<h", int(max(-1, min(1, s * gain)) * 32767)) for s in filtered))
-print(f"wrote {path} ({length / RATE:.2f} s)")
+
+render("psst.wav")
+render("psst-soft.wav", stretch=1.35, level=0.35, q=1.0, seed=11)
+render("psst-quick.wav", stretch=0.7, level=0.6, q=1.8, seed=3)

@@ -194,6 +194,21 @@ class BackendTests(unittest.TestCase):
 
     # Sending ---------------------------------------------------------------
 
+    def test_recipient_chooses_their_notification_sound(self):
+        ada, emre = new_user("Ada"), new_user("Emre")
+        conn = connect(ada, emre)
+        event = uuid.uuid4()
+        ada.rpc("send_signal", event, conn, "psst")
+        service = Api("service_role")
+        self.assertEqual(service.rpc("push_targets", event)["sound"], "psst.wav")
+        emre.rpc("set_notification_sound", "psst-soft.wav")
+        self.assertEqual(service.rpc("push_targets", event)["sound"], "psst-soft.wav")
+        # Only Emre's own choice counts, and only known files.
+        ada.rpc("set_notification_sound", "psst-quick.wav")
+        self.assertEqual(service.rpc("push_targets", event)["sound"], "psst-soft.wav")
+        with self.fails("invalid_sound", 422):
+            emre.rpc("set_notification_sound", "../evil.caf")
+
     def test_same_moment_within_ten_seconds(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         conn = connect(ada, emre)

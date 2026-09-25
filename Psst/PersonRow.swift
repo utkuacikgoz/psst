@@ -15,6 +15,8 @@ struct PersonRow: View {
     var cornerMark: String?
     /// Option T2: the band dims while sending is paused.
     var isDimmed = false
+    /// Psst+ (BC1): a colour you chose for this person, on your phone only.
+    var color: Color? = nil
 
     @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = Tokens.Band.titleSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -60,7 +62,7 @@ struct PersonRow: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(PersonBandStyle(color: .personBand(name), isDimmed: isDimmed))
+        .buttonStyle(PersonBandStyle(color: color ?? .personBand(name), isDimmed: isDimmed))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name)
         .accessibilityValue([status, cornerMark.map { "Psst \($0)" } ?? ""].filter { !$0.isEmpty }.joined(separator: ", "))

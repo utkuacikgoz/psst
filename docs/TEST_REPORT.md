@@ -24,6 +24,6 @@ As of 25 September 2026, `main`. "Automated" runs on every push in GitHub Action
 
 ## Known gaps
 
-- **Reports** are stored and block the person, but nobody reviews them yet. Guideline 1.2 expects prompt action on reports before release.
+- **Reports** are stored and block the person. The owner reviews them regularly by hand (`docs/REPORTS.md`); there is no automated alert.
 - The **app icon** is provisional (wordmark on purple).
 - Push delivery is only as good as APNs acceptance, which isn't device receipt. The app says "seen" only after the recipient's app displayed the signal.

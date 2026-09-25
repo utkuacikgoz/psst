@@ -24,6 +24,7 @@ secret; credentials live in Supabase project secrets and in the git-ignored
   look invalid to the other. The blocked person isn't told.
 - **reports**: reporter, reported person and time; `report_user` also blocks.
   Clients can't read the table. Rows go when either account is deleted.
+  The owner reviews them regularly: see `docs/REPORTS.md`.
 - **signal_events**: the ID is generated on the sending phone and reused on
   retry, so a retry can never store a second copy. `created_at` is server time.
   `seen_at` is set only by the recipient's app after it displayed the signal.

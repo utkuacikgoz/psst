@@ -6,6 +6,8 @@ export interface PushTargets {
   event_id: string;
   connection_id: string;
   effect_id: string;
+  /** Both people pssted within 10 seconds (server time). Optional for older databases. */
+  same_moment?: boolean;
   push_status: PushStatus;
   sender_name: string;
   tokens: { token: string; environment: ApnsEnvironment }[];
@@ -48,6 +50,7 @@ export function buildPayload(targets: PushTargets) {
       event_id: targets.event_id,
       connection_id: targets.connection_id,
       effect_id: targets.effect_id,
+      same_moment: targets.same_moment ?? false,
     },
   };
 }

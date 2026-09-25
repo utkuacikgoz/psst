@@ -35,6 +35,12 @@ final class LiveScreenshotTests: XCTestCase {
         wait(2.2)
         shot("live-04-home")
 
+        // Answering Ada right after her Psst is a same moment.
+        app.buttons["Ada"].tap()
+        wait(0.7)
+        shot("live-04b-same-moment")
+        wait(3.0)
+
         app.buttons["Emre"].tap()
         wait(0.5)
         shot("live-05-sending")

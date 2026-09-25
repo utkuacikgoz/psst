@@ -16,7 +16,7 @@ As of 25 September 2026, `main`. "Automated" runs on every push in GitHub Action
 
 ## Not yet verified
 
-- **Push on physical devices:** notification arrival, opening to the right person, "Send back" from the notification, the "seen" round trip, and the notifications-off path. Needs the two-phone check in `supabase/README.md`.
+- **Push on physical devices:** notification arrival, opening to the right person, "Psst back" from the notification, the "seen" round trip, and the notifications-off path. Needs the two-phone check in `supabase/README.md`.
 - **VoiceOver:** labels, hints and actions are set in code, but no one has done a full pass with VoiceOver running.
 - **Reduce Motion:** the effect falls back to a fade in code, but it hasn't been reviewed on screen.
 - **Offline behaviour on a real network:** simulated offline only.

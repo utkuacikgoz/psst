@@ -22,6 +22,8 @@ struct UnseenSignal: Decodable, Identifiable, Equatable {
     let senderName: String
     let effectId: String
     let createdAt: Date
+    /// Both people pssted within 10 seconds, by the server's clock.
+    var sameMoment: Bool? = nil
 
     var signal: Signal { Signal(rawValue: effectId) ?? .psst }
 }
@@ -31,6 +33,8 @@ struct SendResult: Decodable, Equatable {
     let createdAt: Date
     let pushStatus: String
     let duplicate: Bool
+    /// This send answered theirs within 10 seconds, by the server's clock.
+    var sameMoment: Bool? = nil
 }
 
 struct CreatedInvite: Decodable, Equatable {
@@ -69,11 +73,13 @@ struct SignalPayload: Equatable {
     let eventID: UUID
     let connectionID: UUID
     let signal: Signal
+    var sameMoment = false
 
-    init(eventID: UUID, connectionID: UUID, signal: Signal) {
+    init(eventID: UUID, connectionID: UUID, signal: Signal, sameMoment: Bool = false) {
         self.eventID = eventID
         self.connectionID = connectionID
         self.signal = signal
+        self.sameMoment = sameMoment
     }
 
     init?(userInfo: [AnyHashable: Any]) {
@@ -82,7 +88,8 @@ struct SignalPayload: Equatable {
               let connection = (psst["connection_id"] as? String).flatMap(UUID.init(uuidString:)),
               let signal = (psst["effect_id"] as? String).flatMap(Signal.init(rawValue:))
         else { return nil }
-        self.init(eventID: event, connectionID: connection, signal: signal)
+        self.init(eventID: event, connectionID: connection, signal: signal,
+                  sameMoment: psst["same_moment"] as? Bool ?? false)
     }
 }
 

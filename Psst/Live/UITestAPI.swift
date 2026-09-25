@@ -84,7 +84,9 @@ final class UITestAPI: PsstAPI {
             try await Task.sleep(for: .milliseconds(1500))
         }
         last[connectionID] = (true, signal, false)
-        return SendResult(id: eventID, createdAt: Date(), pushStatus: "accepted", duplicate: false)
+        // Ada pssted just before, so answering her is a same moment.
+        return SendResult(id: eventID, createdAt: Date(), pushStatus: "accepted", duplicate: false,
+                          sameMoment: connectionID == ada)
     }
 
 

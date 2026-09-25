@@ -180,6 +180,28 @@ class BackendTests(unittest.TestCase):
 
     # Sending ---------------------------------------------------------------
 
+    def test_same_moment_within_ten_seconds(self):
+        ada, emre = new_user("Ada"), new_user("Emre")
+        conn = connect(ada, emre)
+        first = ada.rpc("send_signal", uuid.uuid4(), conn, "psst")
+        self.assertFalse(first["same_moment"])
+        second_id = uuid.uuid4()
+        second = emre.rpc("send_signal", second_id, conn, "psst")
+        self.assertTrue(second["same_moment"])
+        # The retry reports the stored value; Ada learns it from her unseen list.
+        self.assertTrue(emre.rpc("send_signal", second_id, conn, "psst")["same_moment"])
+        self.assertEqual(ada.rows("select same_moment from public.list_unseen()"), [(True,)])
+        # Bounded: another answer within the minute is ordinary.
+        self.assertFalse(ada.rpc("send_signal", uuid.uuid4(), conn, "psst")["same_moment"])
+
+    def test_same_moment_needs_the_other_person_and_the_window(self):
+        ada, emre = new_user("Ada"), new_user("Emre")
+        conn = connect(ada, emre)
+        ada.rpc("send_signal", uuid.uuid4(), conn, "psst")
+        self.assertFalse(ada.rpc("send_signal", uuid.uuid4(), conn, "psst")["same_moment"], "not with yourself")
+        admin("update public.signal_events set created_at = created_at - interval '11 seconds' where connection_id = %s", conn)
+        self.assertFalse(emre.rpc("send_signal", uuid.uuid4(), conn, "psst")["same_moment"], "too late")
+
     def test_send_and_idempotent_retry(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         conn = connect(ada, emre)

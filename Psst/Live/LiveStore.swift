@@ -43,6 +43,7 @@ final class LiveStore {
     /// The server allows 10 per rolling minute to one person, so a slot is free within a minute.
     static let pauseDuration: TimeInterval = 60
     static let welcomedKey = "psst.live.welcomedConnections"
+    static let pinnedOrderKey = "psst.live.pinnedOrder"
 
     private(set) var phase: Phase = .loading
     private(set) var connections: [ConnectionSummary] = []
@@ -69,6 +70,11 @@ final class LiveStore {
     private let sentDisplayDuration: Duration
     @ObservationIgnored private var lastTapAt: [UUID: Date] = [:]
     private var pausedUntil: [UUID: Date] = [:]
+    /// People the user placed by dragging, top first. Kept on this device only.
+    private(set) var pinnedOrder: [UUID] = []
+    /// Everyone else, most recent first, as of the last time home appeared. Not
+    /// re-sorted while you're tapping, so a band never moves under your finger.
+    private var recencyOrder: [UUID] = []
     @ObservationIgnored private var lastRegisteredToken: String?
 
     static let profileKey = "psst.live.profileCreated"
@@ -80,6 +86,7 @@ final class LiveStore {
         self.defaults = defaults
         self.now = now
         self.sentDisplayDuration = sentDisplayDuration
+        pinnedOrder = (defaults.stringArray(forKey: Self.pinnedOrderKey) ?? []).compactMap(UUID.init(uuidString:))
     }
 
     // MARK: Onboarding
@@ -117,6 +124,7 @@ final class LiveStore {
     func refresh() async {
         do {
             connections = try await api.listConnections()
+            if !hasLoadedConnections { reorderByRecency() }
             hasLoadedConnections = true
             isOffline = false
             await showUnseenIfVisible()
@@ -168,7 +176,8 @@ final class LiveStore {
         // One full-screen moment: the most recent sender.
         if let latest = newest.values.filter({ s in connections.contains { $0.id == s.connectionId } })
             .max(by: { $0.createdAt < $1.createdAt }) {
-            arrival = Arrival(id: latest.id, connectionID: latest.connectionId, senderName: latest.senderName)
+            arrival = Arrival(id: latest.id, connectionID: latest.connectionId, senderName: latest.senderName,
+                              kind: latest.sameMoment == true ? .sameMoment : .signal)
         }
         let shown = unseen.filter { signal in connections.contains { $0.id == signal.connectionId } }.map(\.id)
         if (try? await api.ackSignals(shown)) != nil, let updated = try? await api.listConnections() {
@@ -179,6 +188,58 @@ final class LiveStore {
     private func play(_ trigger: EffectTrigger, on connectionID: UUID) {
         effects[connectionID] = trigger
         latestEffect = trigger
+    }
+
+    // MARK: Order (O2, plus dragging)
+
+    /// Pinned people first in the order placed, then new people, then everyone
+    /// else most recent first.
+    var orderedConnections: [ConnectionSummary] {
+        let byID = Dictionary(connections.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let pinnedIDs = Set(pinnedOrder)
+        let pinned = pinnedOrder.compactMap { byID[$0] }
+        let known = recencyOrder.filter { byID[$0] != nil && !pinnedIDs.contains($0) }
+        let knownIDs = Set(known)
+        let new = Self.byRecency(connections.filter { !pinnedIDs.contains($0.id) && !knownIDs.contains($0.id) })
+        return pinned + new + known.compactMap { byID[$0] }
+    }
+
+    /// Called when home appears, never mid-tapping.
+    func reorderByRecency() {
+        recencyOrder = Self.byRecency(connections).map(\.id)
+    }
+
+    static func byRecency(_ list: [ConnectionSummary]) -> [ConnectionSummary] {
+        list.sorted { a, b in
+            let (x, y) = (a.lastCreatedAt ?? .distantPast, b.lastCreatedAt ?? .distantPast)
+            return x != y ? x > y : a.otherName.localizedStandardCompare(b.otherName) == .orderedAscending
+        }
+    }
+
+    /// Dropping one band onto another takes that band's place. The moved person,
+    /// and everyone above the lowest placed person, stays where they are.
+    func move(_ id: UUID, onto target: UUID) {
+        var ids = orderedConnections.map(\.id)
+        guard id != target, let from = ids.firstIndex(of: id), let to = ids.firstIndex(of: target) else { return }
+        ids.remove(at: from)
+        ids.insert(id, at: to)
+        let placed = Set(pinnedOrder).union([id])
+        let lowest = ids.lastIndex { placed.contains($0) } ?? to
+        pinnedOrder = Array(ids.prefix(through: lowest))
+        defaults.set(pinnedOrder.map(\.uuidString), forKey: Self.pinnedOrderKey)
+    }
+
+    /// VoiceOver's Move up / Move down.
+    func move(_ id: UUID, by offset: Int) {
+        let ids = orderedConnections.map(\.id)
+        guard let index = ids.firstIndex(of: id), ids.indices.contains(index + offset) else { return }
+        move(id, onto: ids[index + offset])
+    }
+
+    func resetOrder() {
+        pinnedOrder = []
+        defaults.removeObject(forKey: Self.pinnedOrderKey)
+        reorderByRecency()
     }
 
     // MARK: Sending
@@ -223,8 +284,11 @@ final class LiveStore {
     func send(connectionID: UUID, eventID: UUID, signal: Signal) async {
         sendStates[connectionID] = .sending(eventID: eventID, signal: signal)
         do {
-            _ = try await api.sendSignal(eventID: eventID, connectionID: connectionID, signal: signal)
+            let result = try await api.sendSignal(eventID: eventID, connectionID: connectionID, signal: signal)
             isOffline = false
+            if result.sameMoment == true, let name = connections.first(where: { $0.id == connectionID })?.otherName {
+                arrival = Arrival(id: eventID, connectionID: connectionID, senderName: name, kind: .sameMoment)
+            }
             sendStates[connectionID] = .sent(eventID: eventID, signal: signal)
             play(EffectTrigger(id: eventID, signal: signal), on: connectionID)
             if let updated = try? await api.listConnections() { connections = updated }
@@ -292,19 +356,22 @@ final class LiveStore {
         play(EffectTrigger(id: payload.eventID, signal: payload.signal), on: payload.connectionID)
         await refresh()
         if let sender = connections.first(where: { $0.id == payload.connectionID }) {
-            arrival = Arrival(id: payload.eventID, connectionID: sender.id, senderName: sender.otherName)
+            arrival = Arrival(id: payload.eventID, connectionID: sender.id, senderName: sender.otherName,
+                              kind: payload.sameMoment ? .sameMoment : .signal)
         }
     }
 
-    /// Tapping the arrival sends a Psst back to that person.
+    /// Tapping the arrival sends a Psst back to that person. Tapping a same
+    /// moment just closes it: you've both already pssted.
     func psstBack(_ arrival: Arrival) {
         self.arrival = nil
+        guard arrival.kind != .sameMoment else { return }
         if let connection = connections.first(where: { $0.id == arrival.connectionID }) {
             tap(connection)
         }
     }
 
-    /// "Send back" from a notification. The reply's ID derives from the original,
+    /// "Psst back" from a notification. The reply's ID derives from the original,
     /// so a repeated action can't send twice. Returns false if it wasn't sent.
     func sendBack(_ payload: SignalPayload) async -> Bool {
         try? await api.ackSignals([payload.eventID])
@@ -328,6 +395,9 @@ final class LiveStore {
         api.signOutLocally()
         defaults.removeObject(forKey: Self.profileKey)
         defaults.removeObject(forKey: Self.welcomedKey)
+        defaults.removeObject(forKey: Self.pinnedOrderKey)
+        pinnedOrder = []
+        recencyOrder = []
         pausedUntil = [:]
         connections = []
         sendStates = [:]

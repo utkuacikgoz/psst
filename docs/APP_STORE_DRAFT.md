@@ -42,7 +42,7 @@ Based on what the backend stores (`supabase/migrations`) and what the app sends.
 
 ## Privacy policy, terms and support pages
 
-`site/` is deployed on Vercel at **psstapp.fun**. In the Vercel project, set Root Directory to `site`; `site/vercel.json` turns on clean URLs.
+`site/` is deployed on Vercel at **psstapp.fun**. The root `vercel.json` publishes `site/` with clean URLs; leave the Vercel project's Root Directory empty and Framework Preset on "Other".
 
 - Privacy Policy URL: **https://psstapp.fun/privacy**
 - Support URL: **https://psstapp.fun/support**

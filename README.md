@@ -72,4 +72,4 @@ Validation for the Yo-inspired revision: 34 existing unit tests passed, the fina
 
 ## Website
 
-`site/` holds the public pages served by Vercel at https://psstapp.fun: `/privacy`, `/terms` and `/support`, plus a small home page. In Vercel, set the project's Root Directory to `site`. The app links to these pages from Settings and from the Psst+ sheet.
+`site/` holds the public pages served by Vercel at https://psstapp.fun: `/privacy`, `/terms` and `/support`, plus a small home page. Vercel needs no settings: the root `vercel.json` publishes `site/` as static files (leave Root Directory empty; `site/vercel.json` covers the case where it is set to `site`). The app links to these pages from Settings and from the Psst+ sheet.

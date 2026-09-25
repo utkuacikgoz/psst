@@ -9,6 +9,7 @@ final class FakeAPI: PsstAPI {
     var sentEventIDs: [UUID] = []
     var acked: [UUID] = []
     var sendError: Error?
+    var sameMoment = false
     var listError: Error?
     /// When set, sends wait until `releaseSend()` is called.
     var holdSends = false
@@ -32,7 +33,8 @@ final class FakeAPI: PsstAPI {
         if holdSends { await withCheckedContinuation { held.append($0) } }
         sentEventIDs.append(eventID)
         if let sendError { throw sendError }
-        return SendResult(id: eventID, createdAt: Date(), pushStatus: "accepted", duplicate: false)
+        return SendResult(id: eventID, createdAt: Date(), pushStatus: "accepted", duplicate: false,
+                          sameMoment: sameMoment)
     }
     func createInvite() async throws -> CreatedInvite { CreatedInvite(code: "ABCDEFGH", expiresAt: Date()) }
     func previewInvite(code: String) async throws -> InvitePreview { InvitePreview(status: .pending, inviterName: "Ada") }
@@ -186,6 +188,87 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(LiveHomeView.countdown(42), "0:42")
         XCTAssertEqual(LiveHomeView.countdown(59.2), "1:00")
         XCTAssertEqual(LiveHomeView.countdown(-3), "0:00")
+    }
+
+    // MARK: Same moment (X2)
+
+    func testSameMomentShowsForTheSecondSender() async {
+        let ada = connection()
+        api.connections = [ada]
+        await store.refresh()
+        api.sameMoment = true
+        await store.tap(ada)?.value
+        XCTAssertEqual(store.arrival?.kind, .sameMoment)
+        XCTAssertEqual(store.arrival?.senderName, "Ada")
+
+        // Tapping it closes without sending again.
+        store.psstBack(store.arrival!)
+        XCTAssertNil(store.arrival)
+        XCTAssertEqual(api.sentEventIDs.count, 1)
+    }
+
+    func testSameMomentPayloadFlag() {
+        let event = UUID(), connection = UUID()
+        let payload = SignalPayload(userInfo: ["psst": [
+            "event_id": event.uuidString, "connection_id": connection.uuidString,
+            "effect_id": "psst", "same_moment": true]])
+        XCTAssertEqual(payload?.sameMoment, true)
+        XCTAssertEqual(SignalPayload(userInfo: ["psst": [
+            "event_id": event.uuidString, "connection_id": connection.uuidString, "effect_id": "psst"]])?.sameMoment, false)
+    }
+
+    // MARK: Order (O2 + drag)
+
+    private func at(_ seconds: TimeInterval, _ name: String) -> ConnectionSummary {
+        ConnectionSummary(connectionId: UUID(), otherId: UUID(), otherName: name,
+                          lastEventId: UUID(), lastFromMe: true, lastEffect: "psst",
+                          lastCreatedAt: Date(timeIntervalSince1970: seconds), lastSeenAt: nil, unseenCount: 0)
+    }
+
+    func testMostRecentFirstAndStillWhileTapping() async {
+        let ada = at(100, "Ada"), emre = at(300, "Emre"), sam = connection(name: "Sam")
+        api.connections = [ada, emre, sam]
+        await store.refresh()
+        XCTAssertEqual(store.orderedConnections.map(\.otherName), ["Emre", "Ada", "Sam"])
+
+        // Ada becomes most recent, but home doesn't reshuffle until it reappears.
+        api.connections = [at(500, "Ada").withID(ada.id), emre, sam]
+        await store.refresh()
+        XCTAssertEqual(store.orderedConnections.map(\.otherName), ["Emre", "Ada", "Sam"])
+        store.reorderByRecency()
+        XCTAssertEqual(store.orderedConnections.map(\.otherName), ["Ada", "Emre", "Sam"])
+    }
+
+    func testNewPeopleAppearAtTheTop() async {
+        api.connections = [at(100, "Ada")]
+        await store.refresh()
+        api.connections.append(connection(name: "Kim"))
+        await store.refresh()
+        XCTAssertEqual(store.orderedConnections.map(\.otherName), ["Kim", "Ada"])
+    }
+
+    func testDraggedPeopleStayPutAndPersist() async {
+        let ada = at(300, "Ada"), emre = at(200, "Emre"), sam = at(100, "Sam")
+        api.connections = [ada, emre, sam]
+        await store.refresh()
+        store.move(sam.id, onto: ada.id)
+        XCTAssertEqual(store.orderedConnections.map(\.otherName), ["Sam", "Ada", "Emre"])
+        XCTAssertEqual(store.pinnedOrder, [sam.id])
+
+        // Emre becomes most recent: he rises to just below the placed person.
+        api.connections = [ada, at(900, "Emre").withID(emre.id), sam]
+        await store.refresh()
+        store.reorderByRecency()
+        XCTAssertEqual(store.orderedConnections.map(\.otherName), ["Sam", "Emre", "Ada"])
+
+        let restarted = LiveStore(api: api, defaults: defaults)
+        await restarted.refresh()
+        XCTAssertEqual(restarted.orderedConnections.first?.otherName, "Sam")
+
+        store.move(sam.id, by: 1)
+        XCTAssertEqual(store.orderedConnections.map(\.otherName), ["Emre", "Sam", "Ada"])
+        store.resetOrder()
+        XCTAssertEqual(store.orderedConnections.map(\.otherName), ["Emre", "Ada", "Sam"])
     }
 
     // MARK: Welcome (J2)
@@ -369,5 +452,13 @@ final class LiveParsingTests: XCTestCase {
         XCTAssertNil(InviteLink.code(from: URL(string: "psst://other/ABCD")!))
         XCTAssertNil(InviteLink.code(from: URL(string: "https://invite/ABCD")!))
         XCTAssertNil(InviteLink.code(from: URL(string: "psst://invite")!))
+    }
+}
+
+private extension ConnectionSummary {
+    func withID(_ id: UUID) -> ConnectionSummary {
+        ConnectionSummary(connectionId: id, otherId: otherId, otherName: otherName, lastEventId: lastEventId,
+                          lastFromMe: lastFromMe, lastEffect: lastEffect, lastCreatedAt: lastCreatedAt,
+                          lastSeenAt: lastSeenAt, unseenCount: unseenCount)
     }
 }

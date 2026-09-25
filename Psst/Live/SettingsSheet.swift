@@ -47,11 +47,11 @@ struct SettingsSheet: View {
                     Text(notificationText)
                 }
 
-                Section("People") {
+                Section {
                     if store.connections.isEmpty {
                         Text("No one yet.").foregroundStyle(.secondary)
                     }
-                    ForEach(store.connections) { connection in
+                    ForEach(store.orderedConnections) { connection in
                         Button {
                             managing = connection
                         } label: {
@@ -65,6 +65,13 @@ struct SettingsSheet: View {
                         }
                         .accessibilityLabel("Manage \(connection.otherName)")
                     }
+                    if !store.pinnedOrder.isEmpty {
+                        Button("Sort everyone by most recent") { store.resetOrder() }
+                    }
+                } header: {
+                    Text("People")
+                } footer: {
+                    Text("Home puts whoever you pssted most recently first. Hold and drag a band to place someone yourself.")
                 }
 
                 Section("Blocked") {

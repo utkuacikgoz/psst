@@ -18,7 +18,7 @@ Draft for review. Grounded in the code as of 25 September 2026. Nothing here has
 
   No feed, no strangers, no contacts upload, no location.
 
-- **What to test (TestFlight):** Invite a second tester, tap each other, open a notification, and try "Send back" from the notification. Turn notifications off and check that signals still appear in the app.
+- **What to test (TestFlight):** Invite a second tester, tap each other, open a notification, and try "Psst back" from the notification. Turn notifications off and check that signals still appear in the app.
 
 ## App Privacy ("nutrition label")
 

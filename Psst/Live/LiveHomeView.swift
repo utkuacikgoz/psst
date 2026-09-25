@@ -60,7 +60,8 @@ struct LiveHomeView: View {
                             // Yo classic (H2): people and the + band share the screen
                             // equally; with many people each keeps a minimum and scrolls.
                             let bandHeight = Self.bandHeight(available: proxy.size.height, people: store.connections.count)
-                            ForEach(store.connections) { connection in
+                            // O2: most recent first; drag a band to place it yourself.
+                            ForEach(store.orderedConnections) { connection in
                                 row(connection, minHeight: bandHeight)
                             }
                             addBand(minHeight: bandHeight)
@@ -117,8 +118,11 @@ struct LiveHomeView: View {
     }
 
     private func updateVisibility() {
+        let wasVisible = store.isHomeVisible
         store.isHomeVisible = scenePhase == .active && !anySheet
         if store.isHomeVisible {
+            // Re-sort by recency only as home appears, never while tapping.
+            if !wasVisible { withAnimation(reduceMotion ? nil : .snappy) { store.reorderByRecency() } }
             Task { await store.showUnseenIfVisible() }
         }
     }
@@ -250,6 +254,16 @@ struct LiveHomeView: View {
                 }
             }
             .accessibilityAction(named: "Manage \(connection.otherName)") { managing = connection }
+            .accessibilityAction(named: "Move up") { withAnimation { store.move(connection.id, by: -1) } }
+            .accessibilityAction(named: "Move down") { withAnimation { store.move(connection.id, by: 1) } }
+            // Hold and drag onto another band to take its place. The placed order
+            // stays on this phone.
+            .draggable(connection.id.uuidString)
+            .dropDestination(for: String.self) { items, _ in
+                guard let dragged = items.first.flatMap(UUID.init(uuidString:)) else { return false }
+                withAnimation(reduceMotion ? nil : .snappy) { store.move(dragged, onto: connection.id) }
+                return true
+            }
         }
     }
 

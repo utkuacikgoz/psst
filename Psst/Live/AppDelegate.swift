@@ -23,7 +23,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
         let center = UNUserNotificationCenter.current()
         center.delegate = self
-        let sendBack = UNNotificationAction(identifier: Self.sendBackAction, title: "Send back", options: [])
+        let sendBack = UNNotificationAction(identifier: Self.sendBackAction, title: "Psst back", options: [])
         center.setNotificationCategories([
             UNNotificationCategory(identifier: Self.signalCategory, actions: [sendBack], intentIdentifiers: [])
         ])

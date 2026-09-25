@@ -140,7 +140,7 @@ different Apple ID or at least a different Psst account:
    with A's name. Until B opens it, A's row says "Psst · sent".
 4. B taps the notification: Psst opens and plays the signal on A's row. Within
    15 seconds A's row says "Psst · seen".
-5. B long-presses a new notification → **Send back**, without opening the app.
+5. B long-presses a new notification → **Psst back**, without opening the app.
    A receives it.
 6. Airplane mode on A, tap B: **Not sent · Retry**. Airplane mode off, tap
    again: exactly one signal arrives.

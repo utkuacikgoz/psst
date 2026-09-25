@@ -8,7 +8,13 @@ struct LiveRootView: View {
         Group {
             switch store.phase {
             case .loading:
-                Color.psstCanvas.ignoresSafeArea()
+                // Matches the launch screen, so startup has no visible jump.
+                Text("psst")
+                    .font(.system(size: 84, weight: .heavy))
+                    .foregroundStyle(Color.onCanvas)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.psstCanvas.ignoresSafeArea())
+                    .accessibilityHidden(true)
             case .needsName:
                 NameStepView()
             case .needsNotificationChoice:

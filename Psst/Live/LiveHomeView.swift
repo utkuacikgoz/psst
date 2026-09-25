@@ -31,6 +31,7 @@ struct LiveHomeView: View {
     @Environment(LiveStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var showingInvite = false
     @State private var showingSettings = false
@@ -72,6 +73,14 @@ struct LiveHomeView: View {
             }
         }
         .background(Color.psstCanvas.ignoresSafeArea())
+        .overlay {
+            if let arrival = store.arrival {
+                ArrivalView(arrival: arrival,
+                            onTap: { withAnimation { store.psstBack(arrival) } },
+                            onDone: { withAnimation { store.arrival = nil } })
+            }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: store.arrival)
         .preferredColorScheme(.dark)
         .sensoryFeedback(trigger: store.latestEffect) { _, new in new?.signal.haptic }
         .task(id: scenePhase) {

@@ -47,6 +47,8 @@ final class LiveStore {
     private(set) var effects: [UUID: EffectTrigger] = [:]
     /// The most recent effect anywhere, for a single haptic per event.
     private(set) var latestEffect: EffectTrigger?
+    /// A Psst that just arrived, shown full screen for a moment (R2).
+    var arrival: Arrival?
     private(set) var isOffline = false
     private(set) var hasLoadedConnections = false
     /// A short, factual message for the home screen (e.g. a connection that ended).
@@ -131,6 +133,11 @@ final class LiveStore {
         }
         for (connectionID, signal) in newest where connections.contains(where: { $0.id == connectionID }) {
             play(EffectTrigger(id: signal.id, signal: signal.signal), on: connectionID)
+        }
+        // One full-screen moment: the most recent sender.
+        if let latest = newest.values.filter({ s in connections.contains { $0.id == s.connectionId } })
+            .max(by: { $0.createdAt < $1.createdAt }) {
+            arrival = Arrival(id: latest.id, connectionID: latest.connectionId, senderName: latest.senderName)
         }
         let shown = unseen.filter { signal in connections.contains { $0.id == signal.connectionId } }.map(\.id)
         if (try? await api.ackSignals(shown)) != nil, let updated = try? await api.listConnections() {
@@ -242,6 +249,17 @@ final class LiveStore {
         try? await api.ackSignals([payload.eventID])
         play(EffectTrigger(id: payload.eventID, signal: payload.signal), on: payload.connectionID)
         await refresh()
+        if let sender = connections.first(where: { $0.id == payload.connectionID }) {
+            arrival = Arrival(id: payload.eventID, connectionID: sender.id, senderName: sender.otherName)
+        }
+    }
+
+    /// Tapping the arrival sends a Psst back to that person.
+    func psstBack(_ arrival: Arrival) {
+        self.arrival = nil
+        if let connection = connections.first(where: { $0.id == arrival.connectionID }) {
+            tap(connection)
+        }
     }
 
     /// "Send back" from a notification. The reply's ID derives from the original,

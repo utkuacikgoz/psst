@@ -7,6 +7,7 @@ struct HomeView: View {
     @State private var effect: EffectTrigger?
     @State private var showingInvite = false
     @State private var showingAlexPhone = false
+    @State private var arrival: Arrival?
 
     var body: some View {
         GeometryReader { proxy in
@@ -34,6 +35,14 @@ struct HomeView: View {
             }
         }
         .background(Color.psstCanvas.ignoresSafeArea())
+        .overlay {
+            if let arrival {
+                ArrivalView(arrival: arrival,
+                            onTap: { withAnimation { self.arrival = nil }; tapAlex() },
+                            onDone: { withAnimation { self.arrival = nil } })
+            }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: arrival)
         .preferredColorScheme(.dark)
         .sensoryFeedback(trigger: effect) { _, new in new?.signal.haptic }
         .task(id: exchange.activePause(for: .me)) {
@@ -78,6 +87,7 @@ struct HomeView: View {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 300))
             effect = EffectTrigger(id: reply.id, signal: reply.signal)
+            arrival = Arrival(id: reply.id, connectionID: nil, senderName: exchange.partnerName)
         }
     }
 }

@@ -15,11 +15,13 @@ final class AppStoreScreenshotTests: XCTestCase {
         app.launch()
 
         // Ada's Psst is waiting, so the app opens on her full-screen moment.
-        XCTAssertTrue(app.buttons["Ada"].waitForExistence(timeout: 10))
-        wait(0.6)
+        // Wait for the moment itself: it only lasts about two seconds.
+        XCTAssertTrue(app.buttons["Psst from Ada"].waitForExistence(timeout: 15))
+        wait(0.4)
         shot("01-arrival")
 
-        wait(2.4)
+        XCTAssertTrue(app.buttons["Ada"].waitForExistence(timeout: 10))
+        wait(2.6)
         shot("02-home")
 
         // Answering right away is a same moment.

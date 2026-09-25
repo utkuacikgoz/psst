@@ -56,6 +56,18 @@ final class AppStoreScreenshotTests: XCTestCase {
         shot("06-psst-plus")
     }
 
+    /// Just the Psst+ purchase screen (also the purchase's App Review screenshot).
+    func testPsstPlusScreen() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-PsstUITestLive", "empty", "-PsstUITestPlusPrice"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Psst+"].waitForExistence(timeout: 10))
+        app.buttons["Psst+"].tap()
+        XCTAssertTrue(app.buttons["Unlock for $2.99"].waitForExistence(timeout: 5))
+        wait(0.6)
+        shot("psst-plus")
+    }
+
     /// Psst+ after buying: icon and sound choices, and a person's colour.
     func testPsstPlusUnlocked() {
         let app = XCUIApplication()

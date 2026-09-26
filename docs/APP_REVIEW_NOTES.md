@@ -50,3 +50,28 @@ Psst+ (in-app purchase "psstplus.unlock", non-consumable): home → "Psst+" next
 
 Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
 ```
+
+## If Apple asks for "Information Needed" (Guideline 2.1)
+
+Apple asked this for build 7. They want a **screen recording from a physical iPhone** on the latest iOS. Record it yourself with Control Centre → Screen Recording, on a fresh install of the TestFlight or review build. Keep it under about 3 minutes:
+
+1. Delete Psst, reinstall, and open it. Enter a name, read the notification explainer, then Allow.
+2. Tap the gold + band, then "I have a code". Enter an unused code and connect. The band appears.
+3. Tap the band to send a Psst. Show one arriving from the other phone and tap Psst back. Long-press a notification to show "Psst back".
+4. Hold a band to show Remove, Block and Report. Cancel.
+5. Open Psst+ (next to Settings) and show the price, Unlock (sandbox), Restore, and Terms and Privacy. If you're signed into the sandbox, unlock it and show the icon, sound and Colour… choices.
+6. Open Settings to show Delete account and its confirmation. Cancel unless you're using a throwaway account.
+
+Attach the video in App Store Connect under App Review Information → Attachment, then reply with:
+
+```
+1. Purpose: Psst Back lets two people who have both agreed to connect send each other a one-tap "Psst" (thinking of you), and psst back in one tap. Audience: friends, family and couples. It has no feed, no chat, no strangers and no location.
+2. Setup: no login. An anonymous account is created when you enter a name. To connect with our team, use invite code PSSTTEAM (backup: PSSTBACK) via the gold + band → "I have a code". We psst back during review.
+3. External services: Supabase (database, anonymous auth, server functions), Apple Push Notification service, and StoreKit for the Psst+ purchase. The privacy, terms and support pages are hosted on Vercel at psstapp.fun. No AI, ads, tracking or analytics SDKs.
+4. Regional differences: none. The app is the same in every region.
+5. Regulated industry: no. Fonts: Inter Tight, under the SIL Open Font License.
+6. In-app purchase: Psst+ ("psstplus.unlock"), a non-consumable one-time unlock for personal extras: each person's band colour, alternate app icons and whisper sounds. Home → "Psst+" next to Settings. Restore is on the same sheet. Sending, replying and invites are always free.
+7. Safety: hold any band to Remove, Block or Report (reporting also blocks). Settings → Delete account deletes all server data immediately.
+```
+
+Before sending, check that both codes are still unused (`select code, accepted_by from public.invites where code in ('PSSTTEAM','PSSTBACK');`). Build 7 still lists "Home-screen widget" in the Psst+ perks, so don't mention the widget in the reply.

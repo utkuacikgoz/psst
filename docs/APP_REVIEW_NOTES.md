@@ -55,6 +55,8 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 
 Apple asked this for build 7. They want a **screen recording from a physical iPhone** on the latest iOS. Record it yourself with Control Centre → Screen Recording, on a fresh install of the TestFlight or review build. Keep it under about 3 minutes:
 
+Recording alone? In the app, tap + → Share my invite and note the code. Then run Actions → **Stand-in friend** with that code. A temporary "Zoe" joins, sends you one Psst after 30 seconds, pssts back when you psst her, and deletes her account after 10 minutes. The first time, connect with the code instead of step 2 below.
+
 1. Delete Psst, reinstall, and open it. Enter a name, read the notification explainer, then Allow.
 2. Tap the gold + band, then "I have a code". Enter an unused code and connect. The band appears.
 3. Tap the band to send a Psst. Show one arriving from the other phone and tap Psst back. Long-press a notification to show "Psst back".

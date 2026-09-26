@@ -1,0 +1,51 @@
+name: Stand-in friend
+
+# Manual: a temporary friend for recording the app alone. Make an invite in the
+# app, run this with the code, and it connects and pssts you back. Its account
+# is deleted when the time is up. See scripts/stand_in_friend.py.
+on:
+  workflow_dispatch:
+    inputs:
+      code:
+        description: Invite code from the app
+        required: true
+      name:
+        description: Friend's name
+        default: Zoe
+      minutes:
+        description: How long it stays (max 30)
+        default: "10"
+      target:
+        type: choice
+        options: [production, development]
+        default: production
+
+jobs:
+  friend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ inputs.target == 'production' && secrets.SUPABASE_ACCESS_TOKEN_PROD || secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ inputs.target == 'production' && secrets.SUPABASE_PROJECT_REF_PROD || secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Connect and psst back
+        env:
+          INVITE_CODE: ${{ inputs.code }}
+          FRIEND_NAME: ${{ inputs.name }}
+          MINUTES: ${{ inputs.minutes }}
+        run: |
+          [ "$MINUTES" -le 30 ] 2>/dev/null || MINUTES=30
+          SUPABASE_ANON_KEY=$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_REF" -o json | python3 -c "
+          import json, sys
+          keys = json.load(sys.stdin)
+          pick = next((k for k in keys if k.get('name') == 'anon'), None) \
+              or next((k for k in keys if k.get('type') == 'publishable'), None)
+          print(pick['api_key'] if pick else '')
+          ")
+          if [ -z "$SUPABASE_ANON_KEY" ]; then echo "::error::Couldn't read the project's anon key"; exit 1; fi
+          echo "::add-mask::$SUPABASE_ANON_KEY"
+          SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" MINUTES="$MINUTES" python3 scripts/stand_in_friend.py

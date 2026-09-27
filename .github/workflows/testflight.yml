@@ -95,6 +95,30 @@ jobs:
                     f"{detail.get('detail')} Check that ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8 all belong "
                     "to one active key in App Store Connect → Users and Access → Integrations.")
               raise SystemExit(1)
+
+          # The App IDs Xcode will sign, and the capabilities each has. Xcode
+          # can't add capabilities with an API key, so they must exist already.
+          needs = {"app": ["PUSH_NOTIFICATIONS", "APP_GROUPS", "ASSOCIATED_DOMAINS"], "widget": ["APP_GROUPS"]}
+          missing = False
+          for role, identifier in (("app", os.environ["BUNDLE_ID"]), ("widget", os.environ["BUNDLE_ID"] + ".widget")):
+              url = ("https://api.appstoreconnect.apple.com/v1/bundleIds?filter[identifier]="
+                     f"{identifier}&include=bundleIdCapabilities&limit=5")
+              body = json.load(urllib.request.urlopen(
+                  urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"}), timeout=30))
+              exact = [b for b in body["data"] if b["attributes"]["identifier"] == identifier]
+              if not exact:
+                  print(f"::error::The {role} App ID ({role == 'widget' and 'your bundle ID + .widget' or 'your bundle ID'}) "
+                        "isn't registered. Add it in developer.apple.com → Identifiers.")
+                  missing = True
+                  continue
+              ids = {r["id"] for r in exact[0]["relationships"]["bundleIdCapabilities"].get("data", [])}
+              have = sorted(i["attributes"]["capabilityType"] for i in body.get("included", []) if i["id"] in ids)
+              lacking = [c for c in needs[role] if c not in have]
+              print(f"{role} App ID: registered; capabilities {', '.join(have) or 'none'}")
+              if lacking:
+                  print(f"::error::The {role} App ID is missing: {', '.join(lacking)}. Tick them in developer.apple.com → Identifiers.")
+                  missing = True
+          raise SystemExit(1 if missing else 0)
           EOF
 
       - name: Point the build at the ${{ inputs.target }} backend

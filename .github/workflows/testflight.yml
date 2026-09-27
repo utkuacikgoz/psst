@@ -98,9 +98,10 @@ jobs:
 
           # The App IDs Xcode will sign, and the capabilities each has. Xcode
           # can't add capabilities with an API key, so they must exist already.
-          needs = {"app": ["PUSH_NOTIFICATIONS", "APP_GROUPS", "ASSOCIATED_DOMAINS"], "widget": ["APP_GROUPS"]}
+          # The widget is off for now (not embedded), so only the app is checked.
+          needs = {"app": ["PUSH_NOTIFICATIONS", "APP_GROUPS", "ASSOCIATED_DOMAINS"]}
           missing = False
-          for role, identifier in (("app", os.environ["BUNDLE_ID"]), ("widget", os.environ["BUNDLE_ID"] + ".widget")):
+          for role, identifier in (("app", os.environ["BUNDLE_ID"]),):
               url = ("https://api.appstoreconnect.apple.com/v1/bundleIds?filter[identifier]="
                      f"{identifier}&include=bundleIdCapabilities&limit=5")
               body = json.load(urllib.request.urlopen(

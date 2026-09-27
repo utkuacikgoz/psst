@@ -186,12 +186,10 @@
 				A10000000000000000000012 /* Sources */,
 				A10000000000000000000013 /* Frameworks */,
 				A10000000000000000000014 /* Resources */,
-				A10000000000000000000071 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				A10000000000000000000070 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A10000000000000000000006 /* Psst */,

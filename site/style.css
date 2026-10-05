@@ -57,6 +57,12 @@ a { color: var(--purple); }
 .chips { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .chips li { background: #fff; border: 2px solid var(--line); border-radius: 99px; padding: 10px 18px; font-weight: 700; font-size: 16px; color: var(--ink); }
 
+.faq { max-width: 1112px; margin: 0 auto; padding: 56px 24px 24px; }
+.faq h2 { font: 900 clamp(38px, 5vw, 64px)/1 var(--display); letter-spacing: -.04em; color: var(--purple); margin: 0 0 28px; text-align: center; }
+.qas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 14px; }
+.qa { background: #fff; border: 2px solid var(--line); border-radius: 22px; padding: 22px 24px; }
+.qa h3 { font: 800 20px/1.2 var(--display); color: var(--ink); margin: 0 0 8px; }
+.qa p { font-size: 17px; line-height: 1.5; color: var(--ink); margin: 0; }
 .plus { padding: 40px 24px 96px; }
 .plus-card { max-width: 900px; margin: 0 auto; background: #9C6300; color: #fff; border-radius: 36px; padding: clamp(32px, 6vw, 64px); text-align: center; }
 .plus-card h2 { font: 900 clamp(40px, 6vw, 72px)/1 var(--display); letter-spacing: -.04em; margin: 0 0 18px; }

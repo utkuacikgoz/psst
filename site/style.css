@@ -36,7 +36,7 @@ a { color: var(--purple); }
 .hero h1 { font: 900 clamp(52px, 8.4vw, 112px)/.95 var(--display); letter-spacing: -.045em; color: var(--purple); margin: 0 0 26px; text-wrap: balance; }
 .lede { font-size: clamp(19px, 2vw, 22px); font-weight: 600; color: var(--purple-deep); max-width: 30ch; margin: 0 0 30px; line-height: 1.45; }
 .lede em { font-style: normal; background: linear-gradient(transparent 60%, rgba(255, 217, 102, .8) 60%); }
-.soon { display: inline-block; background: var(--ink); color: #fff; font-weight: 800; font-size: 16px; padding: 14px 22px; border-radius: 14px; }
+.soon { display: inline-block; text-decoration: none; background: var(--ink); color: #fff; font-weight: 800; font-size: 16px; padding: 14px 22px; border-radius: 14px; }
 
 .phone { justify-self: center; width: min(320px, 78vw); padding: 11px; background: #111; border-radius: 52px; box-shadow: 0 30px 60px -20px rgba(36, 27, 43, .45), 0 0 0 2px #2a2a2a inset; }
 .phone img { border-radius: 42px; width: 100%; height: auto; }

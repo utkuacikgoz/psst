@@ -4,7 +4,7 @@ Draft for review. Grounded in the code as of 25 September 2026. Nothing here has
 
 ## Listing
 
-- **Name (store, 26 of 30 chars):** Psst Back: Thinking of You (owner pick, 25 Sep 2026; "Psst" alone is taken). The home-screen name stays "Psst".
+- **Name (store):** Psst – Tap a Friend (live: https://apps.apple.com/app/id6815764359; "Psst" alone is taken). The home-screen name stays "Psst".
 - **Subtitle (28 of 30 chars):** One tap. They psst you back.
 - **Before committing:** run a trademark search (USPTO, EUIPO) and register psstback.app / psstback.com if free. Domain checks were blocked from the build environment.
 - **Category:** Social Networking

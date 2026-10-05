@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 import UserNotifications
 
@@ -77,6 +78,7 @@ struct LiveHomeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.requestReview) private var requestReview
 
     @State private var showingInvite = false
     @State private var showingSettings = false
@@ -159,6 +161,15 @@ struct LiveHomeView: View {
         .onDisappear { store.isHomeVisible = false }
         .onChange(of: anySheet) { updateVisibility() }
         .onChange(of: scenePhase) { updateVisibility() }
+        // After the first accepted Psst, once its "sent" has shown and nothing
+        // else is on screen. Apple decides whether the prompt actually appears.
+        .task(id: store.reviewDue && store.arrival == nil && !anySheet && scenePhase == .active) {
+            guard store.reviewDue, store.arrival == nil, !anySheet, scenePhase == .active else { return }
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            store.reviewDue = false
+            requestReview()
+        }
         .onChange(of: store.plusRequested) { _, requested in
             if requested { showingPlus = true; store.plusRequested = false }
         }

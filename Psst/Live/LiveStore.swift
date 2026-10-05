@@ -45,6 +45,7 @@ final class LiveStore {
     static let welcomedKey = "psst.live.welcomedConnections"
     static let pinnedOrderKey = "psst.live.pinnedOrder"
     static let coachKey = "psst.live.coachShown"
+    static let reviewAskedKey = "psst.live.reviewAsked"
 
     private(set) var phase: Phase = .loading
     private(set) var connections: [ConnectionSummary] = []
@@ -70,6 +71,9 @@ final class LiveStore {
     var introSeen = false
     /// Set by the widget's Psst+ message (psst://plus); home opens Psst+.
     var plusRequested = false
+    /// Set once, after the first Psst the server accepts; home then shows
+    /// Apple's rating prompt (which Apple may still choose not to show).
+    var reviewDue = false
     /// True only while the home list is on screen in the foreground. Signals are
     /// acknowledged as seen only then, because only then were they displayed.
     var isHomeVisible = false
@@ -88,6 +92,8 @@ final class LiveStore {
     @ObservationIgnored private var lastRegisteredToken: String?
 
     static let profileKey = "psst.live.profileCreated"
+    /// Screenshot runs never show the rating prompt.
+    static let isUITest = ProcessInfo.processInfo.arguments.contains { $0.hasPrefix("-PsstUITest") }
     static let notificationChoiceKey = "psst.live.notificationChoiceMade"
 
     init(api: PsstAPI, defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init,
@@ -363,6 +369,10 @@ final class LiveStore {
                 arrival = Arrival(id: eventID, connectionID: connectionID, senderName: name, kind: .sameMoment)
             }
             sendStates[connectionID] = .sent(eventID: eventID, signal: signal)
+            if !defaults.bool(forKey: Self.reviewAskedKey) {
+                defaults.set(true, forKey: Self.reviewAskedKey)
+                reviewDue = !Self.isUITest
+            }
             play(EffectTrigger(id: eventID, signal: signal), on: connectionID)
             if let updated = try? await api.listConnections() { connections = updated }
             try? await Task.sleep(for: sentDisplayDuration)

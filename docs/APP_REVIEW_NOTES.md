@@ -34,7 +34,7 @@ For a later submission, pick two new unused codes; each works once.
 ## Notes to paste (fill in the two codes)
 
 ```
-Psst Back lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
+Psst lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
 
 To try it with a real person (our team):
 1. Open the app, enter any name, and choose whether to allow notifications.
@@ -67,7 +67,7 @@ Recording alone? In the app, tap + → Share my invite and note the code. Then r
 Attach the video in App Store Connect under App Review Information → Attachment, then reply with:
 
 ```
-1. Purpose: Psst Back lets two people who have both agreed to connect send each other a one-tap "Psst" (thinking of you), and psst back in one tap. Audience: friends, family and couples. It has no feed, no chat, no strangers and no location.
+1. Purpose: Psst lets two people who have both agreed to connect send each other a one-tap "Psst" (thinking of you), and psst back in one tap. Audience: friends, family and couples. It has no feed, no chat, no strangers and no location.
 2. Setup: no login. An anonymous account is created when you enter a name. To connect with our team, use invite code PSSTTEAM (backup: PSSTBACK) via the gold + band → "I have a code". We psst back during review.
 3. External services: Supabase (database, anonymous auth, server functions), Apple Push Notification service, and StoreKit for the Psst+ purchase. The privacy, terms and support pages are hosted on Vercel at psstapp.fun. No AI, ads, tracking or analytics SDKs.
 4. Regional differences: none. The app is the same in every region.

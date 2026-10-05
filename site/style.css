@@ -21,7 +21,7 @@ a { color: var(--purple); }
 /* ---------- shared ---------- */
 .wordmark { font: 900 34px/1 var(--display); letter-spacing: -1.5px; color: var(--purple); text-decoration: none; }
 .wordmark.small { font-size: 26px; }
-.kicker { font: 800 13px/1 var(--display); letter-spacing: .14em; text-transform: uppercase; opacity: .85; margin: 0 0 14px; }
+.kicker { font: 800 13px/1 var(--display); letter-spacing: .14em; text-transform: uppercase; margin: 0 0 14px; }
 .mark { position: relative; white-space: nowrap; }
 .mark::after { content: ""; position: absolute; left: 2%; right: 2%; bottom: -.08em; height: .12em; border-radius: 99px; background: var(--hot); transform: rotate(-1deg); }
 .mark.yellow::after { background: var(--yellow); }
@@ -58,7 +58,7 @@ a { color: var(--purple); }
 .chips li { background: #fff; border: 2px solid var(--line); border-radius: 99px; padding: 10px 18px; font-weight: 700; font-size: 16px; color: var(--ink); }
 
 .plus { padding: 40px 24px 96px; }
-.plus-card { max-width: 900px; margin: 0 auto; background: var(--gold); color: #fff; border-radius: 36px; padding: clamp(32px, 6vw, 64px); text-align: center; }
+.plus-card { max-width: 900px; margin: 0 auto; background: #9C6300; color: #fff; border-radius: 36px; padding: clamp(32px, 6vw, 64px); text-align: center; }
 .plus-card h2 { font: 900 clamp(40px, 6vw, 72px)/1 var(--display); letter-spacing: -.04em; margin: 0 0 18px; }
 .plus-card p { font-size: 19px; font-weight: 500; max-width: 40ch; margin: 0 auto; }
 .plus-card .free { margin-top: 18px; font-weight: 800; }

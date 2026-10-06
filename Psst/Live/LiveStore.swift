@@ -46,8 +46,12 @@ final class LiveStore {
     static let pinnedOrderKey = "psst.live.pinnedOrder"
     static let coachKey = "psst.live.coachShown"
     static let reviewAskedKey = "psst.live.reviewAsked"
+    static let myNameKey = "psst.live.myName"
 
     private(set) var phase: Phase = .loading
+    /// Your own name as last saved on this phone (ED1). Nil on installs from
+    /// before it was kept; Settings then asks you to add it.
+    private(set) var myName: String?
     private(set) var connections: [ConnectionSummary] = []
     private(set) var sendStates: [UUID: SendState] = [:]
     /// The effect currently playing on each row, keyed by connection. A new event ID replays it.
@@ -103,6 +107,7 @@ final class LiveStore {
         self.now = now
         self.sentDisplayDuration = sentDisplayDuration
         coachDismissed = defaults.bool(forKey: Self.coachKey)
+        myName = defaults.string(forKey: Self.myNameKey)
         pinnedOrder = (defaults.stringArray(forKey: Self.pinnedOrderKey) ?? []).compactMap(UUID.init(uuidString:))
     }
 
@@ -123,6 +128,7 @@ final class LiveStore {
             try await api.signUpAnonymously()
         }
         try await api.setDisplayName(name)
+        remember(name: name)
         defaults.set(true, forKey: Self.profileKey)
         phase = defaults.bool(forKey: Self.notificationChoiceKey) ? .ready : .needsNotificationChoice
         await acceptIntroInvite()
@@ -169,6 +175,12 @@ final class LiveStore {
 
     func rename(to name: String) async throws {
         try await api.setDisplayName(name)
+        remember(name: name)
+    }
+
+    private func remember(name: String) {
+        myName = name
+        defaults.set(name, forKey: Self.myNameKey)
     }
 
     // MARK: Loading
@@ -504,6 +516,8 @@ final class LiveStore {
         defaults.removeObject(forKey: Self.profileKey)
         defaults.removeObject(forKey: Self.welcomedKey)
         defaults.removeObject(forKey: Self.pinnedOrderKey)
+        defaults.removeObject(forKey: Self.myNameKey)
+        myName = nil
         pinnedOrder = []
         recencyOrder = []
         arrival = nil

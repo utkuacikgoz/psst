@@ -103,6 +103,18 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(restarted.phase, .ready)
     }
 
+    func testYourNameIsKeptOnThisPhoneAndForgottenOnDelete() async throws {
+        api.isSignedIn = false
+        try await store.createProfile(name: "Sam")
+        XCTAssertEqual(store.myName, "Sam")
+        try await store.rename(to: "Sammy")
+        XCTAssertEqual(LiveStore(api: api, defaults: defaults).myName, "Sammy", "Survives a relaunch")
+
+        try await store.deleteAccount()
+        XCTAssertNil(store.myName)
+        XCTAssertNil(LiveStore(api: api, defaults: defaults).myName)
+    }
+
     func testInviteLinkBeforeOnboardingLeadsWithTheInviterThenAccepts() async throws {
         api.isSignedIn = false
         await store.start()

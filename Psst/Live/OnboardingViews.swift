@@ -1,16 +1,15 @@
 import SwiftUI
 import UserNotifications
 
-/// Step 1: the only identity Psst asks for. You type straight into your own
-/// band, which is how you'll appear on the other person's phone.
+/// Step 1 (NM1): the only identity Psst asks for. A plain question, then you
+/// type straight into your own band, which is how you'll appear on their phone.
 struct NameStepView: View {
     @Environment(LiveStore.self) private var store
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var name = ""
     @State private var isSaving = false
     @State private var error: String?
     @FocusState private var focused: Bool
-    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = Tokens.Band.titleSize
+    @ScaledMetric(relativeTo: .largeTitle) private var questionSize: CGFloat = 34
 
     private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -25,15 +24,24 @@ struct NameStepView: View {
                         .padding(.horizontal, inset)
                         .padding(.vertical, Tokens.Space.l)
 
-                    Text("YOUR NAME")
-                        .font(.psst(.footnote, weight: .semibold))
-                        .tracking(Tokens.Band.labelTracking)
-                        .padding(.horizontal, inset)
-                        .padding(.top, Tokens.Space.s)
-                        .padding(.bottom, Tokens.Space.s)
-                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: Tokens.Space.s) {
+                        Text("What do your people call you?")
+                            .font(.psst(size: questionSize, weight: .heavy))
+                            .tracking(Tokens.Band.titleTracking)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("This is the name your people see when you psst them.")
+                            .font(.psst(.subheadline, weight: .medium))
+                    }
+                    .padding(.horizontal, inset)
+                    .padding(.bottom, Tokens.Space.l)
 
-                    nameBand(inset: inset)
+                    NameBand(name: $name, focused: $focused, inset: inset, onSubmit: save)
+
+                    Text("Only people you connect with see it. You can change it later in Settings.")
+                        .font(.psst(.footnote, weight: .medium))
+                        .padding(.horizontal, inset)
+                        .padding(.top, Tokens.Space.m)
 
                     if let error {
                         Label(error, systemImage: "exclamationmark.circle")
@@ -55,55 +63,6 @@ struct NameStepView: View {
         .onAppear { focused = true }
     }
 
-    /// The real text field is underneath, so typing, VoiceOver and autofill work
-    /// normally. On top, the band shows the name the way contact bands do
-    /// (uppercase). The name is saved as typed.
-    private func nameBand(inset: CGFloat) -> some View {
-        let color = Color.personBand(trimmed.isEmpty ? "psst" : trimmed)
-        return VStack(spacing: Tokens.Space.m) {
-            ZStack {
-                TextField("", text: $name)
-                    .font(.psst(size: titleSize, weight: .bold))
-                    .foregroundStyle(.clear)
-                    .tint(.clear)
-                    .multilineTextAlignment(.center)
-                    .textContentType(.givenName)
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled()
-                    .submitLabel(.continue)
-                    .focused($focused)
-                    .onSubmit(save)
-                    .accessibilityLabel("Your name")
-                    .accessibilityHint("Shown on the other person's phone when you send a signal.")
-                    .onChange(of: name) { _, new in
-                        if new.count > 40 { name = String(new.prefix(40)) }
-                    }
-
-                HStack(spacing: 2) {
-                    Text(trimmed.isEmpty ? "NAME" : name.uppercased())
-                        .bandTitle(trimmed.isEmpty ? "NAME" : name, size: titleSize, tracking: Tokens.Band.titleTracking)
-                        .opacity(trimmed.isEmpty ? 0.55 : 1)
-                        .multilineTextAlignment(.center)
-                    if focused { BlinkingCaret(height: titleSize) }
-                }
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-            }
-            .frame(minHeight: titleSize * 1.2)
-
-            Text("This band is you on their phone")
-                .font(.psst(.subheadline, weight: .medium))
-                .multilineTextAlignment(.center)
-        }
-        .padding(.horizontal, inset)
-        .padding(.vertical, Tokens.Band.verticalPadding)
-        .frame(maxWidth: .infinity)
-        .background(color)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: color)
-        .contentShape(Rectangle())
-        .onTapGesture { focused = true }
-    }
-
     private func save() {
         guard !trimmed.isEmpty, !isSaving else { return }
         isSaving = true
@@ -118,6 +77,144 @@ struct NameStepView: View {
             }
             isSaving = false
         }
+    }
+}
+
+/// ED1: change your name from Settings with the same band you made it with.
+struct NameEditSheet: View {
+    @Environment(LiveStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var isSaving = false
+    @State private var error: String?
+    @FocusState private var focused: Bool
+
+    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var unchanged: Bool { trimmed == (store.myName ?? "") }
+
+    var body: some View {
+        NavigationStack {
+            GeometryReader { proxy in
+                let inset = Tokens.sideInset(forWidth: proxy.size.width)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        NameBand(name: $name, focused: $focused, inset: inset, onSubmit: save)
+                            .padding(.top, Tokens.Space.l)
+
+                        Text("Your people see the new name the next time their Psst refreshes.")
+                            .font(.psst(.footnote, weight: .medium))
+                            .padding(.horizontal, inset)
+                            .padding(.top, Tokens.Space.m)
+
+                        if let error {
+                            Label(error, systemImage: "exclamationmark.circle")
+                                .font(.psst(.subheadline, weight: .semibold))
+                                .padding(.horizontal, inset)
+                                .padding(.top, Tokens.Space.l)
+                        }
+                    }
+                    .foregroundStyle(Color.onCanvas)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .scrollDismissesKeyboard(.never)
+            }
+            .background(Color.psstCanvas.ignoresSafeArea())
+            .navigationTitle("Your name")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.psstCanvas, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Save", action: save).disabled(trimmed.isEmpty || unchanged)
+                    }
+                }
+            }
+        }
+        .tint(.white)
+        .environment(\.colorScheme, .dark)
+        .onAppear {
+            name = store.myName ?? ""
+            focused = true
+        }
+    }
+
+    private func save() {
+        guard !trimmed.isEmpty, !isSaving else { return }
+        guard !unchanged else { dismiss(); return }
+        isSaving = true
+        error = nil
+        Task {
+            do {
+                try await store.rename(to: trimmed)
+                dismiss()
+            } catch APIError.offline {
+                error = "No internet right now. Try again once you're back online."
+            } catch {
+                self.error = "That didn't save. Names can be 1 to 40 characters."
+            }
+            isSaving = false
+        }
+    }
+}
+
+/// Your own band, typed into. The real text field is underneath, so typing,
+/// VoiceOver and autofill work normally. On top, the band shows the name the
+/// way contact bands do (uppercase). The name is saved as typed.
+struct NameBand: View {
+    @Binding var name: String
+    var focused: FocusState<Bool>.Binding
+    let inset: CGFloat
+    let onSubmit: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = Tokens.Band.titleSize
+
+    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        let color = Color.personBand(trimmed.isEmpty ? "psst" : trimmed)
+        ZStack {
+            TextField("", text: $name)
+                .font(.psst(size: titleSize, weight: .bold))
+                .foregroundStyle(.clear)
+                .tint(.clear)
+                .multilineTextAlignment(.center)
+                .textContentType(.givenName)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .submitLabel(.done)
+                .focused(focused)
+                .onSubmit(onSubmit)
+                .accessibilityLabel("Your name")
+                .accessibilityHint("Shown on the other person's phone when you psst them.")
+                .onChange(of: name) { _, new in
+                    if new.count > 40 { name = String(new.prefix(40)) }
+                }
+
+            HStack(spacing: 2) {
+                Text(trimmed.isEmpty ? "NAME" : name.uppercased())
+                    .bandTitle(trimmed.isEmpty ? "NAME" : name, size: titleSize, tracking: Tokens.Band.titleTracking)
+                    .opacity(trimmed.isEmpty ? 0.55 : 1)
+                    .multilineTextAlignment(.center)
+                if focused.wrappedValue { BlinkingCaret(height: titleSize) }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+        .frame(minHeight: titleSize * 1.2)
+        .padding(.horizontal, inset)
+        .padding(.vertical, Tokens.Band.verticalPadding)
+        .frame(maxWidth: .infinity)
+        .background(color)
+        .foregroundStyle(Color.onCanvas)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: color)
+        .contentShape(Rectangle())
+        .onTapGesture { focused.wrappedValue = true }
     }
 }
 

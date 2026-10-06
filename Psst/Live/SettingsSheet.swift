@@ -5,8 +5,7 @@ struct SettingsSheet: View {
     @Environment(LiveStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
-    @State private var name = ""
-    @State private var nameMessage: String?
+    @State private var editingName = false
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
     @State private var blocked: [BlockedPerson] = []
     @State private var openInvites: [OpenInvite] = []
@@ -20,20 +19,11 @@ struct SettingsSheet: View {
         // Option S3: the standard grouped iPhone list.
         NavigationStack {
             Form {
+                // ED1: you, as your people see you.
                 Section {
-                    HStack {
-                        TextField("New name", text: $name)
-                            .textContentType(.givenName)
-                            .submitLabel(.done)
-                            .onSubmit(rename)
-                            .accessibilityLabel("New name")
-                        Button("Save", action: rename)
-                            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-                } header: {
-                    Text("Your name")
-                } footer: {
-                    if let nameMessage { Text(nameMessage) }
+                    YouBand(name: store.myName) { editingName = true }
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.personBand(store.myName ?? "psst"))
                 }
 
                 Section {
@@ -152,6 +142,7 @@ struct SettingsSheet: View {
         .manageConnection(menuFor: $managing, confirming: $confirming) {
             Task { blocked = (try? await store.api.listBlocked()) ?? blocked }
         }
+        .sheet(isPresented: $editingName) { NameEditSheet() }
         .confirmationDialog("Delete your account?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete account", role: .destructive, action: deleteAccount)
             Button("Cancel", role: .cancel) {}
@@ -168,19 +159,6 @@ struct SettingsSheet: View {
             "Off. Signals still appear when you open Psst."
         default:
             "Not set up yet."
-        }
-    }
-
-    private func rename() {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        Task {
-            do {
-                try await store.rename(to: trimmed)
-                nameMessage = "Saved. People you're connected with now see \(trimmed)."
-                name = ""
-            } catch {
-                nameMessage = "That didn't save. Names can be 1 to 40 characters."
-            }
         }
     }
 
@@ -212,5 +190,44 @@ struct SettingsSheet: View {
             }
             isDeleting = false
         }
+    }
+}
+
+/// ED1: the top of Settings. Your band in your colour, and one way to change it.
+private struct YouBand: View {
+    let name: String?
+    let onEdit: () -> Void
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 40
+
+    var body: some View {
+        VStack(spacing: Tokens.Space.s) {
+            Text("YOU")
+                .font(.psst(.caption, weight: .bold))
+                .tracking(Tokens.Band.labelTracking * 2)
+                .accessibilityHidden(true)
+            if let name {
+                Text(name.uppercased())
+                    .bandTitle(name, size: titleSize, tracking: Tokens.Band.titleTracking)
+                    .multilineTextAlignment(.center)
+                    .accessibilityLabel("Your name: \(name)")
+            } else {
+                Text("Add the name your people see.")
+                    .font(.psst(.subheadline, weight: .semibold))
+                    .multilineTextAlignment(.center)
+            }
+            Button(action: onEdit) {
+                Text(name == nil ? "Add your name" : "Edit name")
+                    .font(.psst(.subheadline, weight: .bold))
+                    .padding(.horizontal, Tokens.Space.l)
+                    .padding(.vertical, Tokens.Space.s)
+                    .background(Capsule().fill(Color.white.opacity(0.22)))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, Tokens.Space.xs)
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Tokens.Space.l)
+        .padding(.horizontal, Tokens.Space.m)
     }
 }

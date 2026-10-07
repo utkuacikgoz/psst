@@ -77,3 +77,46 @@ Attach the video in App Store Connect under App Review Information → Attachmen
 ```
 
 Before sending, check that both codes are still unused (`select code, accepted_by from public.invites where code in ('PSSTTEAM','PSSTBACK');`). Build 7 still lists "Home-screen widget" in the Psst+ perks, so don't mention the widget in the reply.
+
+## 1.0.1 (build 16)
+
+Create two fresh codes for the Psst Team profile first (the 1.0 ones may be used up):
+
+```sql
+insert into public.invites (code, inviter_id, expires_at)
+select v.code, p.id, now() + interval '30 days'
+from public.profiles p, (values ('PSSTHEY2'), ('PSSTYAY3')) as v(code)
+where p.display_name = 'Psst Team';
+```
+
+What's New in This Version:
+
+```
+Choosing your name is clearer, and you can now see and change it at the top of Settings. Invite links open Psst directly. Plus small polish and fixes.
+```
+
+Notes for the reviewer:
+
+```
+Psst lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
+
+What's new in 1.0.1:
+- First launch now asks "What do your people call you?" and explains that only people you connect with see the name.
+- Settings opens with your name (your colour band) and an "Edit name" button.
+- After your first Psst is accepted, the app may ask Apple to show the standard rating prompt (SKStoreReviewController / requestReview). It is asked once per install; Apple decides whether it appears.
+- Invite links (https://psstapp.fun/invite/CODE) open the app directly.
+
+To try it with a real person (our team):
+1. Open the app, enter any name, and choose whether to allow notifications.
+2. On home, tap the gold + band → "I have a code" and enter:  PSSTHEY2
+   (backup code, if the first was already used:  PSSTYAY3)
+3. Tap Connect. A band for "Psst Team" appears on home.
+4. Tap that band to send a Psst. We'll psst you back within a few minutes during review hours. If both of you psst within 10 seconds, both phones show SAME MOMENT.
+5. Long-press a notification to use "Psst back" without opening the app.
+
+Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. Settings → Delete account removes all server data immediately.
+
+Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "Psst+" next to Settings → Unlock. It adds alternate app icons, whisper sounds and per-person band colours. "Restore purchase" is on the same sheet. Pssting, replies and invites are free.
+
+Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
+```

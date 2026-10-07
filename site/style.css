@@ -73,6 +73,7 @@ a { color: var(--purple); }
 .foot nav { display: flex; flex-wrap: wrap; gap: 20px; }
 .foot nav a { color: var(--muted); text-decoration: none; font-weight: 600; font-size: 15px; }
 .foot nav a:hover { color: var(--purple); }
+.foot .badges { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .foot .badge { display: block; line-height: 0; }
 .foot .badge img { max-width: 100%; height: auto; }
 

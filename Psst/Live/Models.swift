@@ -1,6 +1,6 @@
 import Foundation
 
-struct ConnectionSummary: Decodable, Identifiable, Equatable {
+struct ConnectionSummary: Codable, Identifiable, Equatable {
     let connectionId: UUID
     let otherId: UUID
     let otherName: String

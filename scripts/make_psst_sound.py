@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Generates the notification sounds: Psst/psst.wav, a soft whispered "psst",
-plus the Psst+ variants psst-soft.wav (quieter, slower) and psst-quick.wav.
+plus the Psst+ variants psst-soft.wav (quieter, slower), psst-quick.wav,
+psst-double.wav (two quick pssts), psst-low.wav (a deeper whisper) and
+psst-long.wav (slower and airier).
 
 Filtered noise only (no recording, no licences): a short breathy "p", a
 rising "ss", and a light "t". About 0.55 s, 16-bit mono PCM, which iOS accepts
@@ -55,12 +57,22 @@ def centre(t):
     return 4_200
 
 
-def render(filename, stretch=1.0, level=0.6, q=1.4, seed=7):
+def shape(stretch, q, pitch, seed):
+    """One whispered psst, unscaled."""
     random.seed(seed)
     length = int(RATE * 0.56 * stretch)
     noise = [random.uniform(-1, 1) for _ in range(length)]
     shaped = [n * envelope(i / RATE / stretch) for i, n in enumerate(noise)]
-    filtered = bandpass(shaped, lambda t: centre(t / stretch), q=q)
+    return bandpass(shaped, lambda t: centre(t / stretch) * pitch, q=q)
+
+
+def render(filename, stretch=1.0, level=0.6, q=1.4, seed=7, pitch=1.0, repeat=1, gap=0.08):
+    filtered = []
+    for k in range(repeat):
+        if k:
+            filtered += [0.0] * int(RATE * gap)
+        filtered += shape(stretch, q, pitch, seed + k)
+    length = len(filtered)
     peak = max(abs(s) for s in filtered) or 1
     gain = level / peak  # leave headroom; notification sounds shouldn't be loud
     path = pathlib.Path(__file__).resolve().parents[1] / "Psst" / filename
@@ -75,3 +87,6 @@ def render(filename, stretch=1.0, level=0.6, q=1.4, seed=7):
 render("psst.wav")
 render("psst-soft.wav", stretch=1.35, level=0.35, q=1.0, seed=11)
 render("psst-quick.wav", stretch=0.7, level=0.6, q=1.8, seed=3)
+render("psst-double.wav", stretch=0.62, level=0.6, q=1.6, seed=21, repeat=2)
+render("psst-low.wav", level=0.55, q=1.2, seed=5, pitch=0.62)
+render("psst-long.wav", stretch=1.8, level=0.45, q=0.9, seed=13)

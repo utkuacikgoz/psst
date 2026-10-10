@@ -208,6 +208,10 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(service.rpc("push_targets", event)["sound"], "psst-soft.wav")
         with self.fails("invalid_sound", 422):
             emre.rpc("set_notification_sound", "../evil.caf")
+        # The Psst+ sounds added later are accepted too.
+        for sound in ("psst-double.wav", "psst-low.wav", "psst-long.wav"):
+            emre.rpc("set_notification_sound", sound)
+            self.assertEqual(service.rpc("push_targets", event)["sound"], sound)
 
     def test_daily_metrics_are_aggregate_counts(self):
         ada, emre, sam = new_user("Ada"), new_user("Emre"), new_user("Sam")

@@ -1,12 +1,75 @@
 import SwiftUI
 import WidgetKit
 
-/// The home-screen widget (Psst+): your first people as colour bands. Tapping a
-/// band opens Psst and sends that person a Psst, just like tapping it at home.
-/// The app writes the list to the shared App Group (see WidgetBridge).
+/// The widgets (Psst+). Home screen: your first people as colour bands. Lock
+/// Screen: your first person. Tapping a person opens Psst and sends them a Psst,
+/// just like tapping their band at home. The app writes the list to the shared
+/// App Group (see WidgetBridge).
 @main
 struct PsstWidgetBundle: WidgetBundle {
-    var body: some Widget { PeopleWidget() }
+    var body: some Widget {
+        PeopleWidget()
+        FavouriteWidget()
+    }
+}
+
+/// Lock Screen: one tap on your first person (the top of home).
+struct FavouriteWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "PsstFavourite", provider: Provider()) { entry in
+            FavouriteView(entry: entry)
+                .containerBackground(for: .widget) { AccessoryWidgetBackground() }
+        }
+        .configurationDisplayName("Your person")
+        .description("One tap sends a Psst to the first person on your home screen.")
+        .supportedFamilies([.accessoryCircular, .accessoryRectangular])
+    }
+}
+
+struct FavouriteView: View {
+    let entry: Entry
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        if !entry.unlocked {
+            label(big: "psst", small: "Psst+ puts your person here")
+                .widgetURL(URL(string: "psst://plus"))
+        } else if let person = entry.people.first {
+            label(big: family == .accessoryCircular ? initials(person.name) : person.name.uppercased(),
+                  small: "Tap to psst")
+                .widgetURL(URL(string: "psst://psst/\(person.id.uuidString)"))
+                .accessibilityLabel("Send \(person.name) a Psst")
+        } else {
+            label(big: "psst", small: "Invite someone to psst")
+                .widgetURL(URL(string: "psst://home"))
+        }
+    }
+
+    private func initials(_ name: String) -> String {
+        String(name.split(separator: " ").prefix(2).compactMap(\.first)).uppercased()
+    }
+
+    @ViewBuilder private func label(big: String, small: String) -> some View {
+        if family == .accessoryCircular {
+            Text(big)
+                .font(.custom("InterTight-Black", size: big.count > 2 ? 15 : 24))
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
+                .padding(4)
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(big)
+                    .font(.custom("InterTight-Black", size: 22))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                Text(small)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
 }
 
 struct PeopleWidget: Widget {

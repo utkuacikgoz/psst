@@ -148,6 +148,7 @@ private struct SoundSection: View {
     static let choiceKey = "psst.plus.sound"
     static let sounds: [(title: String, file: String)] = [
         ("Whisper", "psst.wav"), ("Soft", "psst-soft.wav"), ("Quick", "psst-quick.wav"),
+        ("Double", "psst-double.wav"), ("Low", "psst-low.wav"), ("Long", "psst-long.wav"),
     ]
 
     @Environment(LiveStore.self) private var store
@@ -254,6 +255,6 @@ struct ColourSheet: View {
         }
         .tint(Color.psstCanvas)
         .environment(\.colorScheme, .light)
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 }

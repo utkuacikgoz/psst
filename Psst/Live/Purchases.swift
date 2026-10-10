@@ -127,8 +127,10 @@ final class Purchases {
 final class Personalization {
     static let colorsKey = "psst.plus.bandColors"
 
-    /// The eight band colours on offer (BC1), the default palette first.
-    static let palette: [UInt32] = [0x5F61AE, 0xAC3E68, 0x2476AA, 0x187F69, 0xB34F2B, 0x8A6500, 0x2B2B38, 0xC2185B]
+    /// The band colours on offer (BC1), the default palette first. All keep
+    /// white names readable (3:1 or better for band-size text).
+    static let palette: [UInt32] = [0x5F61AE, 0xAC3E68, 0x2476AA, 0x187F69, 0xB34F2B, 0x8A6500, 0x2B2B38, 0xC2185B,
+                                    0x1F4E8C, 0x2E6B3A, 0x0E6E78, 0xA22B3A]
 
     /// Alternate app icons: display name and asset name (nil is the default).
     static let icons: [(title: String, name: String?, preview: UInt32)] = [

@@ -39,7 +39,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         // Signals still appear in the app; nothing else to do.
     }
 
-    /// In the foreground on the home list, the row shows the signal instead of a banner.
+    /// In the foreground on the home list, the full-screen arrival replaces the
+    /// banner, but the whisper still plays: iOS plays the push's own sound (your
+    /// choice), so silent mode and Focus still apply.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
@@ -51,7 +53,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                 completionHandler([.banner, .list, .sound])
                 return
             }
-            completionHandler([])
+            completionHandler([.sound])
             await store.openedNotification(payload)
         }
     }

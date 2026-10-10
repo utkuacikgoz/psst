@@ -22,6 +22,7 @@ final class Purchases {
 
     private(set) var product: Product?
     private(set) var isUnlocked = false
+    private(set) var signedTransaction: String?
     private(set) var state: State = .idle
     private(set) var loadFailed = false
 
@@ -47,11 +48,11 @@ final class Purchases {
         await refreshEntitlement()
     }
 
-    func buy() async {
+    func buy(accountID: UUID? = nil) async {
         guard let product, state != .purchasing else { return }
         state = .purchasing
         do {
-            switch try await product.purchase() {
+            switch try await product.purchase(options: accountID.map { [.appAccountToken($0)] } ?? []) {
             case .success(let result):
                 await handle(result)
                 state = .idle
@@ -87,12 +88,15 @@ final class Purchases {
 
     private func refreshEntitlement() async {
         var unlocked = false
+        var proof: String?
         for await result in StoreKit.Transaction.currentEntitlements {
             if case .verified(let transaction) = result,
                Self.grants(productID: transaction.productID, revocationDate: transaction.revocationDate) {
                 unlocked = true
+                proof = result.jwsRepresentation
             }
         }
+        signedTransaction = proof
         isUnlocked = unlocked
         if unlocked, case .pending = state { state = .idle }
     }
@@ -115,7 +119,7 @@ final class Personalization {
     /// Alternate app icons: display name and asset name (nil is the default).
     static let icons: [(title: String, name: String?, preview: UInt32)] = [
         ("Purple", nil, 0x713F93), ("Night", "AppIcon-Night", 0x1C1726),
-        ("Gold", "AppIcon-Gold", 0xB87500), ("Pink", "AppIcon-Pink", 0xAC3E68),
+        ("Mischief", "AppIcon-Cat", 0x713F93), ("Gold", "AppIcon-Gold", 0xB87500), ("Pink", "AppIcon-Pink", 0xAC3E68),
     ]
 
     private(set) var colors: [UUID: UInt32]

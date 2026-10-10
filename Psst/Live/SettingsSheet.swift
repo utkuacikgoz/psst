@@ -5,11 +5,14 @@ struct SettingsSheet: View {
     @Environment(LiveStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
+    @AppStorage("psst.hapticsEnabled") private var hapticsEnabled = true
+    @AppStorage("psst.superEffectsEnabled") private var superEffectsEnabled = true
+    @State private var savingSuper = false
+    @State private var showingActivityPreview = false
+    @State private var superSaveFailed = false
     @State private var name = ""
-    @State private var nameMessage: String?
+    @State private var actions = SettingsActions()
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
-    @State private var blocked: [BlockedPerson] = []
-    @State private var openInvites: [OpenInvite] = []
     @State private var confirmingDelete = false
     @State private var isDeleting = false
     @State private var deleteError: String?
@@ -28,12 +31,35 @@ struct SettingsSheet: View {
                             .onSubmit(rename)
                             .accessibilityLabel("New name")
                         Button("Save", action: rename)
-                            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                            .disabled(actions.isRenaming || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 } header: {
                     Text("Your name")
                 } footer: {
-                    if let nameMessage { Text(nameMessage) }
+                    if let message = actions.nameMessage { Text(message) }
+                }
+
+                Section {
+                    NavigationLink("Your Psst activity") { ActivityView() }
+                } footer: {
+                    Text("Your personal sent and received rankings over the last 30 days.")
+                }
+
+                Section {
+                    Toggle("Haptic feedback", isOn: $hapticsEnabled)
+                    Toggle("Super Psst sounds and effects", isOn: Binding(
+                        get: { superEffectsEnabled },
+                        set: { enabled in
+                            savingSuper = true; superSaveFailed = false
+                            Task {
+                                do { try await store.api.setSuperEffects(enabled); superEffectsEnabled = enabled }
+                                catch { superSaveFailed = true }
+                                savingSuper = false
+                            }
+                        }))
+                        .disabled(savingSuper)
+                } footer: {
+                    Text(superSaveFailed ? "Couldn't save. Try again when you're online." : "Turn off Super effects to receive them like ordinary Pssts. Silent mode and Focus still apply.")
                 }
 
                 Section {
@@ -77,9 +103,9 @@ struct SettingsSheet: View {
                 }
 
                 // PI2: invites nobody has used yet, each cancellable.
-                if !openInvites.isEmpty {
+                if !actions.openInvites.isEmpty {
                     Section {
-                        ForEach(openInvites) { invite in
+                        ForEach(actions.openInvites) { invite in
                             HStack {
                                 Text(invite.displayCode)
                                     .font(.body.monospaced())
@@ -92,30 +118,36 @@ struct SettingsSheet: View {
                                 Button("Cancel") { revoke(invite) }
                                     .buttonStyle(.borderless)
                                     .accessibilityLabel("Cancel invite \(invite.displayCode)")
+                                    .disabled(actions.revoking.contains(invite.code))
                             }
                         }
                     } header: {
                         Text("Open invites")
                     } footer: {
-                        Text("Each works once. Cancel one you sent to the wrong person.")
-                    }
-                }
-
-                Section("Blocked") {
-                    if blocked.isEmpty {
-                        Text("No one.").foregroundStyle(.secondary)
-                    }
-                    ForEach(blocked) { person in
-                        HStack {
-                            Text(person.displayName)
-                            Spacer()
-                            Button("Unblock") { unblock(person) }
-                        }
+                        Text(actions.inviteError ?? "Each works once. Cancel one you sent to the wrong person.")
                     }
                 }
 
                 Section {
-                    Text("Psst stores your name, your connections, and signals from the last 30 days, plus your device's notification token. It doesn't read your contacts or location, and there are no messages to store.")
+                    if actions.blocked.isEmpty {
+                        Text("No one.").foregroundStyle(.secondary)
+                    }
+                    ForEach(actions.blocked) { person in
+                        HStack {
+                            Text(person.displayName)
+                            Spacer()
+                            Button("Unblock") { unblock(person) }
+                                .disabled(actions.unblocking.contains(person.userId))
+                        }
+                    }
+                } header: {
+                    Text("Blocked")
+                } footer: {
+                    if let error = actions.unblockError { Text(error) }
+                }
+
+                Section {
+                    Text("Psst stores your name, connections, the last 30 days of signals and daily allowances, and your notification token. Psst+ also keeps a purchase record for verification. It doesn't read your contacts or location.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } header: {
@@ -132,6 +164,14 @@ struct SettingsSheet: View {
                 }
             }
             .navigationTitle("Settings")
+            .navigationDestination(isPresented: $showingActivityPreview) { ActivityView() }
+            .onAppear {
+                #if DEBUG
+                let arguments = ProcessInfo.processInfo.arguments
+                if arguments.contains("-PsstUITestLive"), let index = arguments.firstIndex(of: "-PsstDesignScreen"),
+                   index + 1 < arguments.count, arguments[index + 1] == "activity" { showingActivityPreview = true }
+                #endif
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -139,15 +179,18 @@ struct SettingsSheet: View {
                 }
             }
         }
+        .task {
+            if let allowance = try? await store.api.superAllowance() { superEffectsEnabled = allowance.effectsEnabled }
+        }
         .tint(Color.psstCanvas)
         .environment(\.colorScheme, .light)
         .task {
             notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
-            blocked = (try? await store.api.listBlocked()) ?? []
-            openInvites = (try? await store.api.listOpenInvites()) ?? []
+            actions.blocked = (try? await store.api.listBlocked()) ?? []
+            actions.openInvites = (try? await store.api.listOpenInvites()) ?? []
         }
         .manageConnection(menuFor: $managing, confirming: $confirming) {
-            Task { blocked = (try? await store.api.listBlocked()) ?? blocked }
+            Task { actions.blocked = (try? await store.api.listBlocked()) ?? actions.blocked }
         }
         .confirmationDialog("Delete your account?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete account", role: .destructive, action: deleteAccount)
@@ -169,32 +212,18 @@ struct SettingsSheet: View {
     }
 
     private func rename() {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let draft = name
         Task {
-            do {
-                try await store.rename(to: trimmed)
-                nameMessage = "Saved. People you're connected with now see \(trimmed)."
-                name = ""
-            } catch {
-                nameMessage = "That didn't save. Names can be 1 to 40 characters."
-            }
+            if await actions.rename(to: draft, api: store.api), name == draft { name = "" }
         }
     }
 
     private func revoke(_ invite: OpenInvite) {
-        withAnimation { openInvites.removeAll { $0 == invite } }
-        Task {
-            try? await store.api.revokeInvite(code: invite.code)
-            // Show the server's truth, whether or not the cancel went through.
-            if let fresh = try? await store.api.listOpenInvites() { openInvites = fresh }
-        }
+        Task { await actions.revoke(invite, api: store.api) }
     }
 
     private func unblock(_ person: BlockedPerson) {
-        Task {
-            try? await store.api.unblockUser(person.userId)
-            blocked = (try? await store.api.listBlocked()) ?? blocked
-        }
+        Task { await actions.unblock(person, api: store.api) }
     }
 
     private func deleteAccount() {

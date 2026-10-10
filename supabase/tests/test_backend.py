@@ -15,6 +15,7 @@ import os
 import pathlib
 import unittest
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 
 import psycopg
@@ -451,6 +452,83 @@ class BackendTests(unittest.TestCase):
         admin("update public.signal_events set created_at = now() - interval '31 days' where id = %s", event)
         admin("select private.purge_expired()")
         self.assertEqual(admin("select count(*) from public.signal_events where id = %s", event)[0][0], 0)
+
+
+    def test_super_daily_limit_is_global_and_retry_is_idempotent(self):
+        a, b, c = new_user("Sender"), new_user("B"), new_user("C")
+        ab, ac = connect(a, b), connect(a, c)
+        event = uuid.uuid4()
+        a.rpc("send_signal", event, ab, "super_psst")
+        self.assertTrue(a.rpc("send_signal", event, ab, "super_psst")["duplicate"])
+        with self.fails("super_daily_limit", 409):
+            a.rpc("send_signal", uuid.uuid4(), ac, "super_psst")
+        a.rpc("send_signal", uuid.uuid4(), ac, "psst")
+        a.rpc("remove_connection", ab)
+        with self.fails("super_daily_limit", 409):
+            a.rpc("send_signal", uuid.uuid4(), ac, "super_psst")
+        self.assertEqual(a.rpc("super_allowance")["remaining"], 0)
+        admin("update private.super_usage set day = day - 1 where user_id = %s", a.user_id)
+        self.assertEqual(a.rpc("super_allowance")["remaining"], 1)
+        a.rpc("send_signal", uuid.uuid4(), ac, "super_psst")
+
+    def test_concurrent_super_requests_accept_exactly_one(self):
+        a, b, c = new_user("Sender"), new_user("B"), new_user("C")
+        pairs = [connect(a, b), connect(a, c)]
+        def send(pair):
+            try:
+                a.rpc("send_signal", uuid.uuid4(), pair, "super_psst")
+                return "sent"
+            except psycopg.Error as error:
+                return error.diag.message_primary
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertCountEqual(list(pool.map(send, pairs)), ["sent", "super_daily_limit"])
+
+    def test_verified_plus_cannot_be_forged_or_shared_and_expiry_restores_limit(self):
+        a, b = new_user("A"), new_user("B")
+        pair = connect(a, b)
+        with self.assertRaises(errors.InsufficientPrivilege):
+            a.rpc("record_verified_plus", a.user_id, "transaction", True)
+        admin("select public.record_verified_plus(%s,%s,true)", a.user_id, str(uuid.uuid4()))
+        self.assertTrue(a.rpc("super_allowance")["unlimited"])
+        for _ in range(2): a.rpc("send_signal", uuid.uuid4(), pair, "super_psst")
+        original = admin("select original_transaction_id from private.plus_entitlements where user_id=%s", a.user_id)[0][0]
+        with self.fails("purchase_already_linked", 409):
+            admin("select public.record_verified_plus(%s,%s,true)", b.user_id, original)
+        admin("select public.record_verified_plus(%s,%s,false)", a.user_id, original)
+        self.assertFalse(a.rpc("super_allowance")["unlimited"])
+        with self.fails("super_daily_limit", 409): a.rpc("send_signal", uuid.uuid4(), pair, "super_psst")
+        admin("select public.record_verified_plus(%s,%s,true)", a.user_id, original)
+        admin("update private.plus_entitlements set valid_until=now()-interval '1 minute' where user_id=%s", a.user_id)
+        with self.fails("super_daily_limit", 409): a.rpc("send_signal", uuid.uuid4(), pair, "super_psst")
+
+    def test_recipient_can_mute_super_without_changing_sender_event(self):
+        a, b = new_user("A"), new_user("B")
+        pair = connect(a, b)
+        b.rpc("set_super_effects", False)
+        event = uuid.uuid4()
+        a.rpc("send_signal", event, pair, "super_psst")
+        targets = admin("select public.push_targets(%s)", event)[0][0]
+        self.assertEqual(targets["effect_id"], "psst")
+        self.assertEqual(targets["sound"], "psst.wav")
+        self.assertEqual(b.rows("select effect_id from public.list_unseen()"), [("psst",)])
+        b.rpc("set_super_effects", True)
+        targets = admin("select public.push_targets(%s)", event)[0][0]
+        self.assertEqual(targets["effect_id"], "super_psst")
+        self.assertEqual(targets["sound"], "psst-super.wav")
+
+    def test_activity_is_private_counts_both_directions_and_excludes_old_events(self):
+        a, b, stranger = new_user("A"), new_user("B"), new_user("Stranger")
+        pair = connect(a, b)
+        a.rpc("send_signal", uuid.uuid4(), pair, "psst")
+        b.rpc("send_signal", uuid.uuid4(), pair, "super_psst")
+        old = uuid.uuid4(); a.rpc("send_signal", old, pair, "psst")
+        admin("update public.signal_events set created_at=now()-interval '31 days' where id=%s", old)
+        self.assertEqual(a.rows("select other_name,sent_count,received_count from public.personal_activity()"), [("B",1,1)])
+        self.assertEqual(b.rows("select other_name,sent_count,received_count from public.personal_activity()"), [("A",1,1)])
+        self.assertEqual(stranger.rows("select * from public.personal_activity()"), [])
+        with self.assertRaises(errors.InsufficientPrivilege): Api("anon").rpc("personal_activity")
+        a.rpc("block_user", b.user_id)
+        self.assertEqual(a.rows("select * from public.personal_activity()"), [])
 
 
 if __name__ == "__main__":

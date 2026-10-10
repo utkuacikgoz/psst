@@ -160,15 +160,22 @@ struct NotificationStepView: View {
                     .padding(.vertical, Tokens.Space.l)
 
                 ScrollView {
-                    Text("Get a notification when someone taps you?")
-                        .font(.system(size: questionSize, weight: .heavy))
-                        .tracking(Tokens.Band.titleTracking)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, inset)
-                        .frame(minHeight: proxy.size.height * 0.6)
-                        .accessibilityAddTraits(.isHeader)
+                    VStack(spacing: Tokens.Space.l) {
+                        Text("Get a notification when someone taps you?")
+                            .font(.system(size: questionSize, weight: .heavy))
+                            .tracking(Tokens.Band.titleTracking)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, inset)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("Know when a Psst arrives. You can also see Pssts when you open the app.")
+                            .font(.body)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, inset)
+                    }
+                    .frame(minHeight: proxy.size.height * 0.6)
                 }
                 .scrollBounceBehavior(.basedOnSize)
 
@@ -181,6 +188,7 @@ struct NotificationStepView: View {
                             .background(Color.bandShade)
                             .contentShape(Rectangle())
                     }
+                    .disabled(isAsking)
                     .accessibilityHint("Signals still appear when you open Psst.")
                 }
             }
@@ -190,6 +198,7 @@ struct NotificationStepView: View {
     }
 
     private func allow() {
+        guard !isAsking else { return }
         isAsking = true
         Task {
             let granted = (try? await UNUserNotificationCenter.current()

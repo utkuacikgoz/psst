@@ -69,3 +69,14 @@ PsstTests/, PsstUITests/
 The owner-selected reference is the original Yo: edge-to-edge colour bands, oversized contact names, and direct tap feedback. Demo, recipient view, and live contact rows share the revised language. The app has one signal, Psst. Existing networking, authorization, notification, and exchange state logic is retained. See `DESIGN.md`.
 
 Validation for the Yo-inspired revision: 34 existing unit tests passed, the final simulator build succeeded, and local send → effect selection → recipient → tap-back was checked in the running iPhone 17 Pro simulator. Physical-device push delivery and the deployed backend remain unverified.
+
+
+## October feature update (local implementation)
+
+Latest directional exchange time, private 30-day activity, a visible Super Psst
+entry (one daily total; verified unlimited with Psst+), recipient effects controls,
+one-time feature introduction and optional Mischief cat icon are implemented.
+See [feature behavior and backend setup](docs/FEATURE_RELEASE.md),
+[validation](docs/FEATURE_TEST_REPORT.md), and [Apple design audit](docs/APPLE_DESIGN_AUDIT.md).
+The new migration and verify-plus endpoint need deployment before live use;
+physical push and actual StoreKit sandbox verification are still required.

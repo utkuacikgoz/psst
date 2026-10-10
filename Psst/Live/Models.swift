@@ -98,7 +98,8 @@ struct SignalPayload: Equatable {
               let connection = (psst["connection_id"] as? String).flatMap(UUID.init(uuidString:)),
               let signal = (psst["effect_id"] as? String).flatMap(Signal.init(rawValue:))
         else { return nil }
-        self.init(eventID: event, connectionID: connection, signal: signal,
+        self.init(eventID: event, connectionID: connection,
+                  signal: psst["super_psst"] as? Bool == true ? .superPsst : signal,
                   sameMoment: psst["same_moment"] as? Bool ?? false)
     }
 }
@@ -125,4 +126,20 @@ enum InviteLink {
         guard let code, !code.isEmpty else { return nil }
         return code
     }
+}
+
+
+struct ActivitySummary: Decodable, Identifiable, Equatable {
+    let connectionId: UUID
+    let otherName: String
+    let sentCount: Int
+    let receivedCount: Int
+    var id: UUID { connectionId }
+}
+
+struct SuperAllowance: Decodable, Equatable {
+    let remaining: Int
+    let unlimited: Bool
+    let resetsAt: Date
+    let effectsEnabled: Bool
 }

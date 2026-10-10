@@ -13,6 +13,11 @@ enum APIError: Error, Equatable {
 @MainActor
 protocol PsstAPI: AnyObject {
     var isSignedIn: Bool { get }
+    var accountID: UUID? { get }
+    func activity() async throws -> [ActivitySummary]
+    func superAllowance() async throws -> SuperAllowance
+    func setSuperEffects(_ enabled: Bool) async throws
+    func verifyPlus(signedTransaction: String) async throws
     func signUpAnonymously() async throws
     func setDisplayName(_ name: String) async throws
     func listConnections() async throws -> [ConnectionSummary]
@@ -33,6 +38,14 @@ protocol PsstAPI: AnyObject {
     func registerDeviceToken(_ token: String, environment: String) async throws
     func deleteAccount() async throws
     func signOutLocally()
+}
+
+extension PsstAPI {
+    var accountID: UUID? { nil }
+    func activity() async throws -> [ActivitySummary] { throw APIError.server(status: 503, code: "feature_unavailable") }
+    func superAllowance() async throws -> SuperAllowance { throw APIError.server(status: 503, code: "feature_unavailable") }
+    func setSuperEffects(_ enabled: Bool) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
+    func verifyPlus(signedTransaction: String) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
 }
 
 struct AuthSession: Codable, Equatable {
@@ -58,6 +71,13 @@ final class APIClient: PsstAPI {
     }
 
     var isSignedIn: Bool { session != nil }
+    var accountID: UUID? { session?.userID }
+    func activity() async throws -> [ActivitySummary] { try await rpc("personal_activity", [String: String]()) }
+    func superAllowance() async throws -> SuperAllowance { try await rpc("super_allowance", [String: String]()) }
+    func setSuperEffects(_ enabled: Bool) async throws { try await rpcVoid("set_super_effects", ["p_enabled": enabled]) }
+    func verifyPlus(signedTransaction: String) async throws {
+        let _: EmptyResponse = try await authorizedRequest(path: "functions/v1/verify-plus", body: ["signed_transaction": signedTransaction])
+    }
 
     // MARK: Auth
 

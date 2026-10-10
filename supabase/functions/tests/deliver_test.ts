@@ -96,3 +96,12 @@ Deno.test("a retried event whose push failed is pushed again", async () => {
   assertEquals(await deliver(EVENT, deps), "accepted");
   assertEquals(sent.sort(), ["t1", "t2"]);
 });
+
+Deno.test("Super Psst keeps sender identity and carries the distinct sound", () => {
+  const payload = buildPayload(targets({ effect_id: "super_psst", sound: "psst-super.wav" }));
+  assertEquals(payload.aps.alert.title, "Ada");
+  assertEquals(payload.aps.alert.body, "Super Psst");
+  assertEquals(payload.aps.sound, "psst-super.wav");
+  assertEquals(payload.psst.effect_id, "psst");
+  assertEquals(payload.psst.super_psst, true);
+});

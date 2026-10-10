@@ -7,10 +7,21 @@ final class FakeAPI: PsstAPI {
     var connections: [ConnectionSummary] = []
     var unseen: [UnseenSignal] = []
     var sentEventIDs: [UUID] = []
+    var sentSignals: [Signal] = []
     var acked: [UUID] = []
     var sendError: Error?
     var sameMoment = false
     var listError: Error?
+    var renameError: Error?
+    var revokeError: Error?
+    var unblockError: Error?
+    var renamedNames: [String] = []
+    var revokedCodes: [String] = []
+    var unblockedIDs: [UUID] = []
+    var holdRevokes = false
+    private var heldRevokes: [CheckedContinuation<Void, Never>] = []
+    var pendingRevokeCount: Int { heldRevokes.count }
+    func releaseRevoke() { heldRevokes.removeFirst().resume() }
     /// When set, sends wait until `releaseSend()` is called.
     var holdSends = false
     private var held: [CheckedContinuation<Void, Never>] = []
@@ -19,7 +30,10 @@ final class FakeAPI: PsstAPI {
     func releaseSend() { held.removeFirst().resume() }
 
     func signUpAnonymously() async throws { isSignedIn = true }
-    func setDisplayName(_ name: String) async throws {}
+    func setDisplayName(_ name: String) async throws {
+        renamedNames.append(name)
+        if let renameError { throw renameError }
+    }
     func listConnections() async throws -> [ConnectionSummary] {
         if let listError { throw listError }
         return connections
@@ -32,6 +46,7 @@ final class FakeAPI: PsstAPI {
     func sendSignal(eventID: UUID, connectionID: UUID, signal: Signal) async throws -> SendResult {
         if holdSends { await withCheckedContinuation { held.append($0) } }
         sentEventIDs.append(eventID)
+        sentSignals.append(signal)
         if let sendError { throw sendError }
         return SendResult(id: eventID, createdAt: Date(), pushStatus: "accepted", duplicate: false,
                           sameMoment: sameMoment)
@@ -41,11 +56,18 @@ final class FakeAPI: PsstAPI {
     func acceptInvite(code: String) async throws -> AcceptedInvite { AcceptedInvite(status: "accepted", connectionId: nil) }
     func removeConnection(_ id: UUID) async throws {}
     func blockUser(_ id: UUID) async throws {}
-    func unblockUser(_ id: UUID) async throws {}
+    func unblockUser(_ id: UUID) async throws {
+        unblockedIDs.append(id)
+        if let unblockError { throw unblockError }
+    }
     func reportUser(_ id: UUID) async throws {}
     func listBlocked() async throws -> [BlockedPerson] { [] }
     func listOpenInvites() async throws -> [OpenInvite] { [] }
-    func revokeInvite(code: String) async throws {}
+    func revokeInvite(code: String) async throws {
+        revokedCodes.append(code)
+        if holdRevokes { await withCheckedContinuation { heldRevokes.append($0) } }
+        if let revokeError { throw revokeError }
+    }
     func setNotificationSound(_ file: String) async throws {}
     func registerDeviceToken(_ token: String, environment: String) async throws {}
     func deleteAccount() async throws { isSignedIn = false }

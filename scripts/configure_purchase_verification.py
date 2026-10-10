@@ -74,6 +74,8 @@ def main():
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(descriptor, 'w') as output:
         for name, value in values.items():
+            if value == '':
+                continue
             output.write(name + '=' + json.dumps(value) + '\n')
     print('Purchase verification configuration prepared for ' + environment + '; credentials not printed.')
 

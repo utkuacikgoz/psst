@@ -20,7 +20,9 @@ final class FakeAPI: PsstAPI {
 
     func signUpAnonymously() async throws { isSignedIn = true }
     func setDisplayName(_ name: String) async throws {}
+    var listCalls = 0
     func listConnections() async throws -> [ConnectionSummary] {
+        listCalls += 1
         if let listError { throw listError }
         return connections
     }
@@ -101,6 +103,30 @@ final class LiveStoreTests: XCTestCase {
         let restarted = LiveStore(api: api, defaults: defaults)
         await restarted.start()
         XCTAssertEqual(restarted.phase, .ready)
+    }
+
+    func testPeopleFromLastTimeShowAtLaunchAndAreForgottenOnDelete() async throws {
+        api.isSignedIn = false
+        try await store.createProfile(name: "Sam")
+        api.connections = [connection(name: "Mia"), connection(name: "Zoe")]
+        await store.refresh()
+
+        // A relaunch shows them before any request finishes.
+        let relaunched = LiveStore(api: api, defaults: defaults)
+        XCTAssertEqual(relaunched.orderedConnections.map(\.otherName).sorted(), ["Mia", "Zoe"])
+        XCTAssertFalse(relaunched.hasLoadedConnections, "Still refreshes from the server")
+
+        try await store.deleteAccount()
+        XCTAssertTrue(LiveStore(api: api, defaults: defaults).connections.isEmpty)
+    }
+
+    func testOverlappingRefreshesShareOneRequest() async {
+        api.connections = [connection()]
+        async let first: Void = store.refresh()
+        async let second: Void = store.refresh()
+        _ = await (first, second)
+        XCTAssertEqual(api.listCalls, 1)
+        XCTAssertEqual(store.connections.count, 1)
     }
 
     func testYourNameIsKeptOnThisPhoneAndForgottenOnDelete() async throws {

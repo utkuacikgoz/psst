@@ -47,6 +47,8 @@ final class LiveStore {
     static let coachKey = "psst.live.coachShown"
     static let reviewAskedKey = "psst.live.reviewAsked"
     static let myNameKey = "psst.live.myName"
+    /// The last list of people from the server, shown at launch while it refreshes.
+    static let connectionsCacheKey = "psst.live.connectionsCache"
 
     private(set) var phase: Phase = .loading
     /// Your own name as last saved on this phone (ED1). Nil on installs from
@@ -109,6 +111,13 @@ final class LiveStore {
         coachDismissed = defaults.bool(forKey: Self.coachKey)
         myName = defaults.string(forKey: Self.myNameKey)
         pinnedOrder = (defaults.stringArray(forKey: Self.pinnedOrderKey) ?? []).compactMap(UUID.init(uuidString:))
+        // Show the people from last time straight away; refresh() replaces them.
+        if defaults.bool(forKey: Self.profileKey),
+           let data = defaults.data(forKey: Self.connectionsCacheKey),
+           let cached = try? JSONDecoder().decode([ConnectionSummary].self, from: data) {
+            connections = cached
+            reorderByRecency()
+        }
     }
 
     // MARK: Onboarding
@@ -185,9 +194,24 @@ final class LiveStore {
 
     // MARK: Loading
 
+    /// Loads the people from the server. Calls that overlap (launch, foregrounding,
+    /// pull to refresh) share one request instead of each making their own.
     func refresh() async {
+        if let inFlight = refreshTask { return await inFlight.value }
+        let task = Task { await load() }
+        refreshTask = task
+        await task.value
+        refreshTask = nil
+    }
+
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
+
+    private func load() async {
         do {
             connections = try await api.listConnections()
+            if let data = try? JSONEncoder().encode(connections) {
+                defaults.set(data, forKey: Self.connectionsCacheKey)
+            }
             if !hasLoadedConnections { reorderByRecency() }
             hasLoadedConnections = true
             isOffline = false
@@ -517,6 +541,7 @@ final class LiveStore {
         defaults.removeObject(forKey: Self.welcomedKey)
         defaults.removeObject(forKey: Self.pinnedOrderKey)
         defaults.removeObject(forKey: Self.myNameKey)
+        defaults.removeObject(forKey: Self.connectionsCacheKey)
         myName = nil
         pinnedOrder = []
         recencyOrder = []

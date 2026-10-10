@@ -89,6 +89,17 @@ struct LiveHomeView: View {
     @State private var notificationsOff = false
     @ScaledMetric(relativeTo: .largeTitle) private var firstInviteTitleSize: CGFloat = 40
 
+    private func loadingPeople(minHeight: CGFloat) -> some View {
+        VStack(spacing: Tokens.Space.m) {
+            ProgressView().tint(Color.onCanvas).controlSize(.large)
+            Text(store.isOffline ? "Waiting for a connection…" : "Loading your people…")
+                .font(.psst(.subheadline, weight: .semibold))
+        }
+        .foregroundStyle(Color.onCanvas)
+        .frame(maxWidth: .infinity, minHeight: minHeight)
+        .accessibilityElement(children: .combine)
+    }
+
     private var anySheet: Bool {
         showingInvite || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
     }
@@ -106,6 +117,9 @@ struct LiveHomeView: View {
                         if store.connections.isEmpty {
                             if store.hasLoadedConnections {
                                 firstInviteBand(minHeight: Self.bandHeight(available: proxy.size.height, people: 0))
+                            } else {
+                                // First launch on this phone: nothing remembered yet.
+                                loadingPeople(minHeight: Self.bandHeight(available: proxy.size.height, people: 0))
                             }
                         } else {
                             // Yo classic (H2): people and the + band share the screen

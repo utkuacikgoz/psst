@@ -80,6 +80,9 @@ struct LiveHomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.requestReview) private var requestReview
 
+    @State private var showingFeatureIntro = false
+    @State private var superPerson: ConnectionSummary?
+    @AppStorage("psst.hapticsEnabled") private var hapticsEnabled = true
     @State private var showingInvite = false
     @State private var showingSettings = false
     @State private var managing: ConnectionSummary?
@@ -101,7 +104,7 @@ struct LiveHomeView: View {
     }
 
     private var anySheet: Bool {
-        showingInvite || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
+        showingFeatureIntro || superPerson != nil || showingInvite || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
     }
 
     var body: some View {
@@ -139,9 +142,10 @@ struct LiveHomeView: View {
                 .pinnedFooter(!dynamicTypeSize.isAccessibilitySize, inset: inset) { settingsButton }
             }
         }
+        .accessibilityHidden(anySheet)
         .background(Color.psstCanvas.ignoresSafeArea())
         .overlay {
-            if store.showsCoach && store.hasLoadedConnections {
+            if store.showsCoach && store.hasLoadedConnections && !anySheet {
                 CoachOverlay { withAnimation { store.dismissCoach() } }
             }
         }
@@ -157,21 +161,29 @@ struct LiveHomeView: View {
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: store.arrival)
         .preferredColorScheme(.dark)
-        .sensoryFeedback(trigger: store.latestEffect) { _, new in new?.signal.haptic }
+        .sensoryFeedback(trigger: store.latestEffect) { _, new in hapticsEnabled && store.arrival == nil ? new?.signal.haptic : nil }
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
             await updateNotificationStatus()
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-PsstUITestLive") { await store.refresh(); return }
+            #endif
             while !Task.isCancelled {
                 await store.refresh()
                 try? await Task.sleep(for: LiveStore.refreshInterval)
             }
         }
         .onAppear {
+            if store.isExistingUser && !store.featureIntroSeen && store.pendingInviteCode == nil {
+                showingFeatureIntro = true
+            }
+            showDesignPreviewIfRequested()
             updateVisibility()
             // A code that arrived before home existed (e.g. during onboarding).
             if store.pendingInviteCode != nil { showingInvite = true }
             if store.plusRequested { showingPlus = true; store.plusRequested = false }
         }
+        .onChange(of: store.hasLoadedConnections) { showDesignPreviewIfRequested() }
         .onDisappear { store.isHomeVisible = false }
         .onChange(of: anySheet) { updateVisibility() }
         .onChange(of: scenePhase) { updateVisibility() }
@@ -196,11 +208,30 @@ struct LiveHomeView: View {
         .onChange(of: store.pendingInviteCode) { _, code in
             if code != nil { showingInvite = true }
         }
+        .sheet(isPresented: $showingFeatureIntro, onDismiss: { store.dismissFeatureIntro() }) { FeatureIntroSheet() }
+        .sheet(item: $superPerson) { SuperPsstSheet(connection: $0) }
         .sheet(isPresented: $showingInvite) { InviteSheet() }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
         .manageConnection(menuFor: $managing, confirming: $confirming)
         .sheet(isPresented: $showingPlus) { PsstPlusSheet() }
         .sheet(item: $colouring) { ColourSheet(connection: $0) }
+    }
+
+    private func showDesignPreviewIfRequested() {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("-PsstUITestLive"),
+              let index = arguments.firstIndex(of: "-PsstDesignScreen"), index + 1 < arguments.count else { return }
+        switch arguments[index + 1] {
+        case "intro": showingFeatureIntro = true
+        case "invite": showingInvite = true
+        case "code": store.pendingInviteCode = "K7QX4MPA"; showingInvite = true
+        case "activity", "settings": showingSettings = true
+        case "super":
+            if let person = store.connections.first(where: { $0.otherName == "Emre" }) { superPerson = person }
+        default: break
+        }
+        #endif
     }
 
     private var widgetSignature: String {
@@ -229,7 +260,7 @@ struct LiveHomeView: View {
                     .contentShape(Rectangle())
             }
             .foregroundStyle(Color(hex: 0xFFD27A))
-            .accessibilityHint(purchases.isUnlocked ? "Your colours, icons and sounds." : "An optional one-time unlock.")
+            .accessibilityHint(purchases.isUnlocked ? "Your Super Pssts, colours, icons and sounds." : "An optional one-time unlock.")
         }
         .font(.psst(.subheadline, weight: .semibold))
         .frame(maxWidth: .infinity)
@@ -256,14 +287,15 @@ struct LiveHomeView: View {
     }
 
     private var header: some View {
-        HStack {
-            Text("psst")
-                .font(.psst(size: Tokens.Band.wordmarkSize, weight: .heavy)).tracking(Tokens.Band.wordmarkTracking)
-                .foregroundStyle(Color.onCanvas)
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
-        }
-        .padding(.vertical, Tokens.Space.l)
+        HStack { wordmark; Spacer() }.padding(.vertical, Tokens.Space.l)
+    }
+
+    private var wordmark: some View {
+        Text("psst")
+            .font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy))
+            .tracking(Tokens.Band.wordmarkTracking)
+            .foregroundStyle(Color.onCanvas)
+            .accessibilityAddTraits(.isHeader)
     }
 
     /// Splits the space below the header and above Settings between the people
@@ -290,6 +322,9 @@ struct LiveHomeView: View {
     }
 
     @ViewBuilder private var notices: some View {
+        if store.isExistingUser && store.featureIntroSeen && !store.superHintSeen && !store.connections.isEmpty {
+            NoticeView(symbol: "sparkles", text: "Hold a person for Super Psst", actionTitle: "Got it") { store.dismissSuperHint() }
+        }
         if store.isOffline {
             NoticeView(symbol: "wifi.slash", text: "Offline · taps won't get through")
         }
@@ -313,6 +348,7 @@ struct LiveHomeView: View {
             showingInvite = true
         } label: {
             VStack(spacing: Tokens.Space.m) {
+                MischiefCat().frame(width: 52, height: 44)
                 Text("INVITE YOUR FIRST PERSON")
                     .bandTitle("Invite your first person", size: firstInviteTitleSize, tracking: Tokens.Band.titleTracking)
                     .fixedSize(horizontal: false, vertical: true)
@@ -347,8 +383,7 @@ struct LiveHomeView: View {
 
     private func band(_ connection: ConnectionSummary, minHeight: CGFloat, now: Date) -> some View {
         let status = store.status(for: connection)
-        return VStack(alignment: .leading, spacing: 0) {
-            PersonRow(
+        let person = PersonRow(
                 name: connection.otherName,
                 status: Self.text(for: status, now: now),
                 signal: .psst,
@@ -358,13 +393,19 @@ struct LiveHomeView: View {
                 isBusy: Self.isBusy(status),
                 statusSymbol: Self.symbol(for: status),
                 minHeight: minHeight,
-                cornerMark: Self.cornerMark(for: status),
+                cornerMark: dynamicTypeSize.isAccessibilitySize ? nil : Self.cornerMark(for: status),
                 isDimmed: Self.isPaused(status),
-                color: personalization.color(for: connection.id, name: connection.otherName)
+                color: personalization.color(for: connection.id, name: connection.otherName),
+                exchangeDate: connection.lastCreatedAt,
+                exchangeFromMe: connection.lastFromMe
             )
             // Remove, block and report: a long press here, the VoiceOver action,
             // or Settings → People. Each explains itself before acting.
             .contextMenu {
+                Button {
+                    store.dismissSuperHint()
+                    superPerson = connection
+                } label: { Label("Super Psst…", systemImage: "sparkles") }
                 ForEach([ConnectionAction.Kind.remove, .block, .report], id: \.self) { kind in
                     let action = ConnectionAction(kind: kind, connection: connection)
                     Button(role: kind == .remove ? nil : .destructive) {
@@ -380,6 +421,7 @@ struct LiveHomeView: View {
                     Label("Colour…", systemImage: "paintpalette")
                 }
             }
+            .accessibilityAction(named: "Super Psst") { superPerson = connection }
             .accessibilityAction(named: "Manage \(connection.otherName)") { managing = connection }
             .accessibilityAction(named: "Move up") { withAnimation { store.move(connection.id, by: -1) } }
             .accessibilityAction(named: "Move down") { withAnimation { store.move(connection.id, by: 1) } }
@@ -390,6 +432,23 @@ struct LiveHomeView: View {
                 guard let dragged = items.first.flatMap(UUID.init(uuidString:)) else { return false }
                 withAnimation(reduceMotion ? nil : .snappy) { store.move(dragged, onto: connection.id) }
                 return true
+            }
+        return Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 0) {
+                    person
+                    if let mark = Self.cornerMark(for: status) {
+                        Text(mark == "seen" ? "seen ✓" : mark)
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .padding(.horizontal, Tokens.Space.l)
+                            .padding(.vertical, Tokens.Space.s)
+                            .background(personalization.color(for: connection.id, name: connection.otherName))
+                    }
+                }
+            } else {
+                person
             }
         }
     }
@@ -407,12 +466,11 @@ struct LiveHomeView: View {
     static func text(for status: LiveRowStatus, now: Date = .now) -> String {
         switch status {
         // Yo classic: a band shows a line only when something happened.
-        case .ready, .seen, .sentEarlier: ""
+        case .ready, .seen, .sentEarlier, .received: ""
         case .sending: "Sending…"
         case .sent: "Sent"
         case .notSent: "Didn't make it · tap to try again"
         case .paused(_, let until): "Try again in \(countdown(until.timeIntervalSince(now)))"
-        case .received(let name, let signal): "\(name) sent a \(signal.title)"
         }
     }
 
@@ -443,7 +501,7 @@ struct LiveHomeView: View {
         case .notSent(let signal): "Retries \(signal.title)."
         case .paused: "Paused after several taps, so nobody gets flooded."
         case .sending: "Sending."
-        default: "Sends a Psst."
+        default: "Sends a Psst. Touch and hold for Super Psst."
         }
     }
 }
@@ -492,9 +550,9 @@ struct CoachOverlay: View {
                     .scaleEffect(pressing ? 0.88 : 1)
                     .accessibilityHidden(true)
                 Text("Tap a band to psst")
-                    .font(.psst(.title2, weight: .heavy))
-                Text("Hold to move someone or remove them")
-                    .font(.psst(.body, weight: .medium))
+                    .font(.title2.weight(.heavy))
+                Text("Hold for Super Psst")
+                    .font(.body.weight(.medium))
                 Text("Tap anywhere to start")
                     .font(.psst(.footnote, weight: .semibold))
                     .opacity(0.8)
@@ -510,7 +568,7 @@ struct CoachOverlay: View {
         .buttonStyle(.plain)
         .transition(.opacity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Tip: tap a band to send a Psst. Hold a band to move someone or remove them.")
+        .accessibilityLabel("Tip: tap a band to send a Psst. Hold for Super Psst, colours, moving or managing people.")
         .accessibilityHint("Dismisses the tip.")
         .accessibilityAddTraits(.isButton)
         .task {

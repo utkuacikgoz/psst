@@ -23,7 +23,7 @@ enum Tokens {
         static let wordmarkTracking: CGFloat = -2
         /// Contact names and received signal titles; scaled with Dynamic Type by callers.
         static let titleSize: CGFloat = 52
-        static let titleTracking: CGFloat = -2.2
+        static let titleTracking: CGFloat = 0
         /// Signal names in the picker.
         static let optionTitleSize: CGFloat = 30
         static let optionTracking: CGFloat = -0.7
@@ -61,6 +61,8 @@ extension Color {
 
     /// Yo-inspired purple canvas.
     static let psstCanvas = Color(hex: 0x713F93)
+    /// White labels exceed 11:1 contrast on the visible Super Psst action.
+    static let superControl = Color(hex: 0x4D2868)
     /// Main text on canvas.
     static let onCanvas = Color.white
     /// Secondary text on the purple canvas.
@@ -90,19 +92,20 @@ extension Color {
         return palette[seed]
     }
     static let addBand = Color(hex: 0xB87500)
+    /// Gold used behind small white invite text; contrast exceeds 4.5:1.
+    static let inviteGold = Color(hex: 0xA66700)
     /// Shade for the bar that follows a band (opens the picker, never sends).
     static let bandShade = Color.black.opacity(0.15)
 }
 
 extension Text {
-    /// Oversized band titles wrap between words but never inside one: each word
-    /// gets at most one line, and a word too wide for the band scales down instead.
+    /// Oversized titles wrap at the requested text size instead of shrinking
+    /// away the user's accessibility setting.
     func bandTitle(_ text: String, size: CGFloat, tracking: CGFloat) -> some View {
-        let words = max(1, text.split(whereSeparator: \.isWhitespace).count)
-        return font(.psst(size: size, weight: .black))
+        font(.system(size: size, weight: .bold))
             .tracking(tracking)
-            .lineLimit(words)
-            .minimumScaleFactor(0.4)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

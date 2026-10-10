@@ -27,6 +27,7 @@ struct PsstPlusSheet: View {
                 }
 
                 Section {
+                    perk("Unlimited Super Pssts", symbol: "sparkles", tint: 0xB87500)
                     perk("Choose each person's colour", symbol: "paintpalette.fill", tint: 0xAC3E68)
                     perk("Alternate app icons", symbol: "app.fill", tint: 0x2476AA)
                     perk("Choose your whisper sound", symbol: "speaker.wave.2.fill", tint: 0x187F69)
@@ -72,7 +73,7 @@ struct PsstPlusSheet: View {
         Section {
             if let price = purchases.displayPrice {
                 Button {
-                    Task { await purchases.buy() }
+                    Task { await purchases.buy(accountID: store.api.accountID) }
                 } label: {
                     ZStack {
                         Text("Unlock for \(price)")
@@ -102,7 +103,7 @@ struct PsstPlusSheet: View {
                 default:
                     EmptyView()
                 }
-                Text("Pssting, replies and invites are always free.")
+                Text("Pssting, replies and invites are always free. Super Pssts keep pacing limits, and recipients control their sounds and effects.")
                 HStack(spacing: Tokens.Space.m) {
                     Link("Terms of use", destination: AppConfig.termsURL)
                     Link("Privacy policy", destination: AppConfig.privacyURL)
@@ -115,19 +116,30 @@ struct PsstPlusSheet: View {
 /// Alternate app icons (Psst+).
 private struct IconSection: View {
     @State private var current = UIApplication.shared.alternateIconName
+    @State private var isChanging = false
+    @State private var changeError: String?
 
     var body: some View {
-        Section("App icon") {
+        Section {
             ForEach(Personalization.icons.indices, id: \.self) { index in
                 let icon = Personalization.icons[index]
                 Button {
+                    guard !isChanging else { return }
+                    isChanging = true
+                    changeError = nil
                     UIApplication.shared.setAlternateIconName(icon.name) { error in
-                        if error == nil { current = icon.name }
+                        Task { @MainActor in
+                            if error == nil { current = UIApplication.shared.alternateIconName }
+                            else { changeError = "Couldn't change the icon. Try choosing it again." }
+                            isChanging = false
+                        }
                     }
                 } label: {
                     HStack {
-                        Text("psst")
-                            .font(.psst(size: 13, weight: .black))
+                        Group {
+                            if icon.name == "AppIcon-Cat" { MischiefCat().padding(7) }
+                            else { Text("psst").font(.system(size: 13, weight: .bold)) }
+                        }
                             .foregroundStyle(.white)
                             .frame(width: 40, height: 40)
                             .background(Color(hex: icon.preview), in: RoundedRectangle(cornerRadius: 9))
@@ -137,8 +149,13 @@ private struct IconSection: View {
                         if current == icon.name { Image(systemName: "checkmark").foregroundStyle(Color.psstCanvas) }
                     }
                 }
+                .disabled(isChanging)
                 .accessibilityAddTraits(current == icon.name ? .isSelected : [])
             }
+        } header: {
+            Text("App icon")
+        } footer: {
+            if let changeError { Text(changeError) }
         }
     }
 }

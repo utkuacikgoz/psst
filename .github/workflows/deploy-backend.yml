@@ -21,6 +21,11 @@ on:
         type: choice
         options: [development, production]
         default: development
+      purchase_environment:
+        description: Apple purchase environment (Sandbox for TestFlight)
+        type: choice
+        options: [Sandbox, Production]
+        default: Sandbox
 
 concurrency:
   group: deploy-backend-${{ inputs.target }}
@@ -98,10 +103,25 @@ jobs:
             APNS_PRIVATE_KEY="$pem" > /dev/null
           echo "Secrets set (values not printed)."
 
+      - name: Configure verified Psst+ purchases
+        env:
+          PURCHASE_ENVIRONMENT: ${{ inputs.purchase_environment }}
+          APNS_BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/purchases"
+          "$RUNNER_TEMP/purchases/bin/pip" install -q pyjwt cryptography
+          "$RUNNER_TEMP/purchases/bin/python" scripts/configure_purchase_verification.py "$RUNNER_TEMP/purchases.env"
+          supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" --env-file "$RUNNER_TEMP/purchases.env" > /dev/null
+          rm -f "$RUNNER_TEMP/purchases.env"
+
       - name: Deploy functions
         run: |
           supabase functions deploy send-signal --project-ref "$SUPABASE_PROJECT_REF"
           supabase functions deploy delete-account --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy verify-plus --project-ref "$SUPABASE_PROJECT_REF"
 
       - name: Smoke test the deployed backend
         run: |

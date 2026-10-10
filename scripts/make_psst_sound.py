@@ -87,6 +87,17 @@ def render(filename, stretch=1.0, level=0.6, q=1.4, seed=7, pitch=1.0, repeat=1,
 render("psst.wav")
 render("psst-soft.wav", stretch=1.35, level=0.35, q=1.0, seed=11)
 render("psst-quick.wav", stretch=0.7, level=0.6, q=1.8, seed=3)
+
+# Super Psst: two short whispers, with the same peak/headroom as the default.
+root = pathlib.Path(__file__).resolve().parents[1] / "Psst"
+with wave.open(str(root / "psst.wav"), "rb") as source:
+    whisper = source.readframes(source.getnframes())
+with wave.open(str(root / "psst-super.wav"), "wb") as output:
+    output.setnchannels(1)
+    output.setsampwidth(2)
+    output.setframerate(RATE)
+    output.writeframes(whisper + bytes(int(RATE * 0.12) * 2) + whisper)
+
 render("psst-double.wav", stretch=0.62, level=0.6, q=1.6, seed=21, repeat=2)
 render("psst-low.wav", level=0.55, q=1.2, seed=5, pitch=0.62)
 render("psst-long.wav", stretch=1.8, level=0.45, q=0.9, seed=13)

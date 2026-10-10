@@ -44,6 +44,12 @@ final class LiveStore {
     static let pauseDuration: TimeInterval = 60
     static let welcomedKey = "psst.live.welcomedConnections"
     static let pinnedOrderKey = "psst.live.pinnedOrder"
+    static let featureIntroKey = "psst.live.featureIntro.202610"
+    static let superHintKey = "psst.live.superHint.202610"
+    private(set) var featureIntroSeen = false
+    private(set) var superHintSeen = false
+    private(set) var isExistingUser = false
+
     static let coachKey = "psst.live.coachShown"
     static let reviewAskedKey = "psst.live.reviewAsked"
     static let myNameKey = "psst.live.myName"
@@ -108,6 +114,9 @@ final class LiveStore {
         self.defaults = defaults
         self.now = now
         self.sentDisplayDuration = sentDisplayDuration
+        isExistingUser = api.isSignedIn && defaults.bool(forKey: Self.profileKey)
+        featureIntroSeen = defaults.bool(forKey: Self.featureIntroKey)
+        superHintSeen = defaults.bool(forKey: Self.superHintKey)
         coachDismissed = defaults.bool(forKey: Self.coachKey)
         myName = defaults.string(forKey: Self.myNameKey)
         pinnedOrder = (defaults.stringArray(forKey: Self.pinnedOrderKey) ?? []).compactMap(UUID.init(uuidString:))
@@ -268,7 +277,7 @@ final class LiveStore {
         let many = senders.count > 1
         let moments = senders.enumerated().map { index, s in
             Arrival(id: s.id, connectionID: s.connectionId, senderName: s.senderName,
-                    kind: s.sameMoment == true ? .sameMoment : .signal,
+                    kind: s.signal == .superPsst ? .superPsst : (s.sameMoment == true ? .sameMoment : .signal),
                     position: many ? index + 1 : nil, total: many ? senders.count : nil)
         }
         if arrival == nil, let first = moments.first {
@@ -298,7 +307,18 @@ final class LiveStore {
 
     private(set) var coachDismissed = false
 
+    func dismissFeatureIntro() {
+        featureIntroSeen = true
+        defaults.set(true, forKey: Self.featureIntroKey)
+    }
+
+    func dismissSuperHint() {
+        superHintSeen = true
+        defaults.set(true, forKey: Self.superHintKey)
+    }
+
     func dismissCoach() {
+        if !isExistingUser { dismissSuperHint(); dismissFeatureIntro() }
         coachDismissed = true
         defaults.set(true, forKey: Self.coachKey)
     }
@@ -396,11 +416,33 @@ final class LiveStore {
         }
     }
 
+    @discardableResult
+    func sendSuper(_ connection: ConnectionSummary) -> Task<Void, Never>? {
+        // A pending/failed send must be resolved first; never replace its retry ID.
+        guard sendStates[connection.id] == nil || {
+            if case .sent = sendStates[connection.id] { return true }; return false
+        }() else { return nil }
+        if let until = pausedUntil[connection.id], until > now() { return nil }
+        let eventID = UUID()
+        sendStates[connection.id] = .sending(eventID: eventID, signal: .superPsst)
+        return Task { await send(connectionID: connection.id, eventID: eventID, signal: .superPsst) }
+    }
+
     func send(connectionID: UUID, eventID: UUID, signal: Signal) async {
         sendStates[connectionID] = .sending(eventID: eventID, signal: signal)
         do {
             let result = try await api.sendSignal(eventID: eventID, connectionID: connectionID, signal: signal)
             isOffline = false
+            // Acceptance includes the authoritative timestamp, even if the
+            // subsequent list refresh fails. Never synthesize a sent time.
+            connections = connections.map { connection in
+                guard connection.id == connectionID,
+                      connection.lastCreatedAt.map({ $0 <= result.createdAt }) ?? true else { return connection }
+                return ConnectionSummary(connectionId: connection.id, otherId: connection.otherId,
+                    otherName: connection.otherName, lastEventId: result.id, lastFromMe: true,
+                    lastEffect: signal.rawValue, lastCreatedAt: result.createdAt, lastSeenAt: nil,
+                    unseenCount: connection.unseenCount)
+            }
             if result.sameMoment == true, let name = connections.first(where: { $0.id == connectionID })?.otherName {
                 arrival = Arrival(id: eventID, connectionID: connectionID, senderName: name, kind: .sameMoment)
             }
@@ -420,6 +462,10 @@ final class LiveStore {
             sendStates[connectionID] = nil
             connections.removeAll { $0.id == connectionID }
             notice = name.map { "\($0) isn't here any more." } ?? "That person isn't here any more."
+        } catch APIError.server(_, "super_daily_limit") {
+            isOffline = false
+            sendStates[connectionID] = nil
+            notice = "Today's Super Psst is used. Hold a person to see when it resets."
         } catch APIError.server(429, _) {
             isOffline = false
             pausedUntil[connectionID] = now().addingTimeInterval(Self.pauseDuration)
@@ -483,11 +529,12 @@ final class LiveStore {
     /// The person opened a notification: it was displayed, so it counts as seen.
     func openedNotification(_ payload: SignalPayload) async {
         try? await api.ackSignals([payload.eventID])
-        play(EffectTrigger(id: payload.eventID, signal: payload.signal), on: payload.connectionID)
+        let signal: Signal = payload.signal == .superPsst && defaults.object(forKey: "psst.superEffectsEnabled") as? Bool == false ? .psst : payload.signal
+        play(EffectTrigger(id: payload.eventID, signal: signal), on: payload.connectionID)
         await refresh()
         if let sender = connections.first(where: { $0.id == payload.connectionID }) {
             arrival = Arrival(id: payload.eventID, connectionID: sender.id, senderName: sender.otherName,
-                              kind: payload.sameMoment ? .sameMoment : .signal)
+                              kind: signal == .superPsst ? .superPsst : (payload.sameMoment ? .sameMoment : .signal))
         }
     }
 
@@ -521,7 +568,7 @@ final class LiveStore {
         try? await api.ackSignals([payload.eventID])
         do {
             _ = try await api.sendSignal(eventID: .reply(to: payload.eventID),
-                                         connectionID: payload.connectionID, signal: payload.signal)
+                                         connectionID: payload.connectionID, signal: .psst)
             return true
         } catch {
             return false
@@ -545,6 +592,9 @@ final class LiveStore {
         myName = nil
         pinnedOrder = []
         recencyOrder = []
+        isExistingUser = false
+        defaults.removeObject(forKey: Self.coachKey)
+        coachDismissed = false
         arrival = nil
         arrivalQueue = []
         pausedUntil = [:]

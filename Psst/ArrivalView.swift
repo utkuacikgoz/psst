@@ -3,7 +3,7 @@ import SwiftUI
 /// A full-screen moment: a Psst that just arrived (R2), someone new (J2), or
 /// both of you pssting within 10 seconds by the server's clock (X2).
 struct Arrival: Identifiable, Equatable {
-    enum Kind { case signal, joined, sameMoment }
+    enum Kind { case signal, joined, sameMoment, superPsst }
 
     /// The signal event (or, for a welcome, the connection), so it never shows twice.
     let id: UUID
@@ -32,6 +32,7 @@ struct ArrivalView: View {
 
     private var holdTime: Duration {
         #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-PsstUITestLive") && ProcessInfo.processInfo.arguments.contains("superArrival") { return .seconds(30) }
         // App Store screenshot runs hold each moment so it can be captured.
         if ProcessInfo.processInfo.arguments.contains("-PsstUITestHoldMoments") { return .seconds(8) }
         #endif
@@ -44,6 +45,9 @@ struct ArrivalView: View {
         return "\(position) of \(total) · "
     }
 
+    @AppStorage("psst.hapticsEnabled") private var hapticsEnabled = true
+    @AppStorage("psst.superEffectsEnabled") private var superEffectsEnabled = true
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = 70
     @ScaledMetric(relativeTo: .largeTitle) private var psstSize: CGFloat = Tokens.Band.titleSize
@@ -55,6 +59,7 @@ struct ArrivalView: View {
     private var announcement: String {
         switch arrival.kind {
         case .signal: "\(countPrefix)Psst from \(name)"
+        case .superPsst: "\(countPrefix)Super Psst from \(name)"
         case .joined: "\(name) is in. You're connected."
         case .sameMoment: "Same moment. You and \(name) pssted each other at the same time."
         }
@@ -62,7 +67,7 @@ struct ArrivalView: View {
 
     private var hint: String {
         switch arrival.kind {
-        case .signal: "Sends a Psst back."
+        case .signal, .superPsst: "Sends a Psst back."
         case .joined: "Sends your first Psst."
         case .sameMoment: "Closes."
         }
@@ -71,7 +76,10 @@ struct ArrivalView: View {
     var body: some View {
         Button(action: onTap) {
             Group {
-                if arrival.kind == .sameMoment { sameMoment } else { single }
+                if dynamicTypeSize.isAccessibilitySize {
+                    ScrollView { if arrival.kind == .sameMoment { sameMoment } else { single } }
+                        .background((color ?? .personBand(name)).ignoresSafeArea())
+                } else if arrival.kind == .sameMoment { sameMoment } else { single }
             }
             .multilineTextAlignment(.center)
             .foregroundStyle(Color.onCanvas)
@@ -83,7 +91,11 @@ struct ArrivalView: View {
         .accessibilityLabel(announcement)
         .accessibilityHint(hint)
         .accessibilityAddTraits(.isButton)
-        .sensoryFeedback(arrival.kind == .sameMoment ? .success : .impact(flexibility: .soft), trigger: trigger)
+        .sensoryFeedback(trigger: trigger) { _, _ in
+            guard hapticsEnabled else { return nil }
+            return arrival.kind == .sameMoment ? .success :
+                .impact(flexibility: arrival.kind == .superPsst && superEffectsEnabled ? .solid : .soft)
+        }
         .task(id: arrival.id) {
             AccessibilityNotification.Announcement(announcement).post()
             try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 150))
@@ -96,7 +108,7 @@ struct ArrivalView: View {
 
     private var single: some View {
         VStack(spacing: Tokens.Space.l) {
-            if arrival.kind == .signal {
+            if arrival.kind == .signal || arrival.kind == .superPsst {
                 Text("FROM")
                     .font(.psst(.subheadline, weight: .bold))
                     .tracking(Tokens.Band.labelTracking * 2)
@@ -104,10 +116,16 @@ struct ArrivalView: View {
             Text(name.uppercased())
                 .bandTitle(name, size: nameSize, tracking: Tokens.Band.titleTracking)
                 .fixedSize(horizontal: false, vertical: true)
-            if arrival.kind == .signal {
-                SignalGlyph(signal: .psst, trigger: trigger, baseSize: psstSize, tint: .white)
-                Text("Psst!")
-                    .font(.psst(size: psstSize * 0.8, weight: .heavy))
+            if arrival.kind == .signal || arrival.kind == .superPsst {
+                if arrival.kind == .superPsst {
+                    MischiefCat().frame(width: 84, height: 68)
+                        .scaleEffect(trigger == nil || reduceMotion ? 1 : 1.08)
+                        .animation(reduceMotion ? nil : .spring(duration: 0.3), value: trigger)
+                } else {
+                    SignalGlyph(signal: .psst, trigger: trigger, baseSize: psstSize, tint: .white)
+                }
+                Text(arrival.kind == .superPsst ? "Super Psst!" : "Psst!")
+                    .font(.system(size: psstSize * 0.8, weight: .heavy))
                     .opacity(0.9)
             } else {
                 Text("IS IN")
@@ -115,8 +133,8 @@ struct ArrivalView: View {
                     .tracking(Tokens.Band.titleTracking)
                     .opacity(0.9)
             }
-            Text(arrival.kind == .signal ? "\(countPrefix)Tap to psst back" : "Tap to send your first Psst")
-                .font(.psst(.subheadline, weight: .medium))
+            Text(arrival.kind != .joined ? "\(countPrefix)Tap to psst back" : "Tap to send your first Psst")
+                .font(.subheadline.weight(.medium))
                 .padding(.top, Tokens.Space.l)
         }
         .padding(Tokens.Space.xl)

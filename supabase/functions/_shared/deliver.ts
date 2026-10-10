@@ -29,6 +29,7 @@ export interface DeliverDeps {
 
 const EFFECT_TITLES: Record<string, string> = {
   psst: "Psst",
+  super_psst: "Super Psst",
 };
 
 /** A signal is a moment, not a message: undelivered pushes are dropped after an hour. */
@@ -51,7 +52,9 @@ export function buildPayload(targets: PushTargets) {
     psst: {
       event_id: targets.event_id,
       connection_id: targets.connection_id,
-      effect_id: targets.effect_id,
+      // Keep the original routing ID so older app versions can still psst back.
+      effect_id: targets.effect_id === "super_psst" ? "psst" : targets.effect_id,
+      super_psst: targets.effect_id === "super_psst",
       same_moment: targets.same_moment ?? false,
     },
   };

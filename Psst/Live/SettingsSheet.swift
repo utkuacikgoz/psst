@@ -27,9 +27,21 @@ struct SettingsSheet: View {
                 }
 
                 Section {
-                    Button("Open notification settings") {
-                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
-                            UIApplication.shared.open(url)
+                    if notificationStatus == .notDetermined {
+                        // "Not now" at first launch: iOS has no switch for Psst
+                        // until it has asked once, so ask here.
+                        Button("Turn on notifications") {
+                            Task {
+                                _ = await NotificationPermission.ask()
+                                notificationStatus = await UNUserNotificationCenter.current()
+                                    .notificationSettings().authorizationStatus
+                            }
+                        }
+                    } else {
+                        Button("Open notification settings") {
+                            if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
                         }
                     }
                 } header: {
@@ -158,7 +170,7 @@ struct SettingsSheet: View {
         case .denied:
             "Off. Signals still appear when you open Psst."
         default:
-            "Not set up yet."
+            "Off. You chose Not now when you started; turn them on to hear when someone pssts you."
         }
     }
 

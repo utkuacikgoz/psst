@@ -289,9 +289,7 @@ struct NotificationStepView: View {
     private func allow() {
         isAsking = true
         Task {
-            let granted = (try? await UNUserNotificationCenter.current()
-                .requestAuthorization(options: [.alert, .sound])) ?? false
-            if granted { UIApplication.shared.registerForRemoteNotifications() }
+            _ = await NotificationPermission.ask()
             isAsking = false
             store.finishNotificationChoice()
         }
@@ -322,5 +320,17 @@ struct PrimaryButton: View {
         }
         .disabled(!isEnabled || isBusy)
         .accessibilityLabel(title)
+    }
+}
+
+/// The one system permission Psst asks for: notifications (alerts and sound).
+enum NotificationPermission {
+    /// Shows iOS's prompt (only the first time it's asked) and registers for
+    /// pushes if allowed.
+    @MainActor static func ask() async -> Bool {
+        let granted = (try? await UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .sound])) ?? false
+        if granted { UIApplication.shared.registerForRemoteNotifications() }
+        return granted
     }
 }

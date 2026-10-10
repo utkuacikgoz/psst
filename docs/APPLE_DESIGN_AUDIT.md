@@ -60,7 +60,7 @@ Scope: onboarding, invites, settings, purchases, account/error recovery, accessi
 
 **Fix:** Remove it from the purchase benefits until available, or place it in a clearly separate “Planned” note outside the purchasable-value list. Verify StoreKit product copy and paywall on device before release.
 
-**Resolution (implemented):** Removed the unavailable widget from the purchasable benefits. Current Psst+ perks remain unchanged. StoreKit product metadata and on-device purchases still need release validation.
+**Resolution (implemented):** Removed the unavailable widget claim during the audit. Release integration found that current main already implements Home Screen and Lock Screen widgets; the real widget benefit is retained with that implementation. StoreKit product metadata and on-device purchases still need release validation.
 
 **Basis:** Apple’s in-app purchase guidance recommends simple, clear product names and descriptions so people can understand what they are buying: [Apple In-App Purchase HIG](https://developer.apple.com/design/human-interface-guidelines/apple-in-app-purchase). Apple’s product metadata guidance also calls for clear, descriptive names and text: [Creating SKUs for In-App Purchases](https://developer.apple.com/documentation/advancedcommerceapi/creating-your-purchases).
 

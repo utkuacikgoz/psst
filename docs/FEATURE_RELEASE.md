@@ -96,8 +96,20 @@ screens, copy and audit fixes remain in place.
 
 ## Validation
 
-Local native build and the 59-test iOS unit suite pass. Backend migration,
+Local native build and the 67-test integrated iOS unit suite pass. Backend migration,
 authorization, concurrency and entitlement tests: 33 pass. Deno delivery and
 purchase-verification handler tests: 21 pass; function type checks pass. Native
 normal-size feature captures and Super arrival checks pass. The full validation
 report records the remaining device-size checks separately.
+
+## Release 1.0.3 integration
+
+Current main was integrated before release, retaining its widget, additional
+whisper sounds, notification setup, cache and startup improvements. App and widget
+versions are 1.0.3. The backend workflow configures purchase-verification secrets
+from existing App Store Connect credentials and Apple's public root certificate.
+Choose Sandbox for TestFlight purchases even when the app uses the production
+Supabase backend; choose Production for App Store purchases. Public privacy
+disclosures now include daily usage and purchase-verification records.
+
+Integrated iOS unit suite: 67 passed. PostgreSQL and Deno CI checks passed.

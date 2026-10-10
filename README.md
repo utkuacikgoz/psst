@@ -73,7 +73,7 @@ Validation for the Yo-inspired revision: 34 existing unit tests passed, the fina
 
 ## October feature update (local implementation)
 
-Latest directional exchange time, private 30-day activity, a visible Super Psst
+Latest directional exchange time, private 30-day activity, a long-press Super Psst
 entry (one daily total; verified unlimited with Psst+), recipient effects controls,
 one-time feature introduction and optional Mischief cat icon are implemented.
 See [feature behavior and backend setup](docs/FEATURE_RELEASE.md),

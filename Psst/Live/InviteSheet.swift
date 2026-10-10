@@ -4,6 +4,7 @@ import SwiftUI
 struct InviteSheet: View {
     @Environment(LiveStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private enum Mode { case choose, share, enter }
 
@@ -28,11 +29,9 @@ struct InviteSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            switch mode {
-            case .choose: chooser
-            case .share: shareStep
-            case .enter: enterStep
-            }
+            if dynamicTypeSize.isAccessibilitySize {
+                ScrollView { content }
+            } else { content }
         }
         .foregroundStyle(Color.onCanvas)
         .background(Color.psstCanvas.ignoresSafeArea())
@@ -44,6 +43,14 @@ struct InviteSheet: View {
                 mode = .enter
                 check()
             }
+        }
+    }
+
+    @ViewBuilder private var content: some View {
+        switch mode {
+        case .choose: chooser
+        case .share: shareStep
+        case .enter: enterStep
         }
     }
 
@@ -67,7 +74,9 @@ struct InviteSheet: View {
 
     private var chooser: some View {
         VStack(spacing: 0) {
-            chooserBand(title: "Share my invite", subtitle: "Send a link to one person", color: .addBand) {
+            MischiefCat().frame(width: 48, height: 40)
+                .frame(maxWidth: .infinity).padding(.top, Tokens.Space.s)
+            chooserBand(title: "Share my invite", subtitle: "Send a link to one person", color: .inviteGold) {
                 withAnimation { mode = .share }
                 if invite == nil { create() }
             }
@@ -109,10 +118,9 @@ struct InviteSheet: View {
                     .font(.psst(.subheadline, weight: .bold))
                     .tracking(Tokens.Band.labelTracking * 2)
                 if let invite {
-                    Text(invite.displayCode)
+                    Text(dynamicTypeSize.isAccessibilitySize ? "\(invite.code.prefix(4))\n\(invite.code.suffix(4))" : invite.displayCode)
                         .font(.system(size: codeSize, weight: .bold, design: .monospaced))
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                         .accessibilityLabel("Invite code \(invite.code.map(String.init).joined(separator: " "))")
                     Text("Works once · expires \(invite.expiresAt.formatted(date: .abbreviated, time: .omitted))")
@@ -130,7 +138,7 @@ struct InviteSheet: View {
             .multilineTextAlignment(.center)
             .padding(Tokens.Space.xl)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.addBand)
+            .background(Color.inviteGold)
 
             if let invite {
                 ShareLink(
@@ -148,6 +156,7 @@ struct InviteSheet: View {
     }
 
     private func create() {
+        guard !isCreating else { return }
         isCreating = true
         createError = nil
         Task {
@@ -172,15 +181,15 @@ struct InviteSheet: View {
                 Text("THEIR CODE")
                     .font(.psst(.subheadline, weight: .bold))
                     .tracking(Tokens.Band.labelTracking * 2)
-                TextField("", text: $code, prompt: Text("ABCD EFGH").foregroundStyle(Color.onCanvasSecondary))
-                    .font(.system(size: codeSize, weight: .bold, design: .monospaced))
+                TextField("", text: $code, prompt: Text("ABCDEFGH").foregroundStyle(Color.onCanvasSecondary))
+                    .font(.system(.title2, design: .monospaced).weight(.bold))
                     .multilineTextAlignment(.center)
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
                     .submitLabel(.go)
                     .focused($codeFocused)
                     .onSubmit(check)
-                    .minimumScaleFactor(0.5)
+                    .disabled(isChecking || isAccepting)
                     .accessibilityLabel("Invite code")
                     .onChange(of: code) { preview = nil; enterError = nil }
 
@@ -188,7 +197,8 @@ struct InviteSheet: View {
                     Text(Self.message(for: preview.status, name: preview.inviterName ?? "them"))
                         .font(.psst(.body, weight: .semibold))
                         .fixedSize(horizontal: false, vertical: true)
-                } else if let enterError {
+                }
+                if let enterError {
                     Label(enterError, systemImage: "exclamationmark.circle")
                         .font(.psst(.subheadline, weight: .semibold))
                 }
@@ -215,6 +225,8 @@ struct InviteSheet: View {
             }
             .font(.psst(.body, weight: .semibold))
             .foregroundStyle(Color.ink)
+            .padding(.horizontal, Tokens.Space.xl)
+            .padding(.vertical, Tokens.Space.s)
             .frame(maxWidth: .infinity, minHeight: Tokens.Band.barMinHeight)
             .background(Color.surface)
             .contentShape(Rectangle())
@@ -237,7 +249,7 @@ struct InviteSheet: View {
 
     private func check() {
         let trimmed = code.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty, !isChecking, !isAccepting else { return }
         isChecking = true
         enterError = nil
         Task {
@@ -253,6 +265,7 @@ struct InviteSheet: View {
     }
 
     private func accept() {
+        guard !isAccepting, !isChecking, preview?.status == .pending else { return }
         isAccepting = true
         enterError = nil
         Task {

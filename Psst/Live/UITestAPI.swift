@@ -11,6 +11,9 @@ final class UITestAPI: PsstAPI {
         case tour
         /// Signed in with no connections yet.
         case empty
+        case features
+        case returning
+        case superArrival
         /// The tour's people, already signed in, for App Store screenshots.
         case store
     }
@@ -29,8 +32,15 @@ final class UITestAPI: PsstAPI {
             defaults.set(true, forKey: LiveStore.profileKey)
             defaults.set(true, forKey: LiveStore.notificationChoiceKey)
         }
+        if scenario == .features || scenario == .returning || scenario == .superArrival {
+            defaults.set(true, forKey: LiveStore.coachKey)
+            defaults.set(true, forKey: LiveStore.superHintKey)
+            if scenario != .returning { defaults.set(true, forKey: LiveStore.featureIntroKey) }
+        }
         if scenario == .store {
             defaults.set(true, forKey: LiveStore.coachKey)
+            defaults.set(true, forKey: LiveStore.superHintKey)
+            defaults.set(true, forKey: LiveStore.featureIntroKey)
         }
         return LiveStore(api: UITestAPI(scenario: scenario), defaults: defaults)
     }
@@ -42,6 +52,7 @@ final class UITestAPI: PsstAPI {
     private var samTaps = 0
     private var last: [UUID: (fromMe: Bool, signal: Signal, seen: Bool)] = [:]
     private var unseen: [UnseenSignal] = []
+    private var lastDates: [UUID: Date] = [:]
     private var names: [UUID: String] = [:]
 
     var isSignedIn: Bool
@@ -49,10 +60,12 @@ final class UITestAPI: PsstAPI {
     init(scenario: Scenario) {
         isSignedIn = scenario != .tour
         guard scenario != .empty else { return }
-        names = [ada: "Mia", emre: "Zoe", sam: "Ava"]
+        names = scenario == .store ? [ada: "Mia", emre: "Zoe", sam: "Ava"] : [ada: "Ada", emre: "Emre", sam: "Sam"]
         last = [ada: (false, .psst, false), emre: (true, .psst, true)]
-        unseen = [UnseenSignal(id: UUID(), connectionId: ada, senderId: UUID(), senderName: "Mia",
-                               effectId: Signal.psst.rawValue, createdAt: Date())]
+        lastDates = [ada: Date().addingTimeInterval(scenario == .tour ? 0 : -720),
+                     emre: Date().addingTimeInterval(-90000)]
+        unseen = [UnseenSignal(id: UUID(), connectionId: ada, senderId: UUID(), senderName: names[ada] ?? "Ada",
+                               effectId: scenario == .superArrival ? Signal.superPsst.rawValue : Signal.psst.rawValue, createdAt: Date())]
     }
 
     func signUpAnonymously() async throws { isSignedIn = true }
@@ -65,7 +78,7 @@ final class UITestAPI: PsstAPI {
             return ConnectionSummary(
                 connectionId: id, otherId: id, otherName: name,
                 lastEventId: event == nil ? nil : UUID(), lastFromMe: event?.fromMe,
-                lastEffect: event?.signal.rawValue, lastCreatedAt: event == nil ? nil : Date(),
+                lastEffect: event?.signal.rawValue, lastCreatedAt: event == nil ? nil : lastDates[id],
                 lastSeenAt: event?.seen == true ? Date() : nil,
                 unseenCount: unseen.filter { $0.connectionId == id }.count)
         }
@@ -88,12 +101,32 @@ final class UITestAPI: PsstAPI {
         if connectionID == emre {
             try await Task.sleep(for: .milliseconds(1500))
         }
+        if signal == .superPsst {
+            if usedSuper { throw APIError.server(status: 409, code: "super_daily_limit") }
+            usedSuper = true
+        }
+        lastDates[connectionID] = Date()
         last[connectionID] = (true, signal, false)
         // Mia pssted just before, so answering her is a same moment.
         return SendResult(id: eventID, createdAt: Date(), pushStatus: "accepted", duplicate: false,
                           sameMoment: connectionID == ada)
     }
 
+
+    private var usedSuper = false
+    private var superEffectsEnabled = true
+    func activity() async throws -> [ActivitySummary] {
+        names.map { id, name in ActivitySummary(connectionId: id, otherName: name,
+            sentCount: id == emre ? 12 : 3, receivedCount: id == ada ? 18 : 2) }
+    }
+    func superAllowance() async throws -> SuperAllowance {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return SuperAllowance(remaining: usedSuper ? 0 : 1, unlimited: false,
+            resetsAt: calendar.startOfDay(for: Date()).addingTimeInterval(86400),
+            effectsEnabled: superEffectsEnabled)
+    }
+    func setSuperEffects(_ enabled: Bool) async throws { superEffectsEnabled = enabled }
 
     func createInvite() async throws -> CreatedInvite {
         CreatedInvite(code: "K7QX4MPA", expiresAt: Date().addingTimeInterval(7 * 86_400))

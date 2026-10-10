@@ -70,6 +70,17 @@ The owner-selected reference is the original Yo: edge-to-edge colour bands, over
 
 Validation for the Yo-inspired revision: 34 existing unit tests passed, the final simulator build succeeded, and local send → effect selection → recipient → tap-back was checked in the running iPhone 17 Pro simulator. Physical-device push delivery and the deployed backend remain unverified.
 
+
+## October feature update (local implementation)
+
+Latest directional exchange time, private 30-day activity, a long-press Super Psst
+entry (one daily total; verified unlimited with Psst+), recipient effects controls,
+one-time feature introduction and optional Mischief cat icon are implemented.
+See [feature behavior and backend setup](docs/FEATURE_RELEASE.md),
+[validation](docs/FEATURE_TEST_REPORT.md), and [Apple design audit](docs/APPLE_DESIGN_AUDIT.md).
+The new migration and verify-plus endpoint need deployment before live use;
+physical push and actual StoreKit sandbox verification are still required.
+
 ## Website
 
 `site/` holds the public pages served by Vercel at https://psstapp.fun: `/privacy`, `/terms` and `/support`, plus a small home page. Vercel needs no settings: the root `vercel.json` publishes `site/` as static files (leave Root Directory empty; `site/vercel.json` covers the case where it is set to `site`). The app links to these pages from Settings and from the Psst+ sheet.

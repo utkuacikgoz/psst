@@ -2,6 +2,17 @@
 
 Read `CLAUDE.md` first. This guide is self-contained for this repository. Exact measurements and colours are starting specifications, not separately approved owner decisions.
 
+## October 2026 approved feature direction
+
+The latest owner decisions supersede earlier restrictions on persistent row
+metadata and personal-only Psst+ extras. See `docs/FEATURE_RELEASE.md` for the
+complete behavior: latest exchange time, private 30-day activity rankings,
+Super Psst in each person’s long-press menu (one daily total; unlimited with verified Psst+),
+optional recipient effects, one-time feature introduction and a subtle vector cat.
+Ordinary taps and replies remain free Pssts. Purple wordmark stays the default
+icon; Mischief is an optional icon. Functional titles use system tracking and
+wrap without shrinking away accessibility text sizes.
+
 ## 1. What “finished design” means
 
 The first screen must feel intentionally composed on a real phone. A pile of attractive components is not sufficient. Prioritize, in order:
@@ -38,7 +49,7 @@ Use SF Symbols at one consistent weight for utility controls. Avoid mixing line 
 
 ## 3. App-specific design
 
-This app is about people and one-tap contact. Its tone is warm with optional mischief: an inside joke between people who care about each other. Keep the interface restrained and make the exchange expressive.
+This app is about people and quick contact. Its tone is warm with optional mischief: an inside joke between people who care about each other. Keep the interface restrained and make the exchange expressive.
 
 ### Owner-selected reference: original Yo
 
@@ -67,7 +78,7 @@ The owner explicitly chose **Yo** after rejecting the earlier cobalt-card design
 - Rating: after your first Psst the server accepts (never a failed one), once its "sent" has shown and nothing else is on screen, Psst asks Apple to show its rating prompt, once per install. Apple decides whether it appears (at most three times a year); screenshot runs never ask.
 - Psst+ (optional one-time unlock): home's footer reads Settings · Psst+ (PP2). The Psst+ sheet is a standard list (PS1): what's included, the App Store's local price, Unlock, Restore purchase, and "Pssting, replies and invites are always free." Once unlocked, the same sheet holds the app icon and whisper sound choices (Whisper, Soft, Quick, and since 10 Oct 2026 Double, Low and Long; the server allow-list must include a sound before the app offers it). A band's long-press menu has Colour… (BC1): twelve colours (four added 10 Oct 2026), on your phone only. Without Psst+, Colour… opens the Psst+ sheet.
 - Accounts are anonymous and live on one phone. On a new phone you choose your name again and re-invite your people (owner decision NP1).
-- The first time home has someone to tap, a one-time dark overlay shows a tapping hand: "Tap a band to psst" / "Hold to move someone or remove them". Any tap only dismisses it; it never sends.
+- The first time home has someone to tap, a one-time dark overlay shows a tapping hand: "Tap a band to psst" / "Hold for Super Psst". Any tap only dismisses it; it never sends.
 - Typeface (owner pick, 25 Sep 2026): **Inter Tight**, the same face as psstapp.fun. It's bundled in the app (Psst/Fonts, SIL Open Font License) and used through `Font.psst(...)`: Black for band names and headlines, Bold/SemiBold/Medium for lines and labels. It scales with Dynamic Type. Standard iPhone lists (Settings, Psst+, alerts) keep the system font. SF Symbols stay on the system font.
 - App icon (final, owner-approved 25 Sep 2026): the white lowercase "psst" wordmark on #713F93, matching the launch screen. Psst+ offers Night, Gold and Pink versions of the same mark.
 - The notification's button reads "Psst back".
@@ -126,3 +137,12 @@ Check every item:
 - [ ] Delivery feedback matches real system state, including offline and permission-denied cases.
 - [ ] Purchase previews are separate from sending/buying; prices come from StoreKit.
 - [ ] There are no placeholder assets, fake friends, fake stats, decorative badges, or dead controls presented as finished features.
+
+### Latest discovery direction
+
+The owner selected long press for now. Ordinary band taps send Psst immediately.
+Touch and hold a person, then choose Super Psst to open the approved review;
+Send Super Psst remains explicit. VoiceOver exposes the same action. Home has
+no header action, repeated Super buttons or person-choice sheet. The introduction
+and first-use hint explain the gesture. This supersedes the rejected placement
+proposals and restores the original one-tap home behavior.

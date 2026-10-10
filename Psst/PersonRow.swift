@@ -17,6 +17,8 @@ struct PersonRow: View {
     var isDimmed = false
     /// Psst+ (BC1): a colour you chose for this person, on your phone only.
     var color: Color? = nil
+    var exchangeDate: Date? = nil
+    var exchangeFromMe: Bool? = nil
 
     @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = Tokens.Band.titleSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -34,7 +36,14 @@ struct PersonRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(minHeight: nameSize * 1.15)
                 }
-                // Yo classic: the line appears only when something happened.
+                if let exchangeDate, let exchangeFromMe {
+                    TimelineView(.periodic(from: .now, by: 60)) { context in
+                        Text("\(exchangeFromMe ? "Sent" : "Received") · \(ExchangeTime.label(exchangeDate, now: context.date))")
+                            .font(.subheadline.weight(.medium))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                // Transient sending or failure status stays separate from the timestamp.
                 if isBusy || !status.isEmpty {
                     HStack(spacing: Tokens.Space.s) {
                         if isBusy { ProgressView().tint(.white) }
@@ -46,7 +55,8 @@ struct PersonRow: View {
             }
             .multilineTextAlignment(.center)
             .foregroundStyle(.white)
-            .padding(.horizontal, Tokens.Space.xl).padding(.vertical, Tokens.Band.verticalPadding)
+            .padding(.horizontal, Tokens.Space.xl)
+            .padding(.vertical, Tokens.Band.verticalPadding)
             .frame(maxWidth: .infinity, minHeight: minHeight)
             .overlay(alignment: .bottomTrailing) {
                 if let cornerMark, !showingEffect {
@@ -65,7 +75,8 @@ struct PersonRow: View {
         .buttonStyle(PersonBandStyle(color: color ?? .personBand(name), isDimmed: isDimmed))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name)
-        .accessibilityValue([status, cornerMark.map { "Psst \($0)" } ?? ""].filter { !$0.isEmpty }.joined(separator: ", "))
+        .accessibilityValue([status, cornerMark.map { "Psst \($0)" } ?? "",
+                             exchangeDate.map { "\(exchangeFromMe == true ? "Sent" : "Received") \($0.formatted(date: .complete, time: .shortened))" } ?? ""].filter { !$0.isEmpty }.joined(separator: ", "))
         .accessibilityHint(accessibilityHint)
         .accessibilityAddTraits(.isButton)
         .task(id: effect?.id) {

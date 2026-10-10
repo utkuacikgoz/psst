@@ -51,8 +51,15 @@ final class LiveStore {
     private(set) var isExistingUser = false
 
     static let coachKey = "psst.live.coachShown"
+    static let reviewAskedKey = "psst.live.reviewAsked"
+    static let myNameKey = "psst.live.myName"
+    /// The last list of people from the server, shown at launch while it refreshes.
+    static let connectionsCacheKey = "psst.live.connectionsCache"
 
     private(set) var phase: Phase = .loading
+    /// Your own name as last saved on this phone (ED1). Nil on installs from
+    /// before it was kept; Settings then asks you to add it.
+    private(set) var myName: String?
     private(set) var connections: [ConnectionSummary] = []
     private(set) var sendStates: [UUID: SendState] = [:]
     /// The effect currently playing on each row, keyed by connection. A new event ID replays it.
@@ -67,13 +74,18 @@ final class LiveStore {
     private(set) var hasLoadedConnections = false
     /// A short, factual message for the home screen (e.g. a connection that ended).
     var notice: String?
-    /// Set from a psst://invite link; the home screen opens the invite sheet with it.
+    /// Set from an invite link (https://psstapp.fun/invite/CODE or psst://invite/CODE); the home screen opens the invite sheet with it.
     var pendingInviteCode: String?
     /// IF2: someone new opened an invite link. Their start leads with the
     /// inviter; once they've chosen a name, the invite is accepted for them.
     private(set) var invitedBy: String?
     private(set) var introInviteCode: String?
     var introSeen = false
+    /// Set by the widget's Psst+ message (psst://plus); home opens Psst+.
+    var plusRequested = false
+    /// Set once, after the first Psst the server accepts; home then shows
+    /// Apple's rating prompt (which Apple may still choose not to show).
+    var reviewDue = false
     /// True only while the home list is on screen in the foreground. Signals are
     /// acknowledged as seen only then, because only then were they displayed.
     var isHomeVisible = false
@@ -92,6 +104,8 @@ final class LiveStore {
     @ObservationIgnored private var lastRegisteredToken: String?
 
     static let profileKey = "psst.live.profileCreated"
+    /// Screenshot runs never show the rating prompt.
+    static let isUITest = ProcessInfo.processInfo.arguments.contains { $0.hasPrefix("-PsstUITest") }
     static let notificationChoiceKey = "psst.live.notificationChoiceMade"
 
     init(api: PsstAPI, defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init,
@@ -104,7 +118,15 @@ final class LiveStore {
         featureIntroSeen = defaults.bool(forKey: Self.featureIntroKey)
         superHintSeen = defaults.bool(forKey: Self.superHintKey)
         coachDismissed = defaults.bool(forKey: Self.coachKey)
+        myName = defaults.string(forKey: Self.myNameKey)
         pinnedOrder = (defaults.stringArray(forKey: Self.pinnedOrderKey) ?? []).compactMap(UUID.init(uuidString:))
+        // Show the people from last time straight away; refresh() replaces them.
+        if defaults.bool(forKey: Self.profileKey),
+           let data = defaults.data(forKey: Self.connectionsCacheKey),
+           let cached = try? JSONDecoder().decode([ConnectionSummary].self, from: data) {
+            connections = cached
+            reorderByRecency()
+        }
     }
 
     // MARK: Onboarding
@@ -124,6 +146,7 @@ final class LiveStore {
             try await api.signUpAnonymously()
         }
         try await api.setDisplayName(name)
+        remember(name: name)
         defaults.set(true, forKey: Self.profileKey)
         phase = defaults.bool(forKey: Self.notificationChoiceKey) ? .ready : .needsNotificationChoice
         await acceptIntroInvite()
@@ -170,13 +193,34 @@ final class LiveStore {
 
     func rename(to name: String) async throws {
         try await api.setDisplayName(name)
+        remember(name: name)
+    }
+
+    private func remember(name: String) {
+        myName = name
+        defaults.set(name, forKey: Self.myNameKey)
     }
 
     // MARK: Loading
 
+    /// Loads the people from the server. Calls that overlap (launch, foregrounding,
+    /// pull to refresh) share one request instead of each making their own.
     func refresh() async {
+        if let inFlight = refreshTask { return await inFlight.value }
+        let task = Task { await load() }
+        refreshTask = task
+        await task.value
+        refreshTask = nil
+    }
+
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
+
+    private func load() async {
         do {
             connections = try await api.listConnections()
+            if let data = try? JSONEncoder().encode(connections) {
+                defaults.set(data, forKey: Self.connectionsCacheKey)
+            }
             if !hasLoadedConnections { reorderByRecency() }
             hasLoadedConnections = true
             isOffline = false
@@ -403,6 +447,10 @@ final class LiveStore {
                 arrival = Arrival(id: eventID, connectionID: connectionID, senderName: name, kind: .sameMoment)
             }
             sendStates[connectionID] = .sent(eventID: eventID, signal: signal)
+            if !defaults.bool(forKey: Self.reviewAskedKey) {
+                defaults.set(true, forKey: Self.reviewAskedKey)
+                reviewDue = !Self.isUITest
+            }
             play(EffectTrigger(id: eventID, signal: signal), on: connectionID)
             if let updated = try? await api.listConnections() { connections = updated }
             try? await Task.sleep(for: sentDisplayDuration)
@@ -460,6 +508,17 @@ final class LiveStore {
 
     // MARK: Notifications
 
+    @ObservationIgnored private var reportedNotificationStatus: Bool?
+
+    /// Measurement (docs/METRICS.md): tells the server whether notifications
+    /// are on, only when it changes. Nothing else about the device is sent.
+    func reportNotificationStatus(enabled: Bool) async {
+        guard enabled != reportedNotificationStatus, api.isSignedIn else { return }
+        if (try? await api.setNotificationStatus(enabled)) != nil {
+            reportedNotificationStatus = enabled
+        }
+    }
+
     func registerDeviceToken(_ token: String) async {
         guard token != lastRegisteredToken, api.isSignedIn, defaults.bool(forKey: Self.profileKey) else { return }
         if (try? await api.registerDeviceToken(token, environment: AppConfig.pushEnvironment)) != nil {
@@ -476,6 +535,15 @@ final class LiveStore {
         if let sender = connections.first(where: { $0.id == payload.connectionID }) {
             arrival = Arrival(id: payload.eventID, connectionID: sender.id, senderName: sender.otherName,
                               kind: signal == .superPsst ? .superPsst : (payload.sameMoment ? .sameMoment : .signal))
+        }
+    }
+
+    /// A band tapped on the home-screen widget: send that person a Psst, the
+    /// same as tapping their band at home (same pacing and retry rules).
+    func psstFromWidget(_ connectionID: UUID) async {
+        if !connections.contains(where: { $0.id == connectionID }) { await refresh() }
+        if let connection = connections.first(where: { $0.id == connectionID }) {
+            await tap(connection)?.value
         }
     }
 
@@ -519,6 +587,9 @@ final class LiveStore {
         defaults.removeObject(forKey: Self.profileKey)
         defaults.removeObject(forKey: Self.welcomedKey)
         defaults.removeObject(forKey: Self.pinnedOrderKey)
+        defaults.removeObject(forKey: Self.myNameKey)
+        defaults.removeObject(forKey: Self.connectionsCacheKey)
+        myName = nil
         pinnedOrder = []
         recencyOrder = []
         isExistingUser = false

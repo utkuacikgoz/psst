@@ -13,7 +13,7 @@ final class SettingsActions {
     private(set) var unblockError: String?
     private(set) var nameMessage: String?
 
-    func rename(to draft: String, api: any PsstAPI) async -> Bool {
+    func rename(to draft: String, api: any PsstAPI, save: ((String) async throws -> Void)? = nil) async -> Bool {
         guard !isRenaming else { return false }
         let name = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (1...40).contains(name.count) else {
@@ -24,7 +24,7 @@ final class SettingsActions {
         nameMessage = nil
         defer { isRenaming = false }
         do {
-            try await api.setDisplayName(name)
+            if let save { try await save(name) } else { try await api.setDisplayName(name) }
             nameMessage = "Saved. People you're connected with now see \(name)."
             return true
         } catch APIError.offline {

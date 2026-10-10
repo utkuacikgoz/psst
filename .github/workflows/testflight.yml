@@ -1,7 +1,9 @@
 name: TestFlight
 
-# Manual only: builds a signed release pointed at the development backend and
-# uploads it to App Store Connect for TestFlight.
+# Manual only: builds a signed release pointed at the chosen backend and uploads
+# it to App Store Connect for TestFlight (and, from there, App Store release).
+# Production reads SUPABASE_PROJECT_REF_PROD (and SUPABASE_ACCESS_TOKEN_PROD if
+# set); see deploy-backend.yml.
 #
 # Repository secrets needed, besides the backend ones already set:
 #   ASC_KEY_ID      App Store Connect API key ID
@@ -11,6 +13,12 @@ name: TestFlight
 #         SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF (to read the anon key).
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Which backend the build talks to
+        type: choice
+        options: [production, development]
+        default: production
 
 concurrency:
   group: testflight
@@ -20,17 +28,20 @@ jobs:
   upload:
     runs-on: macos-15
     timeout-minutes: 60
+    environment: ${{ inputs.target }}
     env:
+      TARGET: ${{ inputs.target }}
+      PROD_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
       TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
       BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_ACCESS_TOKEN: ${{ inputs.target == 'production' && secrets.SUPABASE_ACCESS_TOKEN_PROD || secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ inputs.target == 'production' && secrets.SUPABASE_PROJECT_REF_PROD || secrets.SUPABASE_PROJECT_REF }}
       BUILD_NUMBER: ${{ github.run_number }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Select Xcode 26
         run: scripts/select_xcode.sh
@@ -42,6 +53,10 @@ jobs:
                       SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF; do
             if [ -z "${!name}" ]; then echo "::error::Secret for $name is not set"; missing=1; fi
           done
+          if [ "$TARGET" = production ] && [ -z "$PROD_REF" ]; then
+            echo "::error::SUPABASE_PROJECT_REF_PROD is not set; a production build must not point at development."
+            missing=1
+          fi
           exit $missing
 
       - name: Write the App Store Connect key
@@ -56,7 +71,64 @@ jobs:
           chmod 600 "$KEY_PATH"
           echo "KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
-      - name: Point the build at the development backend
+      # Asks App Store Connect directly, so a revoked or mismatched key fails
+      # here with Apple's own answer instead of as a signing error later.
+      - name: Check the App Store Connect key
+        run: |
+          python3 -m venv "$RUNNER_TEMP/asc" && "$RUNNER_TEMP/asc/bin/pip" install -q pyjwt cryptography
+          "$RUNNER_TEMP/asc/bin/python" - <<'EOF'
+          import json, os, time, urllib.error, urllib.request
+          import jwt
+          token = jwt.encode(
+              {"iss": os.environ["ASC_ISSUER_ID"], "iat": int(time.time()), "exp": int(time.time()) + 600,
+               "aud": "appstoreconnect-v1"},
+              open(os.environ["KEY_PATH"]).read(), algorithm="ES256",
+              headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"})
+          request = urllib.request.Request("https://api.appstoreconnect.apple.com/v1/apps?limit=1",
+                                           headers={"Authorization": f"Bearer {token}"})
+          try:
+              urllib.request.urlopen(request, timeout=30)
+              print("App Store Connect accepted the key.")
+          except urllib.error.HTTPError as error:
+              detail = json.loads(error.read() or b"{}").get("errors", [{}])[0]
+              print(f"::error::App Store Connect refused the key ({error.code} {detail.get('code')}): "
+                    f"{detail.get('detail')} Check that ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8 all belong "
+                    "to one active key in App Store Connect → Users and Access → Integrations.")
+              raise SystemExit(1)
+
+          # The App IDs Xcode will sign, and the capabilities each has. Xcode
+          # can't add capabilities with an API key, so they must exist already.
+          needs = {"app": ["PUSH_NOTIFICATIONS", "APP_GROUPS", "ASSOCIATED_DOMAINS"], "widget": ["APP_GROUPS"]}
+          missing = False
+          for role, identifier in (("app", os.environ["BUNDLE_ID"]), ("widget", os.environ["BUNDLE_ID"] + ".widget")):
+              url = ("https://api.appstoreconnect.apple.com/v1/bundleIds?filter[identifier]="
+                     f"{identifier}&include=bundleIdCapabilities&limit=5")
+              body = json.load(urllib.request.urlopen(
+                  urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"}), timeout=30))
+              exact = [b for b in body["data"] if b["attributes"]["identifier"] == identifier]
+              if not exact:
+                  print(f"::error::The {role} App ID ({role == 'widget' and 'your bundle ID + .widget' or 'your bundle ID'}) "
+                        "isn't registered. Add it in developer.apple.com → Identifiers.")
+                  missing = True
+                  continue
+              ids = {r["id"] for r in exact[0]["relationships"]["bundleIdCapabilities"].get("data", [])}
+              have = sorted(i["attributes"]["capabilityType"] for i in body.get("included", []) if i["id"] in ids)
+              lacking = [c for c in needs[role] if c not in have]
+              print(f"{role} App ID: registered; capabilities {', '.join(have) or 'none'}")
+              if lacking:
+                  print(f"::error::The {role} App ID is missing: {', '.join(lacking)}. Tick them in developer.apple.com → Identifiers.")
+                  missing = True
+
+          # Remember the certificates that exist now, so the last step can
+          # revoke only the ones this run's Xcode creates.
+          certs = urllib.request.Request("https://api.appstoreconnect.apple.com/v1/certificates?limit=200",
+                                         headers={"Authorization": f"Bearer {token}"})
+          before = [c["id"] for c in json.load(urllib.request.urlopen(certs, timeout=30))["data"]]
+          json.dump(before, open(os.path.join(os.environ["RUNNER_TEMP"], "certs-before.json"), "w"))
+          raise SystemExit(1 if missing else 0)
+          EOF
+
+      - name: Point the build at the ${{ inputs.target }} backend
         run: |
           # One Management API call instead of installing the Supabase CLI.
           ANON=$(curl -sf -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
@@ -73,16 +145,9 @@ jobs:
           PSST_SUPABASE_HOST = $SUPABASE_PROJECT_REF.supabase.co
           PSST_SUPABASE_ANON_KEY = $ANON
           DEVELOPMENT_TEAM = $TEAM_ID
-          PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID
+          PSST_APP_BUNDLE_ID = $BUNDLE_ID
           CODE_SIGN_ENTITLEMENTS = Config/Psst.entitlements
           EOF
-
-      - name: Unit tests
-        run: |
-          UDID=$(python3 scripts/pick_simulators.py any)
-          set -o pipefail
-          xcodebuild test -project Psst.xcodeproj -scheme Psst \
-            -destination "id=$UDID" -only-testing:PsstTests CODE_SIGNING_ALLOWED=NO
 
       - name: Archive
         run: |
@@ -122,7 +187,35 @@ jobs:
             -authenticationKeyPath "$KEY_PATH" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
-          echo "Uploaded build $BUILD_NUMBER. It appears in TestFlight after Apple finishes processing (usually 5–30 minutes)."
+          echo "Uploaded build $BUILD_NUMBER ($TARGET backend). It appears in TestFlight after Apple finishes processing (usually 5–30 minutes)."
+
+      # Every run is a fresh Mac, so Xcode makes new signing certificates each
+      # time and Apple's small per-account limit fills up. Revoke only the ones
+      # this run made (not in the snapshot above); uploaded builds aren't affected.
+      - name: Revoke this run's certificates
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/certs-before.json" ] || { echo "No snapshot; nothing to revoke."; exit 0; }
+          "$RUNNER_TEMP/asc/bin/python" - <<'EOF'
+          import json, os, time, urllib.request
+          import jwt
+          token = jwt.encode(
+              {"iss": os.environ["ASC_ISSUER_ID"], "iat": int(time.time()), "exp": int(time.time()) + 600,
+               "aud": "appstoreconnect-v1"},
+              open(os.environ["KEY_PATH"]).read(), algorithm="ES256",
+              headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"})
+          auth = {"Authorization": f"Bearer {token}"}
+          before = set(json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "certs-before.json"))))
+          now = json.load(urllib.request.urlopen(urllib.request.Request(
+              "https://api.appstoreconnect.apple.com/v1/certificates?limit=200", headers=auth), timeout=30))["data"]
+          for cert in now:
+              if cert["id"] in before:
+                  continue
+              urllib.request.urlopen(urllib.request.Request(
+                  f"https://api.appstoreconnect.apple.com/v1/certificates/{cert['id']}", method="DELETE", headers=auth),
+                  timeout=30)
+              print(f"Revoked the {cert['attributes'].get('certificateType')} certificate this run made.")
+          EOF
 
       - name: Remove the key
         if: always()

@@ -33,6 +33,8 @@ struct ArrivalView: View {
     private var holdTime: Duration {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-PsstUITestLive") && ProcessInfo.processInfo.arguments.contains("superArrival") { return .seconds(30) }
+        // App Store screenshot runs hold each moment so it can be captured.
+        if ProcessInfo.processInfo.arguments.contains("-PsstUITestHoldMoments") { return .seconds(8) }
         #endif
         if arrival.kind == .sameMoment { return Self.sameMomentTime }
         return arrival.total == nil ? Self.displayTime : Self.queuedTime
@@ -108,7 +110,7 @@ struct ArrivalView: View {
         VStack(spacing: Tokens.Space.l) {
             if arrival.kind == .signal || arrival.kind == .superPsst {
                 Text("FROM")
-                    .font(.subheadline.weight(.bold))
+                    .font(.psst(.subheadline, weight: .bold))
                     .tracking(Tokens.Band.labelTracking * 2)
             }
             Text(name.uppercased())
@@ -127,7 +129,7 @@ struct ArrivalView: View {
                     .opacity(0.9)
             } else {
                 Text("IS IN")
-                    .font(.system(size: psstSize * 0.8, weight: .heavy))
+                    .font(.psst(size: psstSize * 0.8, weight: .heavy))
                     .tracking(Tokens.Band.titleTracking)
                     .opacity(0.9)
             }
@@ -148,7 +150,7 @@ struct ArrivalView: View {
         }
         .overlay {
             Text("SAME MOMENT")
-                .font(.system(size: labelSize, weight: .heavy))
+                .font(.psst(size: labelSize, weight: .heavy))
                 .tracking(Tokens.Band.titleTracking / 2)
                 .foregroundStyle(Color.ink)
                 .lineLimit(1)

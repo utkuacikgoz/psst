@@ -57,13 +57,13 @@ struct InviteSheet: View {
     private var header: some View {
         HStack {
             Text("psst")
-                .font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy))
+                .font(.psst(size: Tokens.Band.wordmarkSize, weight: .heavy))
                 .tracking(Tokens.Band.wordmarkTracking)
             Spacer()
             Button(mode == .choose ? "Cancel" : "Back") {
                 if mode == .choose { dismiss() } else { withAnimation { mode = .choose } }
             }
-            .font(.body.weight(.semibold))
+            .font(.psst(.body, weight: .semibold))
             .frame(minHeight: Tokens.minTouch)
         }
         .padding(.horizontal, Tokens.Space.xl)
@@ -94,7 +94,7 @@ struct InviteSheet: View {
                     .bandTitle(title, size: bandTitleSize, tracking: Tokens.Band.titleTracking)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
-                    .font(.subheadline.weight(.medium))
+                    .font(.psst(.subheadline, weight: .medium))
             }
             .multilineTextAlignment(.center)
             .padding(Tokens.Space.xl)
@@ -115,7 +115,7 @@ struct InviteSheet: View {
         VStack(spacing: 0) {
             VStack(spacing: Tokens.Space.m) {
                 Text("YOUR CODE")
-                    .font(.subheadline.weight(.bold))
+                    .font(.psst(.subheadline, weight: .bold))
                     .tracking(Tokens.Band.labelTracking * 2)
                 if let invite {
                     Text(dynamicTypeSize.isAccessibilitySize ? "\(invite.code.prefix(4))\n\(invite.code.suffix(4))" : invite.displayCode)
@@ -124,12 +124,12 @@ struct InviteSheet: View {
                         .textSelection(.enabled)
                         .accessibilityLabel("Invite code \(invite.code.map(String.init).joined(separator: " "))")
                     Text("Works once · expires \(invite.expiresAt.formatted(date: .abbreviated, time: .omitted))")
-                        .font(.subheadline.weight(.medium))
+                        .font(.psst(.subheadline, weight: .medium))
                 } else if let createError {
                     Label(createError, systemImage: "exclamationmark.circle")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.psst(.subheadline, weight: .semibold))
                     Button("Try again", action: create)
-                        .font(.body.weight(.semibold))
+                        .font(.psst(.body, weight: .semibold))
                         .frame(minHeight: Tokens.minTouch)
                 } else {
                     ProgressView().tint(.white)
@@ -146,7 +146,7 @@ struct InviteSheet: View {
                     message: Text("I want to be able to psst you. Tap to join me (code \(invite.code)).")
                 ) {
                     Label("Share invite", systemImage: "square.and.arrow.up")
-                        .font(.body.weight(.semibold))
+                        .font(.psst(.body, weight: .semibold))
                         .foregroundStyle(Color.ink)
                         .frame(maxWidth: .infinity, minHeight: Tokens.Band.barMinHeight)
                         .background(Color.surface)
@@ -179,7 +179,7 @@ struct InviteSheet: View {
         VStack(spacing: 0) {
             VStack(spacing: Tokens.Space.m) {
                 Text("THEIR CODE")
-                    .font(.subheadline.weight(.bold))
+                    .font(.psst(.subheadline, weight: .bold))
                     .tracking(Tokens.Band.labelTracking * 2)
                 TextField("", text: $code, prompt: Text("ABCDEFGH").foregroundStyle(Color.onCanvasSecondary))
                     .font(.system(.title2, design: .monospaced).weight(.bold))
@@ -195,12 +195,12 @@ struct InviteSheet: View {
 
                 if let preview {
                     Text(Self.message(for: preview.status, name: preview.inviterName ?? "them"))
-                        .font(.body.weight(.semibold))
+                        .font(.psst(.body, weight: .semibold))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let enterError {
                     Label(enterError, systemImage: "exclamationmark.circle")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.psst(.subheadline, weight: .semibold))
                 }
             }
             .multilineTextAlignment(.center)
@@ -223,7 +223,7 @@ struct InviteSheet: View {
                 Text(title).opacity(busy ? 0 : 1)
                 if busy { ProgressView().tint(Color.ink) }
             }
-            .font(.body.weight(.semibold))
+            .font(.psst(.body, weight: .semibold))
             .foregroundStyle(Color.ink)
             .padding(.horizontal, Tokens.Space.xl)
             .padding(.vertical, Tokens.Space.s)

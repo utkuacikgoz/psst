@@ -28,7 +28,25 @@ final class Purchases {
 
     @ObservationIgnored private var updates: Task<Void, Never>?
 
+    /// The price to show: the App Store's, or a sample in screenshot runs.
+    var displayPrice: String? { product?.displayPrice ?? Self.sampleUITestPrice }
+
+    #if DEBUG
+    /// Screenshot runs have no App Store connection: -PsstUITestPlusPrice shows
+    /// a sample price, and -PsstUITestPlusUnlocked shows the unlocked sheet.
+    private static let sampleUITestPrice: String? =
+        ProcessInfo.processInfo.arguments.contains("-PsstUITestPlusPrice") ? "$2.99" : nil
+    private static let uiTestUnlocked = ProcessInfo.processInfo.arguments.contains("-PsstUITestPlusUnlocked")
+    #else
+    private static let sampleUITestPrice: String? = nil
+    private static let uiTestUnlocked = false
+    #endif
+
     init() {
+        if Self.uiTestUnlocked {
+            isUnlocked = true
+            return
+        }
         updates = Task { [weak self] in
             for await update in StoreKit.Transaction.updates {
                 await self?.handle(update)
@@ -113,8 +131,10 @@ final class Purchases {
 final class Personalization {
     static let colorsKey = "psst.plus.bandColors"
 
-    /// The eight band colours on offer (BC1), the default palette first.
-    static let palette: [UInt32] = [0x5F61AE, 0xAC3E68, 0x2476AA, 0x187F69, 0xB34F2B, 0x8A6500, 0x2B2B38, 0xC2185B]
+    /// The band colours on offer (BC1), the default palette first. All keep
+    /// white names readable (3:1 or better for band-size text).
+    static let palette: [UInt32] = [0x5F61AE, 0xAC3E68, 0x2476AA, 0x187F69, 0xB34F2B, 0x8A6500, 0x2B2B38, 0xC2185B,
+                                    0x1F4E8C, 0x2E6B3A, 0x0E6E78, 0xA22B3A]
 
     /// Alternate app icons: display name and asset name (nil is the default).
     static let icons: [(title: String, name: String?, preview: UInt32)] = [
@@ -135,7 +155,11 @@ final class Personalization {
 
     /// Someone's band colour: your choice if you made one, else the usual one.
     func color(for id: UUID, name: String) -> Color {
-        colors[id].map { Color(hex: $0) } ?? .personBand(name)
+        Color(hex: colorHex(for: id, name: name))
+    }
+
+    func colorHex(for id: UUID, name: String) -> UInt32 {
+        colors[id] ?? Color.personBandHex(name)
     }
 
     func setColor(_ hex: UInt32?, for id: UUID) {

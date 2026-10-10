@@ -31,6 +31,7 @@ struct PsstPlusSheet: View {
                     perk("Choose each person's colour", symbol: "paintpalette.fill", tint: 0xAC3E68)
                     perk("Alternate app icons", symbol: "app.fill", tint: 0x2476AA)
                     perk("Choose your whisper sound", symbol: "speaker.wave.2.fill", tint: 0x187F69)
+                    perk("Home Screen and Lock Screen widgets", symbol: "rectangle.grid.1x2.fill", tint: 0xB87500)
                 }
 
                 if purchases.isUnlocked {
@@ -70,12 +71,12 @@ struct PsstPlusSheet: View {
 
     @ViewBuilder private var buySection: some View {
         Section {
-            if let product = purchases.product {
+            if let price = purchases.displayPrice {
                 Button {
                     Task { await purchases.buy(accountID: store.api.accountID) }
                 } label: {
                     ZStack {
-                        Text("Unlock for \(product.displayPrice)")
+                        Text("Unlock for \(price)")
                             .opacity(purchases.state == .purchasing ? 0 : 1)
                         if purchases.state == .purchasing { ProgressView().tint(.white) }
                     }
@@ -103,6 +104,10 @@ struct PsstPlusSheet: View {
                     EmptyView()
                 }
                 Text("Pssting, replies and invites are always free. Super Pssts keep pacing limits, and recipients control their sounds and effects.")
+                HStack(spacing: Tokens.Space.m) {
+                    Link("Terms of use", destination: AppConfig.termsURL)
+                    Link("Privacy policy", destination: AppConfig.privacyURL)
+                }
             }
         }
     }
@@ -161,6 +166,7 @@ private struct SoundSection: View {
     static let choiceKey = "psst.plus.sound"
     static let sounds: [(title: String, file: String)] = [
         ("Whisper", "psst.wav"), ("Soft", "psst-soft.wav"), ("Quick", "psst-quick.wav"),
+        ("Double", "psst-double.wav"), ("Low", "psst-low.wav"), ("Long", "psst-long.wav"),
     ]
 
     @Environment(LiveStore.self) private var store
@@ -267,6 +273,6 @@ struct ColourSheet: View {
         }
         .tint(Color.psstCanvas)
         .environment(\.colorScheme, .light)
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 }

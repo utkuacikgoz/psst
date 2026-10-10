@@ -1,16 +1,34 @@
-name: Deploy backend (development)
+name: Deploy backend
 
-# Manual only: deploying changes a live service.
-# Repository secrets needed (Settings → Secrets and variables → Actions):
+# Manual only: deploying changes a live service. Choose the target when running.
+#
+# Repository secrets (Settings → Secrets and variables → Actions) serve development:
 #   SUPABASE_ACCESS_TOKEN   personal access token from supabase.com/dashboard/account/tokens
 #   SUPABASE_PROJECT_REF    the xxxx in xxxx.supabase.co (development project)
 #   SUPABASE_DB_PASSWORD    that project's database password
 #   APNS_TEAM_ID, APNS_KEY_ID, APNS_BUNDLE_ID, APNS_PRIVATE_KEY (full .p8 contents)
+# Production uses its own secrets, with a _PROD suffix, as repository secrets or
+# on the "production" environment (which can also require an approval):
+#   SUPABASE_PROJECT_REF_PROD, SUPABASE_DB_PASSWORD_PROD   (required)
+#   SUPABASE_ACCESS_TOKEN_PROD   (only if production is in another Supabase account)
+# A production run never falls back to the development project. The APNs key is
+# shared: APNs itself separates sandbox and production device tokens.
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Which backend to deploy
+        type: choice
+        options: [development, production]
+        default: development
+      purchase_environment:
+        description: Apple purchase environment (Sandbox for TestFlight)
+        type: choice
+        options: [Sandbox, Production]
+        default: Sandbox
 
 concurrency:
-  group: deploy-backend-development
+  group: deploy-backend-${{ inputs.target }}
   cancel-in-progress: false
 
 jobs:
@@ -20,13 +38,17 @@ jobs:
   deploy:
     needs: tests
     runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
     timeout-minutes: 20
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      TARGET: ${{ inputs.target }}
+      SUPABASE_ACCESS_TOKEN: ${{ inputs.target == 'production' && secrets.SUPABASE_ACCESS_TOKEN_PROD || secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ inputs.target == 'production' && secrets.SUPABASE_PROJECT_REF_PROD || secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_DB_PASSWORD: ${{ inputs.target == 'production' && secrets.SUPABASE_DB_PASSWORD_PROD || secrets.SUPABASE_DB_PASSWORD }}
+      PROD_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+      PROD_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check that every secret is set
         env:
@@ -38,8 +60,14 @@ jobs:
           missing=0
           for name in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF SUPABASE_DB_PASSWORD \
                       APNS_TEAM_ID APNS_KEY_ID APNS_BUNDLE_ID APNS_PRIVATE_KEY; do
-            if [ -z "${!name}" ]; then echo "::error::Repository secret $name is not set"; missing=1; fi
+            if [ -z "${!name}" ]; then echo "::error::Secret $name is not set for ${{ inputs.target }}"; missing=1; fi
           done
+          # Production must never fall back to the development project.
+          if [ "$TARGET" = production ]; then
+            if [ -z "$PROD_REF" ]; then echo "::error::SUPABASE_PROJECT_REF_PROD is not set"; missing=1; fi
+            if [ -z "$PROD_PASSWORD" ]; then echo "::error::SUPABASE_DB_PASSWORD_PROD is not set"; missing=1; fi
+          fi
+          echo "Deploying to $TARGET."
           # Accept the whole .p8 file or just its base64 body; reject anything else.
           body=$(sed '/-----/d' <<<"$APNS_PRIVATE_KEY" | tr -d ' \r\n\t')
           if ! [[ "$body" =~ ^[A-Za-z0-9+/]+=*$ ]] || [ ${#body} -lt 150 ] || [ ${#body} -gt 400 ]; then
@@ -74,6 +102,20 @@ jobs:
             APNS_BUNDLE_ID="$APNS_BUNDLE_ID" \
             APNS_PRIVATE_KEY="$pem" > /dev/null
           echo "Secrets set (values not printed)."
+
+      - name: Configure verified Psst+ purchases
+        env:
+          PURCHASE_ENVIRONMENT: ${{ inputs.purchase_environment }}
+          APNS_BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/purchases"
+          "$RUNNER_TEMP/purchases/bin/pip" install -q pyjwt cryptography
+          "$RUNNER_TEMP/purchases/bin/python" scripts/configure_purchase_verification.py "$RUNNER_TEMP/purchases.env"
+          supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" --env-file "$RUNNER_TEMP/purchases.env" > /dev/null
+          rm -f "$RUNNER_TEMP/purchases.env"
 
       - name: Deploy functions
         run: |

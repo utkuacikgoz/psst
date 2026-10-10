@@ -34,7 +34,9 @@ final class FakeAPI: PsstAPI {
         renamedNames.append(name)
         if let renameError { throw renameError }
     }
+    var listCalls = 0
     func listConnections() async throws -> [ConnectionSummary] {
+        listCalls += 1
         if let listError { throw listError }
         return connections
     }
@@ -69,6 +71,8 @@ final class FakeAPI: PsstAPI {
         if let revokeError { throw revokeError }
     }
     func setNotificationSound(_ file: String) async throws {}
+    var reportedStatuses: [Bool] = []
+    func setNotificationStatus(_ enabled: Bool) async throws { reportedStatuses.append(enabled) }
     func registerDeviceToken(_ token: String, environment: String) async throws {}
     func deleteAccount() async throws { isSignedIn = false }
     func signOutLocally() { isSignedIn = false }
@@ -123,6 +127,42 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(restarted.phase, .ready)
     }
 
+    func testPeopleFromLastTimeShowAtLaunchAndAreForgottenOnDelete() async throws {
+        api.isSignedIn = false
+        try await store.createProfile(name: "Sam")
+        api.connections = [connection(name: "Mia"), connection(name: "Zoe")]
+        await store.refresh()
+
+        // A relaunch shows them before any request finishes.
+        let relaunched = LiveStore(api: api, defaults: defaults)
+        XCTAssertEqual(relaunched.orderedConnections.map(\.otherName).sorted(), ["Mia", "Zoe"])
+        XCTAssertFalse(relaunched.hasLoadedConnections, "Still refreshes from the server")
+
+        try await store.deleteAccount()
+        XCTAssertTrue(LiveStore(api: api, defaults: defaults).connections.isEmpty)
+    }
+
+    func testOverlappingRefreshesShareOneRequest() async {
+        api.connections = [connection()]
+        async let first: Void = store.refresh()
+        async let second: Void = store.refresh()
+        _ = await (first, second)
+        XCTAssertEqual(api.listCalls, 1)
+        XCTAssertEqual(store.connections.count, 1)
+    }
+
+    func testYourNameIsKeptOnThisPhoneAndForgottenOnDelete() async throws {
+        api.isSignedIn = false
+        try await store.createProfile(name: "Sam")
+        XCTAssertEqual(store.myName, "Sam")
+        try await store.rename(to: "Sammy")
+        XCTAssertEqual(LiveStore(api: api, defaults: defaults).myName, "Sammy", "Survives a relaunch")
+
+        try await store.deleteAccount()
+        XCTAssertNil(store.myName)
+        XCTAssertNil(LiveStore(api: api, defaults: defaults).myName)
+    }
+
     func testInviteLinkBeforeOnboardingLeadsWithTheInviterThenAccepts() async throws {
         api.isSignedIn = false
         await store.start()
@@ -137,6 +177,13 @@ final class LiveStoreTests: XCTestCase {
         await store.acceptIntroInvite() // idempotent with the one finish started
         XCTAssertNil(store.invitedBy)
         XCTAssertNil(store.pendingInviteCode)
+    }
+
+    func testNotificationStatusIsReportedOnlyWhenItChanges() async {
+        await store.reportNotificationStatus(enabled: true)
+        await store.reportNotificationStatus(enabled: true)
+        await store.reportNotificationStatus(enabled: false)
+        XCTAssertEqual(api.reportedStatuses, [true, false])
     }
 
     func testExpiredSessionReturnsToName() async throws {
@@ -160,6 +207,24 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(store.effects[ada.id]?.signal, .psst)
         XCTAssertEqual(store.effects[ada.id]?.id, api.sentEventIDs.first)
         XCTAssertNil(store.sendStates[ada.id], "Sent clears after its display time")
+    }
+
+    func testRatingIsDueOnceAfterTheFirstAcceptedPsst() async {
+        let ada = connection()
+        api.connections = [ada]
+        api.sendError = APIError.offline
+        await store.tap(ada)?.value
+        XCTAssertFalse(store.reviewDue, "A failed send isn't a successful Psst")
+
+        api.sendError = nil
+        clock += 5
+        await store.tap(ada)?.value
+        XCTAssertTrue(store.reviewDue)
+
+        store.reviewDue = false
+        clock += 5
+        await store.tap(ada)?.value
+        XCTAssertFalse(store.reviewDue, "Asked only once")
     }
 
     func testTapsDuringASendAreIgnored() async {
@@ -523,7 +588,11 @@ final class LiveParsingTests: XCTestCase {
 
     func testInviteLinks() {
         XCTAssertEqual(InviteLink.code(from: URL(string: "psst://invite/abcd-efgh")!), "ABCDEFGH")
-        XCTAssertEqual(CreatedInvite(code: "ABCDEFGH", expiresAt: Date()).link.absoluteString, "psst://invite/ABCDEFGH")
+        XCTAssertEqual(CreatedInvite(code: "ABCDEFGH", expiresAt: Date()).link.absoluteString, "https://psstapp.fun/invite/ABCDEFGH")
+        XCTAssertEqual(InviteLink.code(from: URL(string: "https://psstapp.fun/invite/k7qx4mpa")!), "K7QX4MPA")
+        XCTAssertEqual(InviteLink.code(from: URL(string: "https://www.psstapp.fun/invite/K7QX-4MPA")!), "K7QX4MPA")
+        XCTAssertNil(InviteLink.code(from: URL(string: "https://psstapp.fun/privacy")!))
+        XCTAssertNil(InviteLink.code(from: URL(string: "https://example.com/invite/ABCD")!))
         XCTAssertEqual(CreatedInvite(code: "ABCDEFGH", expiresAt: Date()).displayCode, "ABCD EFGH")
         XCTAssertNil(InviteLink.code(from: URL(string: "psst://other/ABCD")!))
         XCTAssertNil(InviteLink.code(from: URL(string: "https://invite/ABCD")!))
@@ -561,5 +630,38 @@ final class PsstPlusTests: XCTestCase {
 
         reloaded.setColor(nil, for: ada)
         XCTAssertNil(Personalization(defaults: defaults).colors[ada])
+    }
+}
+
+@MainActor
+final class WidgetTests: XCTestCase {
+    func testWidgetLinks() {
+        let id = UUID()
+        guard case .psst(let parsed)? = WidgetLink(URL(string: "psst://psst/\(id.uuidString)")!) else {
+            return XCTFail("psst link")
+        }
+        XCTAssertEqual(parsed, id)
+        guard case .plus? = WidgetLink(URL(string: "psst://plus")!) else { return XCTFail("plus link") }
+        XCTAssertNil(WidgetLink(URL(string: "psst://psst/not-a-uuid")!))
+        XCTAssertNil(WidgetLink(URL(string: "psst://invite/ABCDEFGH")!), "invites are handled elsewhere")
+    }
+
+    func testWidgetGetsTheFirstThreePeopleAndOnlyChangesOnChange() throws {
+        let suite = "WidgetTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let people = ["Zoe", "Mia", "Ava", "Lily"].map {
+            ConnectionSummary(connectionId: UUID(), otherId: UUID(), otherName: $0, lastEventId: nil, lastFromMe: nil,
+                              lastEffect: nil, lastCreatedAt: nil, lastSeenAt: nil, unseenCount: 0)
+        }
+        let shown = WidgetBridge.people(from: people) { _, name in name == "Mia" ? 0xC2185B : 0x2476AA }
+        XCTAssertEqual(shown.map(\.name), ["Zoe", "Mia", "Ava"])
+        XCTAssertEqual(shown[1].color, 0xC2185B)
+
+        WidgetBridge.publish(shown, unlocked: true, to: defaults)
+        let stored = try JSONDecoder().decode([WidgetBridge.Person].self,
+                                              from: XCTUnwrap(defaults.data(forKey: WidgetBridge.peopleKey)))
+        XCTAssertEqual(stored, shown)
+        XCTAssertTrue(defaults.bool(forKey: WidgetBridge.unlockedKey))
     }
 }

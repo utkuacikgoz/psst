@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 import UserNotifications
 
@@ -10,7 +11,7 @@ struct LiveRootView: View {
             case .loading:
                 // Matches the launch screen, so startup has no visible jump.
                 Text("psst")
-                    .font(.system(size: 84, weight: .heavy))
+                    .font(.psst(size: 84, weight: .heavy))
                     .foregroundStyle(Color.onCanvas)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.psstCanvas.ignoresSafeArea())
@@ -52,9 +53,9 @@ struct InvitedIntroView: View {
                     .bandTitle(inviter, size: nameSize, tracking: Tokens.Band.titleTracking)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("wants to psst you")
-                    .font(.title3.weight(.semibold))
+                    .font(.psst(.title3, weight: .semibold))
                 Text("First, what should \(inviter) call you?")
-                    .font(.body)
+                    .font(.psst(.body))
                     .padding(.top, Tokens.Space.xl)
             }
             .multilineTextAlignment(.center)
@@ -77,6 +78,7 @@ struct LiveHomeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.requestReview) private var requestReview
 
     @State private var showingFeatureIntro = false
     @State private var superPerson: ConnectionSummary?
@@ -89,6 +91,17 @@ struct LiveHomeView: View {
     @State private var colouring: ConnectionSummary?
     @State private var notificationsOff = false
     @ScaledMetric(relativeTo: .largeTitle) private var firstInviteTitleSize: CGFloat = 40
+
+    private func loadingPeople(minHeight: CGFloat) -> some View {
+        VStack(spacing: Tokens.Space.m) {
+            ProgressView().tint(Color.onCanvas).controlSize(.large)
+            Text(store.isOffline ? "Waiting for a connection…" : "Loading your people…")
+                .font(.psst(.subheadline, weight: .semibold))
+        }
+        .foregroundStyle(Color.onCanvas)
+        .frame(maxWidth: .infinity, minHeight: minHeight)
+        .accessibilityElement(children: .combine)
+    }
 
     private var anySheet: Bool {
         showingFeatureIntro || superPerson != nil || showingInvite || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
@@ -107,6 +120,9 @@ struct LiveHomeView: View {
                         if store.connections.isEmpty {
                             if store.hasLoadedConnections {
                                 firstInviteBand(minHeight: Self.bandHeight(available: proxy.size.height, people: 0))
+                            } else {
+                                // First launch on this phone: nothing remembered yet.
+                                loadingPeople(minHeight: Self.bandHeight(available: proxy.size.height, people: 0))
                             }
                         } else {
                             // Yo classic (H2): people and the + band share the screen
@@ -165,11 +181,30 @@ struct LiveHomeView: View {
             updateVisibility()
             // A code that arrived before home existed (e.g. during onboarding).
             if store.pendingInviteCode != nil { showingInvite = true }
+            if store.plusRequested { showingPlus = true; store.plusRequested = false }
         }
         .onChange(of: store.hasLoadedConnections) { showDesignPreviewIfRequested() }
         .onDisappear { store.isHomeVisible = false }
         .onChange(of: anySheet) { updateVisibility() }
         .onChange(of: scenePhase) { updateVisibility() }
+        // After the first accepted Psst, once its "sent" has shown and nothing
+        // else is on screen. Apple decides whether the prompt actually appears.
+        .task(id: store.reviewDue && store.arrival == nil && !anySheet && scenePhase == .active) {
+            guard store.reviewDue, store.arrival == nil, !anySheet, scenePhase == .active else { return }
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            store.reviewDue = false
+            requestReview()
+        }
+        .onChange(of: store.plusRequested) { _, requested in
+            if requested { showingPlus = true; store.plusRequested = false }
+        }
+        // Keep the home-screen widget's people, colours and Psst+ state current.
+        .task(id: widgetSignature) {
+            WidgetBridge.publish(
+                WidgetBridge.people(from: store.orderedConnections) { personalization.colorHex(for: $0, name: $1) },
+                unlocked: purchases.isUnlocked)
+        }
         .onChange(of: store.pendingInviteCode) { _, code in
             if code != nil { showingInvite = true }
         }
@@ -199,6 +234,12 @@ struct LiveHomeView: View {
         #endif
     }
 
+    private var widgetSignature: String {
+        let people = store.orderedConnections.prefix(3)
+            .map { "\($0.id)|\($0.otherName)|\(personalization.colorHex(for: $0.id, name: $0.otherName))" }
+        return people.joined(separator: ",") + "|\(purchases.isUnlocked)"
+    }
+
     /// Settings, and Psst+ beside it (PP2): always there, never in the way.
     private var settingsButton: some View {
         HStack(spacing: Tokens.Space.l) {
@@ -221,7 +262,7 @@ struct LiveHomeView: View {
             .foregroundStyle(Color(hex: 0xFFD27A))
             .accessibilityHint(purchases.isUnlocked ? "Your Super Pssts, colours, icons and sounds." : "An optional one-time unlock.")
         }
-        .font(.subheadline.weight(.semibold))
+        .font(.psst(.subheadline, weight: .semibold))
         .frame(maxWidth: .infinity)
     }
 
@@ -238,6 +279,8 @@ struct LiveHomeView: View {
     private func updateNotificationStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         notificationsOff = settings.authorizationStatus == .denied
+        await store.reportNotificationStatus(enabled: settings.authorizationStatus == .authorized
+                                             || settings.authorizationStatus == .provisional)
         if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
             UIApplication.shared.registerForRemoteNotifications()
         }
@@ -310,7 +353,7 @@ struct LiveHomeView: View {
                     .bandTitle("Invite your first person", size: firstInviteTitleSize, tracking: Tokens.Band.titleTracking)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("They'll appear here as a band")
-                    .font(.subheadline.weight(.medium))
+                    .font(.psst(.subheadline, weight: .medium))
             }
             .multilineTextAlignment(.center)
             .foregroundStyle(Color.onCanvas)
@@ -477,12 +520,12 @@ struct NoticeView: View {
             Spacer(minLength: 0)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .font(.subheadline.weight(.bold))
+                    .font(.psst(.subheadline, weight: .bold))
                     .underline()
                     .frame(minHeight: Tokens.minTouch)
             }
         }
-        .font(.subheadline.weight(.semibold))
+        .font(.psst(.subheadline, weight: .semibold))
         .foregroundStyle(Color.onCanvas)
         .padding(.horizontal, Tokens.Space.xl)
         .padding(.vertical, Tokens.Space.s)
@@ -511,7 +554,7 @@ struct CoachOverlay: View {
                 Text("Hold for Super Psst")
                     .font(.body.weight(.medium))
                 Text("Tap anywhere to start")
-                    .font(.footnote.weight(.semibold))
+                    .font(.psst(.footnote, weight: .semibold))
                     .opacity(0.8)
                     .padding(.top, Tokens.Space.l)
             }

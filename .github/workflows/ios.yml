@@ -1,130 +1,77 @@
-name: iOS build and tests
+name: iOS
 
-# Unit tests run on pushes to main and on pull requests that touch the app.
-# Screenshots are costly (four simulator runs), so they run only when asked
-# for (Actions → iOS build and tests → Run workflow).
+# Unit tests: on pushes to main that touch the app, and on pull requests.
+# Screenshots: only when run by hand (Actions → iOS → Run workflow). One job,
+# one phone; the images replace the single commit on the `screenshots` branch.
 on:
   push:
     branches: [main]
-    paths:
-      - "Psst/**"
-      - "PsstTests/**"
-      - "PsstUITests/**"
-      - "Psst.xcodeproj/**"
-      - "Config/**"
-      - "scripts/select_xcode.sh"
-      - "scripts/pick_simulators.py"
-      - "scripts/export_screenshots.py"
-      - ".github/workflows/ios.yml"
+    paths: ["Psst/**", "PsstTests/**", "Psst.xcodeproj/**", "Config/**", ".github/workflows/ios.yml"]
   pull_request:
-    paths:
-      - "Psst/**"
-      - "PsstTests/**"
-      - "PsstUITests/**"
-      - "Psst.xcodeproj/**"
-      - "Config/**"
-      - "scripts/select_xcode.sh"
-      - "scripts/pick_simulators.py"
-      - "scripts/export_screenshots.py"
-      - ".github/workflows/ios.yml"
+    paths: ["Psst/**", "PsstTests/**", "PsstUITests/**", "Psst.xcodeproj/**", "Config/**"]
   workflow_dispatch:
+    inputs:
+      tests:
+        description: "UI tests to capture (e.g. PsstUITests/AppStoreScreenshotTests/testPsstPlusUnlocked)"
+        default: PsstUITests/AppStoreScreenshotTests
+      text_size:
+        description: Text size
+        type: choice
+        options: [standard, largest]
+        default: standard
 
-# One iOS run per branch at a time: a newer push or manual run cancels the
-# older one, so macOS runners never stack up.
 concurrency:
-  group: ios-${{ github.ref }}
+  group: ios-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   unit-tests:
-    # A manual run is for screenshots; its UI-test shards build the app anyway.
     if: github.event_name != 'workflow_dispatch'
     runs-on: macos-15
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - name: Select Xcode 26
-        run: scripts/select_xcode.sh
-      - name: Build and run unit tests
+      - uses: actions/checkout@v5
+      - run: scripts/select_xcode.sh
+      - name: Unit tests
         run: |
-          UDID=$(python3 scripts/pick_simulators.py any)
           set -o pipefail
-          xcodebuild test \
-            -project Psst.xcodeproj -scheme Psst \
-            -destination "id=$UDID" \
-            -only-testing:PsstTests \
-            CODE_SIGNING_ALLOWED=NO
+          xcodebuild test -project Psst.xcodeproj -scheme Psst \
+            -destination "id=$(python3 scripts/pick_simulators.py any)" \
+            -only-testing:PsstTests CODE_SIGNING_ALLOWED=NO
 
-  # One shard per phone and text size, in parallel.
   screenshots:
     if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        phone: [compact, large]
-        size: ["large:standard", "accessibility-extra-extra-extra-large:ax-xxxl"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Select Xcode 26
-        run: scripts/select_xcode.sh
-      - name: Capture screenshots
-        run: |
-          set -o pipefail
-          SIZE="${{ matrix.size }}"
-          UDID=$(python3 scripts/pick_simulators.py "${{ matrix.phone }}")
-          xcrun simctl boot "$UDID" || true
-          xcrun simctl bootstatus "$UDID" -b
-          xcrun simctl ui "$UDID" content_size "${SIZE%%:*}"
-          status=0
-          TEST_RUNNER_PSST_SIZE_LABEL="${SIZE##*:}" xcodebuild test \
-            -project Psst.xcodeproj -scheme Psst \
-            -destination "id=$UDID" \
-            -only-testing:PsstUITests \
-            -resultBundlePath results.xcresult \
-            CODE_SIGNING_ALLOWED=NO || status=1
-          # Export whatever was captured, even if a later step failed.
-          python3 scripts/export_screenshots.py results.xcresult screenshots || true
-          # Small JPEG review copies; the PNGs are discarded.
-          mkdir -p review
-          for f in screenshots/*.png; do
-            [ -e "$f" ] || continue
-            name=$(basename "${f%.png}" | tr ' ' '-' | tr -d '()')
-            sips -s format jpeg -s formatOptions 70 --resampleWidth 540 "$f" --out "review/$name.jpg" >/dev/null \
-              || echo "::warning::Skipped unreadable image $f"
-          done
-          exit $status
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: review-${{ matrix.phone }}-${{ strategy.job-index }}
-          path: review
-          if-no-files-found: warn
-          retention-days: 1
-
-  # Replaces the single commit on the `screenshots` branch, so old images never
-  # pile up in history or on main.
-  publish-screenshots:
-    needs: screenshots
-    if: always() && github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: review-*
-          path: review
-          merge-multiple: true
-      - name: Force-push the screenshots branch
+      - uses: actions/checkout@v5
+      - run: scripts/select_xcode.sh
+      - name: Capture
         run: |
-          [ -d review ] && [ -n "$(ls -A review)" ] || { echo "No screenshots to publish."; exit 0; }
-          cd review
+          set -o pipefail
+          UDID=$(python3 scripts/pick_simulators.py large)
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          [ "${{ inputs.text_size }}" = largest ] && size=accessibility-extra-extra-extra-large || size=large
+          xcrun simctl ui "$UDID" content_size "$size"
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 \
+            --wifiBars 3 --cellularMode active --cellularBars 4 --operatorName ""
+          status=0
+          TEST_RUNNER_PSST_SIZE_LABEL="${{ inputs.text_size }}" xcodebuild test \
+            -project Psst.xcodeproj -scheme Psst -destination "id=$UDID" \
+            -only-testing:"${{ inputs.tests }}" \
+            -resultBundlePath results.xcresult CODE_SIGNING_ALLOWED=NO || status=1
+          python3 scripts/export_screenshots.py results.xcresult shots || true
+          exit $status
+      - name: Publish to the screenshots branch
+        if: always()
+        run: |
+          [ -n "$(ls shots/*.png 2>/dev/null)" ] || { echo "No screenshots."; exit 0; }
+          cd shots
           git init -q -b screenshots
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -q -m "Screenshots for ${GITHUB_SHA::7} [skip ci]"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" screenshots
+          git add -A && git commit -q -m "Screenshots for ${GITHUB_SHA::7} [skip ci]"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" screenshots

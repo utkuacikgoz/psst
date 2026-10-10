@@ -23,6 +23,7 @@ struct SettingsSheet: View {
         // Option S3: the standard grouped iPhone list.
         NavigationStack {
             Form {
+                // ED1: you, as your people see you.
                 Section {
                     HStack {
                         TextField("New name", text: $name)
@@ -63,9 +64,21 @@ struct SettingsSheet: View {
                 }
 
                 Section {
-                    Button("Open notification settings") {
-                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
-                            UIApplication.shared.open(url)
+                    if notificationStatus == .notDetermined {
+                        // "Not now" at first launch: iOS has no switch for Psst
+                        // until it has asked once, so ask here.
+                        Button("Turn on notifications") {
+                            Task {
+                                _ = await NotificationPermission.ask()
+                                notificationStatus = await UNUserNotificationCenter.current()
+                                    .notificationSettings().authorizationStatus
+                            }
+                        }
+                    } else {
+                        Button("Open notification settings") {
+                            if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
                         }
                     }
                 } header: {
@@ -150,8 +163,11 @@ struct SettingsSheet: View {
                     Text("Psst stores your name, connections, the last 30 days of signals and daily allowances, and your notification token. Psst+ also keeps a purchase record for verification. It doesn't read your contacts or location.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    Link("Privacy policy", destination: AppConfig.privacyURL)
+                    Link("Terms of use", destination: AppConfig.termsURL)
+                    Link("Help and support", destination: AppConfig.supportURL)
                 } header: {
-                    Text("Privacy")
+                    Text("Privacy and help")
                 }
 
                 Section {
@@ -207,14 +223,14 @@ struct SettingsSheet: View {
         case .denied:
             "Off. Signals still appear when you open Psst."
         default:
-            "Not set up yet."
+            "Off. You chose Not now when you started; turn them on to hear when someone pssts you."
         }
     }
 
     private func rename() {
         let draft = name
         Task {
-            if await actions.rename(to: draft, api: store.api), name == draft { name = "" }
+            if await actions.rename(to: draft, api: store.api, save: { try await store.rename(to: $0) }), name == draft { name = "" }
         }
     }
 
@@ -238,5 +254,44 @@ struct SettingsSheet: View {
             }
             isDeleting = false
         }
+    }
+}
+
+/// ED1: the top of Settings. Your band in your colour, and one way to change it.
+private struct YouBand: View {
+    let name: String?
+    let onEdit: () -> Void
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 40
+
+    var body: some View {
+        VStack(spacing: Tokens.Space.s) {
+            Text("YOU")
+                .font(.psst(.caption, weight: .bold))
+                .tracking(Tokens.Band.labelTracking * 2)
+                .accessibilityHidden(true)
+            if let name {
+                Text(name.uppercased())
+                    .bandTitle(name, size: titleSize, tracking: Tokens.Band.titleTracking)
+                    .multilineTextAlignment(.center)
+                    .accessibilityLabel("Your name: \(name)")
+            } else {
+                Text("Add the name your people see.")
+                    .font(.psst(.subheadline, weight: .semibold))
+                    .multilineTextAlignment(.center)
+            }
+            Button(action: onEdit) {
+                Text(name == nil ? "Add your name" : "Edit name")
+                    .font(.psst(.subheadline, weight: .bold))
+                    .padding(.horizontal, Tokens.Space.l)
+                    .padding(.vertical, Tokens.Space.s)
+                    .background(Capsule().fill(Color.white.opacity(0.22)))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, Tokens.Space.xs)
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Tokens.Space.l)
+        .padding(.horizontal, Tokens.Space.m)
     }
 }

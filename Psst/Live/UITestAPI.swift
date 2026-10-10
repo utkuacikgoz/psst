@@ -14,6 +14,8 @@ final class UITestAPI: PsstAPI {
         case features
         case returning
         case superArrival
+        /// The tour's people, already signed in, for App Store screenshots.
+        case store
     }
 
     static let defaultsSuite = "psst.uitest"
@@ -35,6 +37,11 @@ final class UITestAPI: PsstAPI {
             defaults.set(true, forKey: LiveStore.superHintKey)
             if scenario != .returning { defaults.set(true, forKey: LiveStore.featureIntroKey) }
         }
+        if scenario == .store {
+            defaults.set(true, forKey: LiveStore.coachKey)
+            defaults.set(true, forKey: LiveStore.superHintKey)
+            defaults.set(true, forKey: LiveStore.featureIntroKey)
+        }
         return LiveStore(api: UITestAPI(scenario: scenario), defaults: defaults)
     }
 
@@ -53,11 +60,11 @@ final class UITestAPI: PsstAPI {
     init(scenario: Scenario) {
         isSignedIn = scenario != .tour
         guard scenario != .empty else { return }
-        names = [ada: "Ada", emre: "Emre", sam: "Sam"]
+        names = scenario == .store ? [ada: "Mia", emre: "Zoe", sam: "Ava"] : [ada: "Ada", emre: "Emre", sam: "Sam"]
         last = [ada: (false, .psst, false), emre: (true, .psst, true)]
         lastDates = [ada: Date().addingTimeInterval(scenario == .tour ? 0 : -720),
                      emre: Date().addingTimeInterval(-90000)]
-        unseen = [UnseenSignal(id: UUID(), connectionId: ada, senderId: UUID(), senderName: "Ada",
+        unseen = [UnseenSignal(id: UUID(), connectionId: ada, senderId: UUID(), senderName: names[ada] ?? "Ada",
                                effectId: scenario == .superArrival ? Signal.superPsst.rawValue : Signal.psst.rawValue, createdAt: Date())]
     }
 
@@ -83,7 +90,7 @@ final class UITestAPI: PsstAPI {
         unseen.removeAll { ids.contains($0.id) }
     }
 
-    /// Emre's sends take a moment (to show "Sending…"). Sam's first fails as if
+    /// Zoe's sends take a moment (to show "Sending…"). Ava's first fails as if
     /// offline; the next hits the pacing limit.
     func sendSignal(eventID: UUID, connectionID: UUID, signal: Signal) async throws -> SendResult {
         if connectionID == sam {
@@ -100,7 +107,7 @@ final class UITestAPI: PsstAPI {
         }
         lastDates[connectionID] = Date()
         last[connectionID] = (true, signal, false)
-        // Ada pssted just before, so answering her is a same moment.
+        // Mia pssted just before, so answering her is a same moment.
         return SendResult(id: eventID, createdAt: Date(), pushStatus: "accepted", duplicate: false,
                           sameMoment: connectionID == ada)
     }
@@ -126,11 +133,11 @@ final class UITestAPI: PsstAPI {
     }
 
     func previewInvite(code: String) async throws -> InvitePreview {
-        InvitePreview(status: .pending, inviterName: "Kim")
+        InvitePreview(status: .pending, inviterName: "Lily")
     }
 
     func acceptInvite(code: String) async throws -> AcceptedInvite {
-        names[kim] = "Kim"
+        names[kim] = "Lily"
         return AcceptedInvite(status: "accepted", connectionId: kim)
     }
 
@@ -145,6 +152,7 @@ final class UITestAPI: PsstAPI {
     }
     func revokeInvite(code: String) async throws { openInvites.removeAll { $0 == code } }
     func setNotificationSound(_ file: String) async throws {}
+    func setNotificationStatus(_ enabled: Bool) async throws {}
     func registerDeviceToken(_ token: String, environment: String) async throws {}
     func deleteAccount() async throws { isSignedIn = false }
     func signOutLocally() { isSignedIn = false }

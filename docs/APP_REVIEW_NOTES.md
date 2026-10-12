@@ -171,10 +171,10 @@ Psst+ (in-app purchase "psstplus.unlock", non-consumable): home → "Psst+" next
 Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
 ```
 
-Psst+ in-app purchase description (App Store Connect → In-App Purchases → psstplus.unlock → localization):
+Psst+ in-app purchase description, max 55 characters (App Store Connect → In-App Purchases → psstplus.unlock → localization):
 
 ```
-Unlimited Super Psst, your own band colours, app icons, whisper sounds and widgets. One purchase, yours for good.
+Unlimited Super Psst, colours, icons, sounds, widgets
 ```
 
 App Privacy (App Store Connect → App Privacy), add to what's already declared:

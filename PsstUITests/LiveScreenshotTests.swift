@@ -28,8 +28,9 @@ final class LiveScreenshotTests: XCTestCase {
         shot("live-02-notifications")
         notNow.tap()
 
-        XCTAssertTrue(app.buttons["Mia"].waitForExistence(timeout: 10))
         // Mia's unseen Psst opens the full-screen arrival, which clears itself.
+        // While it shows, VoiceOver (and so this test) can't reach the bands behind it.
+        XCTAssertTrue(app.buttons["Psst from Mia"].waitForExistence(timeout: 10))
         wait(0.4)
         shot("live-03-arrival")
         wait(2.2)

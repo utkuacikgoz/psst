@@ -120,3 +120,63 @@ Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "
 
 Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
 ```
+
+---
+
+## 1.0.3
+
+Submit build **1.0.3 (22)**. Choose **Manually release this version**: keep the backend's purchase environment on Sandbox during review (App Review buys with sandbox accounts), then redeploy with Production and release.
+
+Before submitting, create two fresh review codes for the Psst Team profile:
+
+```sql
+insert into public.invites (code, inviter_id, expires_at)
+select v.code, p.id, now() + interval '30 days'
+from public.profiles p, (values ('PSSTWAVE'), ('PSSTHERE')) as v(code)
+where p.display_name = 'Psst Team';
+```
+
+What's New in This Version:
+
+```
+Super Psst: tap ✦ on someone's band (or hold it) for a bigger, cheekier Psst. One free every day, unlimited with Psst+.
+Your leaderboard: who you psst most and who pssts you, all time or this month. Only you can see it.
+Get a notification when someone accepts your invite, and join with "I have a code" and Paste.
+Plus a new "ps-st" vibration, a bolder look, clearer sent and seen, and fewer false "Offline" warnings.
+```
+
+Notes for the reviewer:
+
+```
+Psst lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
+
+What's new in 1.0.3:
+- Super Psst: tap the ✦ in the corner of a band (or hold the band) to open the Super Psst sheet, then "Send Super Psst". Everyone gets one free Super Psst per day; Psst+ makes them unlimited. Recipients can turn Super effects off in Settings.
+- Settings → Your Psst activity: a private leaderboard (all time / this month). Only the account owner sees it.
+- The person who shared an invite gets a notification when it's accepted.
+- Home shows "I have a code" when you have no one yet; code entry has a Paste button.
+
+To try it with a real person (our team):
+1. Open the app, enter any name, and choose whether to allow notifications.
+2. On home, tap "I have a code" and enter:  PSSTWAVE
+   (backup code, if the first was already used:  PSSTHERE)
+3. Tap Connect. A band for "Psst Team" appears on home.
+4. Tap the band to send a Psst; tap ✦ for a Super Psst. We'll psst you back within a few minutes during review hours. If both of you psst within 10 seconds, both phones show SAME MOMENT.
+5. Long-press a notification to use "Psst back" without opening the app.
+
+Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. Settings → Delete account removes all server data immediately.
+
+Psst+ (in-app purchase "psstplus.unlock", non-consumable): home → "Psst+" next to Settings → Unlock. It adds unlimited Super Psst, per-person band colours, alternate app icons, whisper sounds and Home Screen / Lock Screen widgets. "Restore purchase" is on the same sheet. The purchase is verified with Apple's App Store Server API. Pssting, replies and invites are free.
+
+Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
+```
+
+Psst+ in-app purchase description (App Store Connect → In-App Purchases → psstplus.unlock → localization):
+
+```
+Unlimited Super Psst, your own band colours, app icons, whisper sounds and widgets. One purchase, yours for good.
+```
+
+App Privacy (App Store Connect → App Privacy), add to what's already declared:
+- Purchases → Purchase History: App Functionality, linked to the user, not used for tracking (purchase verification record).
+- Usage Data → Product Interaction: App Functionality, linked to the user, not used for tracking (daily Super Psst allowance; the leaderboard's two counts per connection).

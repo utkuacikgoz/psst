@@ -135,6 +135,7 @@ final class Purchases {
 @Observable
 final class Personalization {
     static let colorsKey = "psst.plus.bandColors"
+    static let slotsKey = "psst.usualBandSlots"
 
     /// The band colours on offer (BC1), the default palette first. All keep
     /// white names readable (3:1 or better for band-size text).

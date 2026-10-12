@@ -154,7 +154,8 @@ private struct PlusPreview: View {
                 }
             }
             HStack(spacing: Tokens.Space.m) {
-                ForEach(Personalization.icons, id: \.title) { icon in
+                ForEach(Personalization.icons.indices, id: \.self) { index in
+                    let icon = Personalization.icons[index]
                     Text("psst")
                         .font(.psst(size: 11, weight: .heavy))
                         .foregroundStyle(.white)

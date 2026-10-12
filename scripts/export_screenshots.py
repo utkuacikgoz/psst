@@ -17,10 +17,13 @@ count = 0
 for test in manifest:
     for item in test.get("attachments", []):
         name = item.get("suggestedHumanReadableName") or item["exportedFileName"]
-        # Only our named screenshots ("device · size · step"); XCTest adds its own
-        # attachments (logs, failure captures) that aren't part of the review set.
-        if " · " not in name or not item["exportedFileName"].lower().endswith((".png", ".jpg", ".jpeg")):
+        if not item["exportedFileName"].lower().endswith((".png", ".jpg", ".jpeg")):
             continue
+        if " · " not in name:
+            # Not one of our "device · size · step" shots: other tests' shots and
+            # XCTest's own capture at a failure, kept under "other" for diagnosis.
+            test_name = test.get("testIdentifier", "test").split("/")[-1].replace("()", "")
+            name = "other · " + test_name + "-" + name
         name = re.sub(r"_\d+_[0-9A-F-]{36}", "", name)  # drop xcresult suffix
         name = re.sub(r"[^\w.·() -]+", "_", name).replace(" · ", "__")
         if not name.endswith(".png"):

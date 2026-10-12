@@ -53,16 +53,22 @@ def main():
             'exp': int(time.time()) + 600, 'aud': 'appstoreconnect-v1', 'bid': bundle},
             iap_pem, algorithm='ES256', headers={'kid': iap_id, 'typ': 'JWT'})
         host = 'api.storekit-sandbox.itunes.apple.com' if environment == 'Sandbox' else 'api.storekit.itunes.apple.com'
-        # Read a nonexistent test-notification status: authenticated keys return
-        # Not Found; this does not send a notification or modify any transaction.
-        probe = urllib.request.Request('https://' + host + '/inApps/v1/notifications/test/' + str(uuid.uuid4()),
+        # Read a nonexistent test-notification status (token shaped like Apple's,
+        # "<uuid>_<milliseconds>"). This sends nothing and changes no transaction.
+        # Only 401/403 mean the key was refused; 400/404 come after authentication.
+        token_id = str(uuid.uuid4()) + '_' + str(int(time.time() * 1000))
+        probe = urllib.request.Request('https://' + host + '/inApps/v1/notifications/test/' + token_id,
             headers={'Authorization': 'Bearer ' + iap_token})
         try:
             urllib.request.urlopen(probe, timeout=30).close()
+            print('In-App Purchase key authenticated with Apple transaction API.')
         except urllib.error.HTTPError as error:
-            if error.code != 404:
+            if error.code in (401, 403):
                 raise ValueError('App Store Server API key check failed (HTTP ' + str(error.code) + ')') from None
-        print('In-App Purchase key authenticated with Apple transaction API.')
+            if error.code in (400, 404):
+                print('In-App Purchase key authenticated with Apple transaction API.')
+            else:
+                print('::warning::Apple answered HTTP ' + str(error.code) + '; the In-App Purchase key could not be confirmed now.')
     else:
         iap_id = iap_issuer = ''
         print('::warning::In-App Purchase key is missing. Unlimited Super Psst verification stays unavailable; the daily free allowance works.')

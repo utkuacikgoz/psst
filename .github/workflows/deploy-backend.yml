@@ -118,7 +118,7 @@ jobs:
           "$RUNNER_TEMP/purchases/bin/pip" install -q pyjwt cryptography
           "$RUNNER_TEMP/purchases/bin/python" scripts/configure_purchase_verification.py "$RUNNER_TEMP/purchases.env"
           if [ -z "$IAP_KEY_ID" ] || [ -z "$IAP_ISSUER_ID" ] || [ -z "$IAP_KEY_P8" ]; then
-            supabase secrets unset APP_STORE_KEY_ID APP_STORE_ISSUER_ID APP_STORE_PRIVATE_KEY --project-ref "$SUPABASE_PROJECT_REF" --yes > /dev/null
+            supabase secrets unset APP_STORE_KEY_ID APP_STORE_ISSUER_ID APP_STORE_PRIVATE_KEY --project-ref "$SUPABASE_PROJECT_REF" --yes > /dev/null || true
           fi
           supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" --env-file "$RUNNER_TEMP/purchases.env" > /dev/null
           rm -f "$RUNNER_TEMP/purchases.env"

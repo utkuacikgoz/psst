@@ -8,6 +8,8 @@ struct PsstPlusSheet: View {
     @Environment(Purchases.self) private var purchases
     @Environment(LiveStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @State private var restoreMessage: String?
+    @State private var restoring = false
 
     var body: some View {
         NavigationStack {
@@ -91,8 +93,19 @@ struct PsstPlusSheet: View {
             } else {
                 HStack { Spacer(); ProgressView(); Spacer() }
             }
-            Button("Restore purchase") { Task { await purchases.restore() } }
-                .frame(maxWidth: .infinity)
+            Button(restoring ? "Restoring…" : "Restore purchase") {
+                restoring = true
+                restoreMessage = nil
+                Task {
+                    // A failure already shows the App Store's reason below.
+                    if await purchases.restore() {
+                        restoreMessage = purchases.isUnlocked ? "Psst+ restored." : "No Psst+ purchase found for this Apple Account."
+                    }
+                    restoring = false
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .disabled(restoring)
         } footer: {
             VStack(alignment: .leading, spacing: Tokens.Space.s) {
                 switch purchases.state {
@@ -103,13 +116,20 @@ struct PsstPlusSheet: View {
                 default:
                     EmptyView()
                 }
+                if let restoreMessage { Text(restoreMessage) }
                 Text("Pssting, replies and invites are always free. Super Pssts keep pacing limits, and recipients control their sounds and effects.")
-                HStack(spacing: Tokens.Space.m) {
-                    Link("Terms of use", destination: AppConfig.termsURL)
-                    Link("Privacy policy", destination: AppConfig.privacyURL)
+                // Side by side when they fit; stacked at very large text sizes.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Tokens.Space.m) { legalLinks }
+                    VStack(alignment: .leading, spacing: Tokens.Space.s) { legalLinks }
                 }
             }
         }
+    }
+
+    @ViewBuilder private var legalLinks: some View {
+        Link("Terms of use", destination: AppConfig.termsURL)
+        Link("Privacy policy", destination: AppConfig.privacyURL)
     }
 }
 
@@ -251,7 +271,7 @@ struct ColourSheet: View {
                                 .aspectRatio(1, contentMode: .fit)
                                 .overlay(Circle().stroke(Color.ink, lineWidth: selected ? 3 : 0).padding(-5))
                         }
-                        .accessibilityLabel("Colour \(Personalization.palette.firstIndex(of: hex)! + 1)")
+                        .accessibilityLabel(Personalization.colourNames[hex] ?? "Colour")
                         .accessibilityAddTraits(selected ? .isSelected : [])
                     }
                 }

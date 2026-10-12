@@ -65,8 +65,14 @@ extension Color {
     static let superControl = Color(hex: 0x4D2868)
     /// Main text on canvas.
     static let onCanvas = Color.white
-    /// Secondary text on the purple canvas.
-    static let onCanvasSecondary = Color.white.opacity(0.82)
+    /// Secondary text on the purple canvas. Solid white with Increase Contrast.
+    static let onCanvasSecondary = Color(UIColor { traits in
+        traits.accessibilityContrast == .high ? .white : UIColor.white.withAlphaComponent(0.82)
+    })
+    /// Softer white for small labels on bands. Solid white with Increase Contrast.
+    static let onBandSoft = Color(UIColor { traits in
+        traits.accessibilityContrast == .high ? .white : UIColor.white.withAlphaComponent(0.9)
+    })
 
     /// Raised person surface and sheets.
     static let surface = Color.white
@@ -113,11 +119,20 @@ extension Text {
 /// License, Psst/Fonts/OFL-InterTight.txt) and registered in Config/Info.plist.
 enum PsstFont {
     static func name(for weight: Font.Weight) -> String {
-        switch weight {
+        // Bold Text: the custom face doesn't thicken on its own, so step it up.
+        switch UIAccessibility.isBoldTextEnabled ? bolder(weight) : weight {
         case .black, .heavy: "InterTight-Black"
         case .bold: "InterTight-Bold"
         case .semibold: "InterTight-SemiBold"
         default: "InterTight-Medium"
+        }
+    }
+
+    private static func bolder(_ weight: Font.Weight) -> Font.Weight {
+        switch weight {
+        case .black, .heavy, .bold: .black
+        case .semibold: .bold
+        default: .semibold
         }
     }
 

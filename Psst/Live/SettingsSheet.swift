@@ -3,6 +3,7 @@ import UserNotifications
 
 struct SettingsSheet: View {
     @Environment(LiveStore.self) private var store
+    @Environment(Purchases.self) private var purchases
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("psst.hapticsEnabled") private var hapticsEnabled = true
@@ -18,6 +19,9 @@ struct SettingsSheet: View {
     @State private var deleteError: String?
     @State private var managing: ConnectionSummary?
     @State private var confirming: ConnectionAction?
+    @State private var superPerson: ConnectionSummary?
+    @State private var colouring: ConnectionSummary?
+    @State private var showingPlus = false
 
     var body: some View {
         // Option S3: the standard grouped iPhone list.
@@ -112,7 +116,7 @@ struct SettingsSheet: View {
                 } header: {
                     Text("People")
                 } footer: {
-                    Text("Home puts whoever you pssted most recently first. Hold and drag a band to place someone yourself.")
+                    Text("Tap someone for Super Psst, colour, remove, block or report. Home puts whoever you pssted most recently first. Hold and drag a band to place someone yourself.")
                 }
 
                 // PI2: invites nobody has used yet, each cancellable.
@@ -207,9 +211,13 @@ struct SettingsSheet: View {
             actions.blocked = await blocked ?? []
             actions.openInvites = await invites ?? []
         }
-        .manageConnection(menuFor: $managing, confirming: $confirming) {
+        .manageConnection(menuFor: $managing, confirming: $confirming, onDone: {
             Task { actions.blocked = (try? await store.api.listBlocked()) ?? actions.blocked }
-        }
+        }, onSuper: { superPerson = $0 },
+           onColour: { if purchases.isUnlocked { colouring = $0 } else { showingPlus = true } })
+        .sheet(item: $superPerson) { SuperPsstSheet(connection: $0) }
+        .sheet(item: $colouring) { ColourSheet(connection: $0) }
+        .sheet(isPresented: $showingPlus) { PsstPlusSheet() }
         .confirmationDialog("Delete your account?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete account", role: .destructive, action: deleteAccount)
             Button("Cancel", role: .cancel) {}

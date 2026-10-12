@@ -103,6 +103,8 @@ struct LiveHomeView: View {
         .accessibilityElement(children: .combine)
     }
 
+    private var showsCoach: Bool { store.showsCoach && store.hasLoadedConnections && !anySheet }
+
     private var anySheet: Bool {
         showingFeatureIntro || superPerson != nil || showingInvite || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
     }
@@ -142,10 +144,11 @@ struct LiveHomeView: View {
                 .pinnedFooter(!dynamicTypeSize.isAccessibilitySize, inset: inset) { settingsButton }
             }
         }
-        .accessibilityHidden(anySheet)
+        // Behind a sheet, an arrival or the tip, VoiceOver can't reach (and tap-send) the bands.
+        .accessibilityHidden(anySheet || store.arrival != nil || showsCoach)
         .background(Color.psstCanvas.ignoresSafeArea())
         .overlay {
-            if store.showsCoach && store.hasLoadedConnections && !anySheet {
+            if showsCoach {
                 CoachOverlay { withAnimation { store.dismissCoach() } }
             }
         }
@@ -213,7 +216,9 @@ struct LiveHomeView: View {
         .sheet(item: $superPerson) { SuperPsstSheet(connection: $0) }
         .sheet(isPresented: $showingInvite) { InviteSheet() }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
-        .manageConnection(menuFor: $managing, confirming: $confirming)
+        .manageConnection(menuFor: $managing, confirming: $confirming,
+                          onSuper: { superPerson = $0 },
+                          onColour: { if purchases.isUnlocked { colouring = $0 } else { showingPlus = true } })
         .sheet(isPresented: $showingPlus) { PsstPlusSheet() }
         .sheet(item: $colouring) { ColourSheet(connection: $0) }
     }
@@ -360,7 +365,7 @@ struct LiveHomeView: View {
             .foregroundStyle(Color.onCanvas)
             .padding(Tokens.Space.xl)
             .frame(maxWidth: .infinity, minHeight: minHeight)
-            .background(Color.addBand)
+            .background(Color.inviteGold)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -556,7 +561,7 @@ struct CoachOverlay: View {
                     .font(.body.weight(.medium))
                 Text("Tap anywhere to start")
                     .font(.psst(.footnote, weight: .semibold))
-                    .opacity(0.8)
+                    .foregroundStyle(Color.onCanvasSecondary)
                     .padding(.top, Tokens.Space.l)
             }
             .multilineTextAlignment(.center)
@@ -571,7 +576,7 @@ struct CoachOverlay: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Tip: tap a band to send a Psst. Hold for Super Psst, colours, moving or managing people.")
         .accessibilityHint("Dismisses the tip.")
-        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits([.isButton, .isModal])
         .task {
             guard !reduceMotion else { return }
             while !Task.isCancelled {

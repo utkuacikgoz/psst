@@ -87,13 +87,18 @@ final class Purchases {
     }
 
     /// Restore purchase: asks the App Store to sync, then re-reads entitlements.
-    func restore() async {
+    /// Returns false when the App Store couldn't be reached (the reason is in `state`).
+    @discardableResult
+    func restore() async -> Bool {
         do {
             try await AppStore.sync()
         } catch {
             state = .failed("Couldn't reach the App Store. Try again in a moment.")
+            await refreshEntitlement()
+            return false
         }
         await refreshEntitlement()
+        return true
     }
 
     private func handle(_ result: VerificationResult<StoreKit.Transaction>) async {
@@ -135,6 +140,12 @@ final class Personalization {
     /// white names readable (3:1 or better for band-size text).
     static let palette: [UInt32] = [0x5F61AE, 0xAC3E68, 0x2476AA, 0x187F69, 0xB34F2B, 0x8A6500, 0x2B2B38, 0xC2185B,
                                     0x1F4E8C, 0x2E6B3A, 0x0E6E78, 0xA22B3A]
+    /// What VoiceOver calls each palette colour.
+    static let colourNames: [UInt32: String] = [
+        0x5F61AE: "Indigo", 0xAC3E68: "Rose", 0x2476AA: "Blue", 0x187F69: "Emerald",
+        0xB34F2B: "Rust", 0x8A6500: "Ochre", 0x2B2B38: "Charcoal", 0xC2185B: "Raspberry",
+        0x1F4E8C: "Navy", 0x2E6B3A: "Forest", 0x0E6E78: "Teal", 0xA22B3A: "Crimson",
+    ]
 
     /// Alternate app icons: display name and asset name (nil is the default).
     static let icons: [(title: String, name: String?, preview: UInt32)] = [

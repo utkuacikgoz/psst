@@ -49,12 +49,18 @@ struct ArrivalView: View {
     @AppStorage("psst.superEffectsEnabled") private var superEffectsEnabled = true
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @Environment(\.accessibilitySwitchControlEnabled) private var switchControl
     @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = 70
     @ScaledMetric(relativeTo: .largeTitle) private var psstSize: CGFloat = Tokens.Band.titleSize
     @ScaledMetric(relativeTo: .title) private var labelSize: CGFloat = 26
     @State private var trigger: UUID?
 
     private var name: String { arrival.senderName }
+
+    /// People using VoiceOver, Switch Control or very large text need time to read
+    /// and act, so the moment waits for them instead of closing on its own.
+    private var staysOpen: Bool { voiceOver || switchControl || dynamicTypeSize.isAccessibilitySize }
 
     private var announcement: String {
         switch arrival.kind {
@@ -86,11 +92,23 @@ struct ArrivalView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 1.04)))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(announcement)
         .accessibilityHint(hint)
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: "Close", onDone)
+        // Closing without sending anything back, outside the tap-to-reply area.
+        .overlay(alignment: .topTrailing) {
+            Button("Close", systemImage: "xmark", action: onDone)
+                .labelStyle(.iconOnly)
+                .font(.body.weight(.bold))
+                .foregroundStyle(Color.onCanvas)
+                .frame(minWidth: Tokens.minTouch, minHeight: Tokens.minTouch)
+                .contentShape(Rectangle())
+                .padding(Tokens.Space.s)
+        }
+        .accessibilityAddTraits(.isModal)
+        .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 1.04)))
         .sensoryFeedback(trigger: trigger) { _, _ in
             hapticsEnabled && arrival.kind == .sameMoment ? .success : nil
         }
@@ -101,6 +119,7 @@ struct ArrivalView: View {
             if hapticsEnabled, arrival.kind == .signal || arrival.kind == .superPsst {
                 PsstHaptics.play(arrival.kind == .superPsst && superEffectsEnabled ? .superPsst : .psst)
             }
+            guard !staysOpen else { return }
             try? await Task.sleep(for: holdTime)
             guard !Task.isCancelled else { return }
             onDone()
@@ -127,12 +146,12 @@ struct ArrivalView: View {
                 }
                 Text(arrival.kind == .superPsst ? "Super Psst!" : "Psst!")
                     .font(.system(size: psstSize * 0.8, weight: .heavy))
-                    .opacity(0.9)
+                    .foregroundStyle(Color.onBandSoft)
             } else {
                 Text("IS IN")
                     .font(.psst(size: psstSize * 0.8, weight: .heavy))
                     .tracking(Tokens.Band.titleTracking)
-                    .opacity(0.9)
+                    .foregroundStyle(Color.onBandSoft)
             }
             Text(arrival.kind != .joined ? "\(countPrefix)Tap to psst back" : "Tap to send your first Psst")
                 .font(.subheadline.weight(.medium))

@@ -65,7 +65,7 @@ struct PersonRow: View {
                         if cornerMark == "seen" { Image(systemName: "checkmark") }
                     }
                     .font(.psst(.footnote, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(Color.onBandSoft)
                     .padding(.horizontal, Tokens.Space.l)
                     .padding(.vertical, Tokens.Space.m)
                 }

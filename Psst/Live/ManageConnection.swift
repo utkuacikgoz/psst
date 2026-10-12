@@ -57,6 +57,9 @@ private struct ManageConnectionModifier: ViewModifier {
     @Binding var menuFor: ConnectionSummary?
     @Binding var confirming: ConnectionAction?
     var onDone: () -> Void
+    /// Visible routes to what is otherwise a touch-and-hold (HIG: gestures are never the only way).
+    var onSuper: ((ConnectionSummary) -> Void)?
+    var onColour: ((ConnectionSummary) -> Void)?
 
     @Environment(LiveStore.self) private var store
     @State private var failedName: String?
@@ -69,6 +72,8 @@ private struct ManageConnectionModifier: ViewModifier {
                 titleVisibility: .visible,
                 presenting: menuFor
             ) { connection in
+                if let onSuper { Button("Super Psst…") { afterDialog { onSuper(connection) } } }
+                if let onColour { Button("Colour…") { afterDialog { onColour(connection) } } }
                 ForEach([ConnectionAction.Kind.remove, .block, .report], id: \.self) { kind in
                     let action = ConnectionAction(kind: kind, connection: connection)
                     Button(action.menuTitle, role: kind == .remove ? nil : .destructive) { ask(action) }
@@ -96,10 +101,14 @@ private struct ManageConnectionModifier: ViewModifier {
     }
 
     private func ask(_ action: ConnectionAction) {
-        // Let the action sheet finish dismissing before the alert presents.
+        afterDialog { confirming = action }
+    }
+
+    /// Lets the action sheet finish dismissing before an alert or sheet presents.
+    private func afterDialog(_ next: @escaping () -> Void) {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(350))
-            confirming = action
+            next()
         }
     }
 
@@ -124,7 +133,10 @@ extension View {
     /// context menu item) skips straight to the explanation.
     func manageConnection(menuFor: Binding<ConnectionSummary?>,
                           confirming: Binding<ConnectionAction?>,
-                          onDone: @escaping () -> Void = {}) -> some View {
-        modifier(ManageConnectionModifier(menuFor: menuFor, confirming: confirming, onDone: onDone))
+                          onDone: @escaping () -> Void = {},
+                          onSuper: ((ConnectionSummary) -> Void)? = nil,
+                          onColour: ((ConnectionSummary) -> Void)? = nil) -> some View {
+        modifier(ManageConnectionModifier(menuFor: menuFor, confirming: confirming, onDone: onDone,
+                                          onSuper: onSuper, onColour: onColour))
     }
 }

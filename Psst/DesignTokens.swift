@@ -23,7 +23,7 @@ enum Tokens {
         static let wordmarkTracking: CGFloat = -2
         /// Contact names and received signal titles; scaled with Dynamic Type by callers.
         static let titleSize: CGFloat = 52
-        static let titleTracking: CGFloat = 0
+        static let titleTracking: CGFloat = -1.5
         /// Signal names in the picker.
         static let optionTitleSize: CGFloat = 30
         static let optionTracking: CGFloat = -0.7
@@ -92,23 +92,28 @@ extension Color {
         Color(hex: personBandHex(name))
     }
 
+    /// The usual band colours, in the order new people get them.
+    static let personBandPalette: [UInt32] = [0x2476AA, 0xB34F2B, 0x187F69, 0xAC3E68, 0x5F61AE]
+
+    /// The colour from a person's name, as before 1.0.3. Kept stable so updating
+    /// doesn't recolour people whose colour was already distinct.
     static func personBandHex(_ name: String) -> UInt32 {
         let palette: [UInt32] = [0x2476AA, 0x187F69, 0xB34F2B, 0xAC3E68, 0x5F61AE]
         let seed = name.lowercased().unicodeScalars.reduce(0) { ($0 + Int($1.value)) % palette.count }
         return palette[seed]
     }
-    static let addBand = Color(hex: 0xB87500)
-    /// Gold used behind small white invite text; contrast exceeds 4.5:1.
-    static let inviteGold = Color(hex: 0xA66700)
+    /// The one gold: the + band and the invite sheet. White text on it is 4.6:1.
+    static let addBand = Color(hex: 0xA66700)
+    static let inviteGold = addBand
     /// Shade for the bar that follows a band (opens the picker, never sends).
     static let bandShade = Color.black.opacity(0.15)
 }
 
 extension Text {
-    /// Oversized titles wrap at the requested text size instead of shrinking
-    /// away the user's accessibility setting.
+    /// Names and headlines in Inter Tight Black (DESIGN.md). Oversized titles wrap
+    /// at the requested text size instead of shrinking away the accessibility setting.
     func bandTitle(_ text: String, size: CGFloat, tracking: CGFloat) -> some View {
-        font(.system(size: size, weight: .bold))
+        font(.psst(size: size, weight: .black))
             .tracking(tracking)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)

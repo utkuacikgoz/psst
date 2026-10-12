@@ -67,7 +67,7 @@ struct InviteSheet: View {
                 .font(.psst(size: Tokens.Band.wordmarkSize, weight: .heavy))
                 .tracking(Tokens.Band.wordmarkTracking)
             Spacer()
-            Button(mode == .choose ? "Cancel" : "Back") {
+            Button(mode == .choose ? "Close" : "Back") {
                 if mode == .choose { dismiss() } else { withAnimation { mode = .choose } }
             }
             .font(.psst(.body, weight: .semibold))
@@ -87,7 +87,7 @@ struct InviteSheet: View {
                 withAnimation { mode = .share }
                 if invite == nil { create() }
             }
-            chooserBand(title: "I have a code", subtitle: "Someone sent you one", color: Color(hex: 0x5F61AE)) {
+            chooserBand(title: "I have a code", subtitle: "Someone invited you", color: Color(hex: 0x5F61AE)) {
                 withAnimation { mode = .enter }
                 codeFocused = true
             }

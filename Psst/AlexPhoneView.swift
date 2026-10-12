@@ -53,7 +53,7 @@ struct AlexPhoneView: View {
     private var replyStatusText: String {
         switch exchange.status(for: .alex) {
         case .ready(let signal), .received(let signal): "Tap to \(signal.title.lowercased()) back"
-        case .playedLocally(let signal): "\(signal.title) back · played locally"
+        case .playedLocally(let signal): "\(signal.title) back · demo only"
         case .shownToOther(let signal): "\(signal.title) back · seen in demo"
         case .paused: "Paused briefly. Try again shortly."
         }

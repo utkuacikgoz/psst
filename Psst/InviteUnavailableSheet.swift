@@ -7,7 +7,7 @@ struct InviteUnavailableSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: Tokens.Space.l) {
-                Text("Invitations aren't available in this preview yet. When they are, you'll share a link or code, and you can send signals once both of you accept.")
+                Text("Invites work in the real app. Alex is pretend: nothing here leaves this phone.")
                     .font(.psst(.body))
                     .foregroundStyle(Color.ink)
                     .fixedSize(horizontal: false, vertical: true)

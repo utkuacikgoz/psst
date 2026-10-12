@@ -67,7 +67,7 @@ struct HomeView: View {
     private var statusText: String {
         switch exchange.status(for: .me) {
         case .ready: ""
-        case .playedLocally(let signal): "\(signal.title) · played locally"
+        case .playedLocally(let signal): "\(signal.title) · demo only"
         case .shownToOther(let signal): "\(signal.title) · seen in demo"
         case .received(let signal): "\(signal.title) back from Alex"
         case .paused: "A little breather. Try again shortly."

@@ -129,14 +129,14 @@ struct LiveHomeView: View {
                                 loadingPeople(minHeight: Self.bandHeight(available: proxy.size.height, people: 0))
                             }
                         } else {
-                            // Yo classic (H2): people and the + band share the screen
-                            // equally; with many people each keeps a minimum and scrolls.
+                            // Yo classic (H2): people share the screen above a short + band;
+                            // with many people each keeps a minimum and scrolls.
                             let bandHeight = Self.bandHeight(available: proxy.size.height, people: store.connections.count)
                             // O2: most recent first; drag a band to place it yourself.
                             ForEach(store.orderedConnections) { connection in
                                 row(connection, minHeight: bandHeight)
                             }
-                            addBand(minHeight: bandHeight)
+                            addBand(minHeight: Tokens.Band.addBandMinHeight)
                         }
                         if dynamicTypeSize.isAccessibilitySize { settingsButton }
                     }
@@ -160,7 +160,7 @@ struct LiveHomeView: View {
                             onTap: { withAnimation { store.psstBack(arrival) } },
                             onDone: { withAnimation { store.nextArrival() } },
                             color: arrival.connectionID.map {
-                                personalization.color(for: $0, name: arrival.senderName)
+                                Color(hex: bandColors[$0] ?? personalization.colorHex(for: $0, name: arrival.senderName))
                             })
             }
         }
@@ -180,16 +180,17 @@ struct LiveHomeView: View {
             }
         }
         .onAppear {
-            if store.isExistingUser && !store.featureIntroSeen && store.pendingInviteCode == nil {
-                showingFeatureIntro = true
-            }
+            showFeatureIntroIfDue()
             showDesignPreviewIfRequested()
             updateVisibility()
             // A code that arrived before home existed (e.g. during onboarding).
             if store.pendingInviteCode != nil { showingInvite = true }
             if store.plusRequested { showingPlus = true; store.plusRequested = false }
         }
-        .onChange(of: store.hasLoadedConnections) { showDesignPreviewIfRequested() }
+        .onChange(of: store.hasLoadedConnections) {
+            showDesignPreviewIfRequested()
+            showFeatureIntroIfDue()
+        }
         .onDisappear { store.isHomeVisible = false }
         .onChange(of: anySheet) { updateVisibility() }
         .onChange(of: scenePhase) { updateVisibility() }
@@ -204,6 +205,9 @@ struct LiveHomeView: View {
         }
         .onChange(of: store.plusRequested) { _, requested in
             if requested { showingPlus = true; store.plusRequested = false }
+        }
+        .onChange(of: store.connections.map(\.id), initial: true) {
+            personalization.assignUsualColors(to: store.connections.map { ($0.id, $0.otherName) })
         }
         // Keep the home-screen widget's people, colours and Psst+ state current.
         .task(id: widgetSignature) {
@@ -241,6 +245,19 @@ struct LiveHomeView: View {
         default: break
         }
         #endif
+    }
+
+    /// What's new is for people who had Psst before and have someone to psst.
+    private func showFeatureIntroIfDue() {
+        if store.isExistingUser && !store.featureIntroSeen && store.pendingInviteCode == nil
+            && !store.connections.isEmpty && !anySheet {
+            showingFeatureIntro = true
+        }
+    }
+
+    /// Home's band colours top to bottom, with no two neighbours the same.
+    private var bandColors: [UUID: UInt32] {
+        personalization.bandColors(for: store.orderedConnections.map { ($0.id, $0.otherName) })
     }
 
     private var widgetSignature: String {
@@ -301,7 +318,7 @@ struct LiveHomeView: View {
 
     private var wordmark: some View {
         Text("psst")
-            .font(.system(size: Tokens.Band.wordmarkSize, weight: .heavy))
+            .font(.psst(size: Tokens.Band.wordmarkSize, weight: .heavy))
             .tracking(Tokens.Band.wordmarkTracking)
             .foregroundStyle(Color.onCanvas)
             .accessibilityAddTraits(.isHeader)
@@ -311,7 +328,8 @@ struct LiveHomeView: View {
     /// and the + band, but never below the band minimum.
     static func bandHeight(available: CGFloat, people: Int) -> CGFloat {
         let chrome: CGFloat = 150 // header and Settings footer, approximately
-        let share = (available - chrome) / CGFloat(people + 1)
+        // People get the room; the + band (or "I have a code") keeps a fixed, shorter height.
+        let share = (available - chrome - (people > 0 ? Tokens.Band.addBandMinHeight : 0)) / CGFloat(max(people, 1))
         return max(Tokens.personRowMinHeight, share)
     }
 
@@ -430,7 +448,7 @@ struct LiveHomeView: View {
                 minHeight: minHeight,
                 cornerMark: dynamicTypeSize.isAccessibilitySize ? nil : Self.cornerMark(for: status),
                 isDimmed: Self.isPaused(status),
-                color: personalization.color(for: connection.id, name: connection.otherName),
+                color: Color(hex: bandColors[connection.id] ?? personalization.colorHex(for: connection.id, name: connection.otherName)),
                 exchangeDate: connection.lastCreatedAt,
                 exchangeFromMe: connection.lastFromMe
             )

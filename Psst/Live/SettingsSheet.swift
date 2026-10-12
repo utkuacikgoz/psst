@@ -116,7 +116,7 @@ struct SettingsSheet: View {
                 } header: {
                     Text("People")
                 } footer: {
-                    Text("Tap someone for Super Psst, colour, remove, block or report. Home puts whoever you pssted most recently first. Hold and drag a band to place someone yourself.")
+                    Text("Tap someone for Super Psst, colour, remove, block or report. Hold and drag a band on home to move it.")
                 }
 
                 // PI2: invites nobody has used yet, each cancellable.
@@ -164,7 +164,7 @@ struct SettingsSheet: View {
                 }
 
                 Section {
-                    Text("Psst stores your name, connections, the last 30 days of signals and daily allowances, and your notification token. Psst+ also keeps a purchase record for verification. It doesn't read your contacts or location.")
+                    Text("Psst stores your name, connections, the last 30 days of Pssts and daily allowances, and your notification token. Psst+ also keeps a purchase record for verification. It doesn't read your contacts or location.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Link("Privacy policy", destination: AppConfig.privacyURL)

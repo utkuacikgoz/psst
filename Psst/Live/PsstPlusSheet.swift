@@ -17,7 +17,8 @@ struct PsstPlusSheet: View {
                 Section {
                     VStack(spacing: Tokens.Space.xs) {
                         Text("Psst+")
-                            .font(.largeTitle.weight(.heavy))
+                            .font(.psst(.largeTitle, weight: .black))
+                            .tracking(Tokens.Band.titleTracking)
                             .foregroundStyle(Color.psstCanvas)
                         Text(purchases.isUnlocked ? "Unlocked. Thank you!" : "One purchase. Yours for good.")
                             .font(.subheadline)
@@ -26,14 +27,19 @@ struct PsstPlusSheet: View {
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
                     .accessibilityElement(children: .combine)
+                    if !purchases.isUnlocked {
+                        PlusPreview()
+                            .listRowBackground(Color.clear)
+                    }
                 }
+                .listRowInsets(EdgeInsets(top: 0, leading: Tokens.Space.l, bottom: Tokens.Space.s, trailing: Tokens.Space.l))
 
                 Section {
                     perk("Unlimited Super Pssts", symbol: "sparkles", tint: 0xB87500)
                     perk("Choose each person's colour", symbol: "paintpalette.fill", tint: 0xAC3E68)
                     perk("Alternate app icons", symbol: "app.fill", tint: 0x2476AA)
                     perk("Choose your whisper sound", symbol: "speaker.wave.2.fill", tint: 0x187F69)
-                    perk("Home Screen and Lock Screen widgets", symbol: "rectangle.grid.1x2.fill", tint: 0xB87500)
+                    perk("Home Screen and Lock Screen widgets", symbol: "rectangle.grid.1x2.fill", tint: 0x5F61AE)
                 }
 
                 if purchases.isUnlocked {
@@ -93,6 +99,9 @@ struct PsstPlusSheet: View {
             } else {
                 HStack { Spacer(); ProgressView(); Spacer() }
             }
+        }
+        // Unlock stands alone, so it reads as one whole button.
+        Section {
             Button(restoring ? "Restoring…" : "Restore purchase") {
                 restoring = true
                 restoreMessage = nil
@@ -128,8 +137,36 @@ struct PsstPlusSheet: View {
     }
 
     @ViewBuilder private var legalLinks: some View {
-        Link("Terms of use", destination: AppConfig.termsURL)
-        Link("Privacy policy", destination: AppConfig.privacyURL)
+        Link("Terms of use", destination: AppConfig.termsURL).font(.footnote)
+        Link("Privacy policy", destination: AppConfig.privacyURL).font(.footnote)
+    }
+}
+
+/// Before buying: what the colours and icons actually look like. Display only.
+private struct PlusPreview: View {
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: Tokens.Space.s), count: 6)
+
+    var body: some View {
+        VStack(spacing: Tokens.Space.m) {
+            LazyVGrid(columns: columns, spacing: Tokens.Space.s) {
+                ForEach(Personalization.palette, id: \.self) { hex in
+                    Circle().fill(Color(hex: hex)).frame(width: 28, height: 28)
+                }
+            }
+            HStack(spacing: Tokens.Space.m) {
+                ForEach(Personalization.icons, id: \.title) { icon in
+                    Text("psst")
+                        .font(.psst(size: 11, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Color(hex: icon.preview), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+            }
+        }
+        .padding(.vertical, Tokens.Space.s)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("12 band colours and 5 app icons")
     }
 }
 
@@ -158,7 +195,7 @@ private struct IconSection: View {
                     HStack {
                         Group {
                             if icon.name == "AppIcon-Cat" { MischiefCat().padding(7) }
-                            else { Text("psst").font(.system(size: 13, weight: .bold)) }
+                            else { Text("psst").font(.psst(size: 13, weight: .heavy)) }
                         }
                             .foregroundStyle(.white)
                             .frame(width: 40, height: 40)

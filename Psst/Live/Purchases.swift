@@ -154,10 +154,17 @@ final class Personalization {
     ]
 
     private(set) var colors: [UUID: UInt32]
+    /// Each person's usual colour, given in the order they joined so the first
+    /// five people never share one (a name hash could match after two).
+    private(set) var usualSlots: [UUID: Int]
     @ObservationIgnored private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        let slots = defaults.dictionary(forKey: Self.slotsKey) as? [String: Int] ?? [:]
+        usualSlots = Dictionary(uniqueKeysWithValues: slots.compactMap { key, value in
+            UUID(uuidString: key).map { ($0, value) }
+        })
         let stored = defaults.dictionary(forKey: Self.colorsKey) as? [String: Int] ?? [:]
         colors = Dictionary(uniqueKeysWithValues: stored.compactMap { key, value in
             UUID(uuidString: key).map { ($0, UInt32(truncatingIfNeeded: value)) }
@@ -170,7 +177,50 @@ final class Personalization {
     }
 
     func colorHex(for id: UUID, name: String) -> UInt32 {
-        colors[id] ?? Color.personBandHex(name)
+        if let chosen = colors[id] { return chosen }
+        if let slot = usualSlots[id] { return Color.personBandPalette[slot % Color.personBandPalette.count] }
+        return Color.personBandHex(name)
+    }
+
+    /// Gives anyone new a usual colour: the one their name always gave them if
+    /// nobody else has it yet (so updating recolours no one needlessly), otherwise
+    /// the least-used one among the people you have now.
+    func assignUsualColors(to people: [(id: UUID, name: String)]) {
+        let palette = Color.personBandPalette.count
+        var counts = Array(repeating: 0, count: palette)
+        for person in people { if let slot = usualSlots[person.id] { counts[slot % palette] += 1 } }
+        var changed = false
+        for person in people where usualSlots[person.id] == nil {
+            let id = person.id
+            let named = Color.personBandPalette.firstIndex(of: Color.personBandHex(person.name))
+            let slot = named.flatMap { counts[$0] == 0 ? $0 : nil }
+                ?? counts.indices.min { counts[$0] < counts[$1] } ?? 0
+            usualSlots[id] = slot
+            counts[slot] += 1
+            changed = true
+        }
+        guard changed else { return }
+        defaults.set(Dictionary(uniqueKeysWithValues: usualSlots.map { ($0.key.uuidString, $0.value) }),
+                     forKey: Self.slotsKey)
+    }
+
+    /// Home's colours, top to bottom. A usual colour that would match the band above
+    /// it moves to the next usual colour, so two neighbours never merge into one block.
+    /// Colours you chose yourself are never changed.
+    func bandColors(for people: [(id: UUID, name: String)]) -> [UUID: UInt32] {
+        var result: [UUID: UInt32] = [:]
+        var above: UInt32?
+        for person in people {
+            var hex = colorHex(for: person.id, name: person.name)
+            if colors[person.id] == nil, hex == above {
+                let palette = Color.personBandPalette
+                let start = palette.firstIndex(of: hex) ?? 0
+                hex = (1..<palette.count).map { palette[(start + $0) % palette.count] }.first { $0 != above } ?? hex
+            }
+            result[person.id] = hex
+            above = hex
+        }
+        return result
     }
 
     func setColor(_ hex: UInt32?, for id: UUID) {

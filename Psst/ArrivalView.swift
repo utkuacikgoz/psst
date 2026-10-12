@@ -26,7 +26,8 @@ struct ArrivalView: View {
     var color: Color? = nil
 
     static let displayTime: Duration = .milliseconds(1800)
-    static let sameMomentTime: Duration = .milliseconds(2600)
+    /// Rare, so it lingers a little longer.
+    static let sameMomentTime: Duration = .milliseconds(3200)
     /// Each moment in a sequence is shorter, so three people don't take all day.
     static let queuedTime: Duration = .milliseconds(1400)
 
@@ -51,9 +52,10 @@ struct ArrivalView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
     @Environment(\.accessibilitySwitchControlEnabled) private var switchControl
-    @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = 70
+    @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = 88
+    @ScaledMetric(relativeTo: .title2) private var replySize: CGFloat = 22
     @ScaledMetric(relativeTo: .largeTitle) private var psstSize: CGFloat = Tokens.Band.titleSize
-    @ScaledMetric(relativeTo: .title) private var labelSize: CGFloat = 26
+    @ScaledMetric(relativeTo: .title) private var labelSize: CGFloat = 34
     @State private var trigger: UUID?
 
     private var name: String { arrival.senderName }
@@ -126,51 +128,85 @@ struct ArrivalView: View {
         }
     }
 
+    private var isPsst: Bool { arrival.kind == .signal || arrival.kind == .superPsst }
+    /// Motion starts when `trigger` is set (just after the moment appears).
+    private var settled: Bool { trigger != nil }
+
+    /// FROM, their name, then "psst" in the wordmark's own lettering, with the
+    /// reply as a band along the bottom, the same shape as everything you tap.
     private var single: some View {
-        VStack(spacing: Tokens.Space.l) {
-            if arrival.kind == .signal || arrival.kind == .superPsst {
-                Text("FROM")
-                    .font(.psst(.subheadline, weight: .bold))
-                    .tracking(Tokens.Band.labelTracking * 2)
-            }
-            Text(name.uppercased())
-                .bandTitle(name, size: nameSize, tracking: Tokens.Band.titleTracking)
-                .fixedSize(horizontal: false, vertical: true)
-            if arrival.kind == .signal || arrival.kind == .superPsst {
-                if arrival.kind == .superPsst {
-                    MischiefCat().frame(width: 84, height: 68)
-                        .scaleEffect(trigger == nil || reduceMotion ? 1 : 1.08)
-                        .animation(reduceMotion ? nil : .spring(duration: 0.3), value: trigger)
-                } else {
-                    SignalGlyph(signal: .psst, trigger: trigger, baseSize: psstSize, tint: .white)
+        VStack(spacing: 0) {
+            Spacer(minLength: Tokens.Space.xxl)
+            VStack(spacing: Tokens.Space.m) {
+                if isPsst {
+                    Text("FROM")
+                        .font(.psst(.subheadline, weight: .bold))
+                        .tracking(Tokens.Band.labelTracking * 2)
                 }
-                Text(arrival.kind == .superPsst ? "Super Psst!" : "Psst!")
-                    .font(.system(size: psstSize * 0.8, weight: .heavy))
-                    .foregroundStyle(Color.onBandSoft)
-            } else {
-                Text("IS IN")
-                    .font(.psst(size: psstSize * 0.8, weight: .heavy))
-                    .tracking(Tokens.Band.titleTracking)
-                    .foregroundStyle(Color.onBandSoft)
+                Text(name.uppercased())
+                    .bandTitle(name, size: nameSize, tracking: Tokens.Band.titleTracking)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.5)
+                    .offset(y: settled || reduceMotion ? 0 : 24)
+                    .opacity(settled || !reduceMotion ? 1 : 0)
+                    .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.25), value: settled)
+                Group {
+                    if arrival.kind == .superPsst {
+                        VStack(spacing: Tokens.Space.s) {
+                            MischiefCat().frame(width: 84, height: 68)
+                                .scaleEffect(!settled || reduceMotion ? 1 : 1.08)
+                            Text("super psst")
+                                .font(.psst(size: psstSize, weight: .heavy))
+                                .tracking(Tokens.Band.wordmarkTracking)
+                        }
+                    } else if isPsst {
+                        Text("psst")
+                            .font(.psst(size: psstSize, weight: .heavy))
+                            .tracking(Tokens.Band.wordmarkTracking)
+                    } else {
+                        Text("IS IN")
+                            .bandTitle("is in", size: nameSize, tracking: Tokens.Band.titleTracking)
+                    }
+                }
+                .opacity(settled ? 1 : 0)
+                .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.25).delay(0.12), value: settled)
             }
-            Text(arrival.kind != .joined ? "\(countPrefix)Tap to psst back" : "Tap to send your first Psst")
-                .font(.subheadline.weight(.medium))
-                .padding(.top, Tokens.Space.l)
+            .padding(.horizontal, Tokens.Space.xl)
+            Spacer(minLength: Tokens.Space.xxl)
+            if !countPrefix.isEmpty {
+                Text(countPrefix.trimmingCharacters(in: CharacterSet(charactersIn: " ·")))
+                    .font(.psst(.footnote, weight: .semibold))
+                    .foregroundStyle(Color.onBandSoft)
+                    .padding(.bottom, Tokens.Space.s)
+            }
+            Text(arrival.kind == .sameMoment ? "CLOSE" : isPsst ? "PSST BACK" : "PSST \(name.uppercased())")
+                .font(.psst(size: replySize, weight: .black))
+                .tracking(Tokens.Band.labelTracking)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .padding(.horizontal, Tokens.Space.xl)
+                .frame(maxWidth: .infinity, minHeight: Tokens.Band.addBandMinHeight)
+                .background(Color.bandShade.ignoresSafeArea(edges: .bottom))
         }
-        .padding(Tokens.Space.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background((color ?? .personBand(name)).ignoresSafeArea())
     }
 
     /// Your half (the app's purple) above theirs, with SAME MOMENT across the seam.
+    /// The two halves slide in from the top and bottom and meet at the seam
+    /// (a crossfade with Reduce Motion); the sticker lands on top, slightly tilted.
     private var sameMoment: some View {
         VStack(spacing: 0) {
             half("You", color: .psstCanvas)
+                .offset(y: settled || reduceMotion ? 0 : -80)
             half(name, color: color ?? .personBand(name))
+                .offset(y: settled || reduceMotion ? 0 : 80)
         }
+        .opacity(settled || !reduceMotion ? 1 : 0)
+        .animation(reduceMotion ? .easeOut(duration: 0.25) : .spring(duration: 0.35, bounce: 0.3), value: settled)
         .overlay {
             Text("SAME MOMENT")
-                .font(.psst(size: labelSize, weight: .heavy))
+                .font(.psst(size: labelSize, weight: .black))
                 .tracking(Tokens.Band.titleTracking / 2)
                 .foregroundStyle(Color.ink)
                 .lineLimit(1)
@@ -178,15 +214,19 @@ struct ArrivalView: View {
                 .padding(.horizontal, Tokens.Space.l)
                 .padding(.vertical, Tokens.Space.s)
                 .background(Color.surface)
-                .scaleEffect(trigger == nil || reduceMotion ? 1 : 1.06)
-                .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0.5), value: trigger)
+                .rotationEffect(.degrees(-3))
+                .scaleEffect(!settled ? (reduceMotion ? 1 : 0.6) : 1)
+                .opacity(settled ? 1 : 0)
+                .animation(reduceMotion ? .easeOut(duration: 0.25) : .spring(duration: 0.35, bounce: 0.5).delay(0.2), value: settled)
                 .padding(.horizontal, Tokens.Space.xl)
         }
     }
 
     private func half(_ title: String, color: Color) -> some View {
         Text(title.uppercased())
-            .bandTitle(title, size: nameSize * 0.75, tracking: Tokens.Band.titleTracking)
+            .bandTitle(title, size: nameSize, tracking: Tokens.Band.titleTracking)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+            .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.5)
             .padding(Tokens.Space.xl)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(color.ignoresSafeArea())

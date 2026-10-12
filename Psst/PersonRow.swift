@@ -39,7 +39,7 @@ struct PersonRow: View {
                 if let exchangeDate, let exchangeFromMe {
                     TimelineView(.periodic(from: .now, by: 60)) { context in
                         Text("\(exchangeFromMe ? "Sent" : "Received") · \(ExchangeTime.label(exchangeDate, now: context.date))")
-                            .font(.subheadline.weight(.medium))
+                            .font(.psst(.subheadline, weight: .semibold))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }

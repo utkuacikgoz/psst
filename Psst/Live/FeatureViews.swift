@@ -45,36 +45,59 @@ enum ExchangeTime {
     }
 }
 
+/// What's new, for people who already had Psst (new people get the tap tip instead).
+/// One way out: the white band at the bottom, or a swipe down.
 struct FeatureIntroSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 34
+
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: Tokens.Space.xl) {
-                    MischiefCat().frame(width: 62, height: 52).frame(maxWidth: .infinity)
-                    Text("A little more mischief.").font(.largeTitle.bold())
-                    item("Make one count.", "Touch and hold a person for Super Psst. One daily; unlimited with Psst+.", symbol: "sparkles")
-                    item("See your activity.", "Find your personal sent and received rankings in Settings.", symbol: "chart.bar")
-                    item("Know when.", "Your latest exchange now includes its time.", symbol: "clock")
-                    Button("Got it") { dismiss() }
-                        .font(.headline).foregroundStyle(Color.psstCanvas)
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 12))
-                }.padding(Tokens.sheetInset)
+                    MischiefCat().frame(width: 62, height: 52)
+                    Text("A little more mischief")
+                        .font(.psst(size: titleSize, weight: .black))
+                        .tracking(Tokens.Band.titleTracking)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                    item("Make one count", "Touch and hold someone for Super Psst. One a day, unlimited with Psst+.", symbol: "sparkles")
+                    item("Your activity", "Who you psst most, and who pssts you, in Settings. Only you see it.", symbol: "chart.bar.fill")
+                    item("Know when", "Each band shows your latest exchange and when it was.", symbol: "clock.fill")
+                }
+                .padding(Tokens.sheetInset)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .foregroundStyle(.white)
-            .background(Color.psstCanvas.ignoresSafeArea())
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Close") { dismiss() }.tint(.white) } }
+            Button { dismiss() } label: {
+                Text("Got it")
+                    .font(.psst(.body, weight: .bold))
+                    .foregroundStyle(Color.psstCanvas)
+                    .frame(maxWidth: .infinity, minHeight: Tokens.Band.barMinHeight)
+                    .background(Color.surface)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
+        .foregroundStyle(Color.onCanvas)
+        .background(Color.psstCanvas.ignoresSafeArea())
+        .presentationBackground(Color.psstCanvas)
     }
+
     private func item(_ title: String, _ detail: String, symbol: String) -> some View {
         HStack(alignment: .top, spacing: Tokens.Space.l) {
-            Image(systemName: symbol).frame(width: 24).accessibilityHidden(true)
+            Image(systemName: symbol)
+                .font(.psst(.body, weight: .bold))
+                .frame(width: 24)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Tokens.Space.xs) {
-                Text(title).font(.headline)
-                Text(detail).font(.body).fixedSize(horizontal: false, vertical: true)
+                Text(title).font(.psst(.headline, weight: .bold))
+                Text(detail)
+                    .font(.psst(.body))
+                    .foregroundStyle(Color.onCanvasSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-        }.accessibilityElement(children: .combine)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -145,62 +168,119 @@ struct SuperPsstSheet: View {
     @State private var verificationFailed = false
     @State private var showingPlus = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(Personalization.self) private var personalization
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 40
+
+    private func isAvailable(at date: Date) -> Bool {
+        guard let allowance else { return false }
+        return allowance.unlimited || allowance.remaining > 0 || date >= allowance.resetsAt
+    }
+
+    private var sendBlocked: Bool {
+        let status = store.status(for: connection)
+        if case .notSent = status { return true }
+        return LiveHomeView.isBusy(status) || LiveHomeView.isPaused(status)
+    }
+
+    /// Their band, full screen: the cat, SUPER PSST, how many you have, and one
+    /// white band to send. Everything else is a single quiet line.
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    MischiefCat().frame(width: 64, height: 54).frame(maxWidth: .infinity)
-                        .listRowBackground(Color.psstCanvas)
-                    Text("Super Psst for \(connection.otherName)")
-                        .font(.title2.bold()).fixedSize(horizontal: false, vertical: true)
-                    Text("Double whisper.")
-                        .font(.body).foregroundStyle(.secondary)
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let available = isAvailable(at: context.date)
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    Button("Close") { dismiss() }
+                        .font(.psst(.body, weight: .semibold))
+                        .frame(minWidth: Tokens.minTouch, minHeight: Tokens.minTouch)
+                        .padding(.horizontal, Tokens.Space.l)
                 }
-                Section {
-                    if loading { ProgressView("Checking today's allowance") }
-                    else if failed { Button("Couldn't check. Try again") { Task { await load() } } }
-                    else if let allowance {
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            let available = allowance.unlimited || allowance.remaining > 0 || context.date >= allowance.resetsAt
-                            Text(allowance.unlimited ? "Unlimited Super Pssts" : (available ? "1 available today" : "Used for today"))
-                                .font(.headline)
-                            if !available {
-                                Text("Next one: \(allowance.resetsAt.formatted(date: .abbreviated, time: .shortened))")
-                                    .font(.subheadline).foregroundStyle(.secondary)
-                            }
-                            Button("Send Super Psst") {
-                                Task { await submit() }
-                            }
-                            .disabled(!available || LiveHomeView.isBusy(store.status(for: connection)) || {
-                                if case .notSent = store.status(for: connection) { return true }
-                                return LiveHomeView.isPaused(store.status(for: connection))
-                            }())
-                            .frame(minHeight: Tokens.minTouch)
+                ScrollView {
+                    VStack(spacing: Tokens.Space.l) {
+                        MischiefCat().frame(width: 84, height: 68)
+                        VStack(spacing: Tokens.Space.xs) {
+                            Text("SUPER PSST")
+                                .bandTitle("Super Psst", size: titleSize, tracking: Tokens.Band.titleTracking)
+                                .accessibilityAddTraits(.isHeader)
+                            Text("for \(connection.otherName)")
+                                .font(.psst(.title3, weight: .bold))
                         }
+                        .accessibilityElement(children: .combine)
+                        allowanceLine(available: available)
+                        notes
                     }
-                } footer: {
-                    Text("Their sound settings still apply.")
-                    switch store.status(for: connection) {
-                    case .notSent: Text("Retry your pending Psst first.")
-                    case .sending: Text("A Psst is already sending.")
-                    case .paused: Text("A little breather. Try again shortly.")
-                    default: EmptyView()
-                    }
-                    if verificationFailed { Text("Couldn't verify Psst+ for unlimited sends. Your free daily Super Psst is still available if unused. Try again.") }
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Tokens.sheetInset)
+                    .padding(.vertical, Tokens.Space.xl)
+                    .frame(maxWidth: .infinity)
                 }
                 if !purchases.isUnlocked {
-                    Section { Button("Unlimited with Psst+") { showingPlus = true } }
+                    Button("Unlimited with Psst+") { showingPlus = true }
+                        .font(.psst(.subheadline, weight: .bold))
+                        .frame(minHeight: Tokens.minTouch)
+                        .padding(.bottom, Tokens.Space.s)
                 }
+                Button { Task { await submit() } } label: {
+                    Text("SEND SUPER PSST")
+                        .font(.psst(.title3, weight: .black))
+                        .tracking(Tokens.Band.labelTracking)
+                        .foregroundStyle(Color(hex: bandHex))
+                        .frame(maxWidth: .infinity, minHeight: 64)
+                        .background(Color.surface.opacity(available && !sendBlocked && !loading ? 1 : 0.4))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!available || sendBlocked || loading)
+                .accessibilityLabel("Send Super Psst")
             }
-            .navigationTitle("Super Psst")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .foregroundStyle(Color.onCanvas)
         }
-        .tint(Color.psstCanvas)
-        .environment(\.colorScheme, .light)
+        .background(Color(hex: bandHex).ignoresSafeArea())
+        .presentationBackground(Color(hex: bandHex))
         .task(id: scenePhase) { if scenePhase == .active { await load() } }
         .sheet(isPresented: $showingPlus, onDismiss: { Task { await load() } }) { PsstPlusSheet() }
     }
+
+    private var bandHex: UInt32 { personalization.colorHex(for: connection.id, name: connection.otherName) }
+
+    @ViewBuilder private func allowanceLine(available: Bool) -> some View {
+        if loading {
+            ProgressView("Checking today's Super Psst").tint(.white)
+        } else if failed {
+            Button("Couldn't check. Try again") { Task { await load() } }
+                .font(.psst(.body, weight: .bold))
+                .frame(minHeight: Tokens.minTouch)
+        } else if let allowance {
+            VStack(spacing: Tokens.Space.xs) {
+                Text(allowance.unlimited ? "Unlimited Super Pssts" : (available ? "1 available today" : "Used for today"))
+                    .font(.psst(.headline, weight: .bold))
+                if !available {
+                    Text("Next one: \(allowance.resetsAt.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.psst(.subheadline, weight: .medium))
+                        .foregroundStyle(Color.onBandSoft)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var notes: some View {
+        VStack(spacing: Tokens.Space.xs) {
+            switch store.status(for: connection) {
+            case .notSent: Text("Retry your pending Psst first.")
+            case .sending: Text("A Psst is already sending.")
+            case .paused: Text("A little breather. Try again shortly.")
+            default: EmptyView()
+            }
+            if verificationFailed {
+                Text("Couldn't verify Psst+ for unlimited sends. Your free daily Super Psst still works if unused.")
+            }
+            Text("Their sound settings still apply.")
+        }
+        .font(.psst(.footnote, weight: .medium))
+        .foregroundStyle(Color.onBandSoft)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
     private func submit() async {
         // Recheck quota and purchase status at the action, rather than trusting an
         // allowance loaded minutes ago while this sheet was open.

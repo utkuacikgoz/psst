@@ -30,7 +30,7 @@ struct NameStepView: View {
                             .tracking(Tokens.Band.titleTracking)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityAddTraits(.isHeader)
-                        Text("This is the name your people see when you psst them.")
+                        Text("It's how you'll show up on their phone.")
                             .font(.psst(.subheadline, weight: .medium))
                     }
                     .padding(.horizontal, inset)
@@ -38,7 +38,7 @@ struct NameStepView: View {
 
                     NameBand(name: $name, focused: $focused, inset: inset, onSubmit: save)
 
-                    Text("Only people you connect with see it. You can change it later in Settings.")
+                    Text("Only your people see it. Change it anytime in Settings.")
                         .font(.psst(.footnote, weight: .medium))
                         .padding(.horizontal, inset)
                         .padding(.top, Tokens.Space.m)
@@ -257,22 +257,21 @@ struct NotificationStepView: View {
                     .padding(.vertical, Tokens.Space.l)
 
                 ScrollView {
-                    VStack(spacing: Tokens.Space.l) {
-                        Text("Get a notification when someone taps you?")
-                            .font(.system(size: questionSize, weight: .heavy))
+                    // Same layout as the name step: left-aligned question, one line under it.
+                    VStack(alignment: .leading, spacing: Tokens.Space.s) {
+                        Text("Hear it when someone pssts you")
+                            .font(.psst(size: questionSize, weight: .heavy))
                             .tracking(Tokens.Band.titleTracking)
-                            .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity)
-                            .padding(.horizontal, inset)
                             .accessibilityAddTraits(.isHeader)
-                        Text("Know when a Psst arrives. You can also see Pssts when you open the app.")
-                            .font(.body)
-                            .multilineTextAlignment(.center)
+                        Text("Pssts also wait for you in the app, whatever you choose.")
+                            .font(.psst(.subheadline, weight: .medium))
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.horizontal, inset)
+                        NotificationPreview()
+                            .padding(.top, Tokens.Space.xxl)
                     }
-                    .frame(minHeight: proxy.size.height * 0.6)
+                    .padding(.horizontal, inset)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .scrollBounceBehavior(.basedOnSize)
 
@@ -319,16 +318,53 @@ struct PrimaryButton: View {
                 if isBusy { ProgressView().tint(Color.ink) }
             }
             .font(.psst(.body, weight: .semibold))
-            .foregroundStyle(Color.ink)
+            // Disabled reads as a quiet white band, not a muddy grey one.
+            .foregroundStyle(isEnabled ? Color.ink : Color.psstCanvas)
             .frame(maxWidth: .infinity, minHeight: 52)
             .background(
                 RoundedRectangle(cornerRadius: Tokens.controlRadius)
-                    .fill(isEnabled ? Color.surface : Color.surface.opacity(0.55))
+                    .fill(isEnabled ? Color.surface : Color.surface.opacity(0.4))
             )
             .contentShape(RoundedRectangle(cornerRadius: Tokens.controlRadius))
         }
         .disabled(!isEnabled || isBusy)
         .accessibilityLabel(title)
+    }
+}
+
+/// What a Psst looks like on the Lock Screen, so the question isn't abstract.
+/// Illustration only: it's labelled as an example and is not a real notification.
+private struct NotificationPreview: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) { card }
+    }
+
+    @ViewBuilder private var card: some View {
+        HStack(alignment: .top, spacing: Tokens.Space.m) {
+            Text("psst")
+                .font(.psst(size: 13, weight: .heavy))
+                .foregroundStyle(Color.onCanvas)
+                .frame(width: 38, height: 38)
+                .background(Color.psstCanvas, in: RoundedRectangle(cornerRadius: 9))
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("Mia").font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text("now").font(.footnote).foregroundStyle(.secondary)
+                }
+                Text("Psst").font(.subheadline)
+            }
+        }
+        .foregroundStyle(Color.ink)
+        .padding(Tokens.Space.m)
+        .background(Color.surface.opacity(0.92), in: RoundedRectangle(cornerRadius: 22))
+        .environment(\.colorScheme, .light)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Example notification: Mia, Psst.")
+        Text("Touch and hold it to psst back without opening Psst.")
+            .font(.psst(.footnote, weight: .medium))
+            .foregroundStyle(Color.onCanvasSecondary)
+            .padding(.top, Tokens.Space.s)
     }
 }
 

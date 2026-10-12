@@ -3,6 +3,12 @@ import XCTest
 /// Walks the live (account) screens against the scripted Debug-only backend
 /// (`UITestAPI`) and attaches a screenshot of each state.
 final class LiveScreenshotTests: XCTestCase {
+    override func record(_ issue: XCTIssue) {
+        var issue = issue
+        attachFailureScreen(to: &issue)
+        super.record(issue)
+    }
+
     override func setUp() {
         continueAfterFailure = false
     }

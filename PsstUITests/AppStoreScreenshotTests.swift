@@ -5,6 +5,12 @@ import XCTest
 /// iPhone (6.9", 1320×2868) with a clean status bar; see the `appstore` option
 /// of .github/workflows/ios.yml. The people are test fixtures.
 final class AppStoreScreenshotTests: XCTestCase {
+    override func record(_ issue: XCTIssue) {
+        var issue = issue
+        attachFailureScreen(to: &issue)
+        super.record(issue)
+    }
+
     override func setUp() {
         continueAfterFailure = false
     }

@@ -430,14 +430,14 @@ struct LiveHomeView: View {
         if Self.isPaused(store.status(for: connection)) {
             // Re-read every second so the countdown moves and the band wakes up on time.
             TimelineView(.periodic(from: .now, by: 1)) { context in
-                band(connection, minHeight: minHeight, now: context.date)
+                band(connection, minHeight: minHeight, now: context.date, colour: colour)
             }
         } else {
-            band(connection, minHeight: minHeight, now: .now)
+            band(connection, minHeight: minHeight, now: .now, colour: colour)
         }
     }
 
-    private func band(_ connection: ConnectionSummary, minHeight: CGFloat, now: Date) -> some View {
+    private func band(_ connection: ConnectionSummary, minHeight: CGFloat, now: Date, colour: UInt32?) -> some View {
         let status = store.status(for: connection)
         let person = PersonRow(
                 name: connection.otherName,

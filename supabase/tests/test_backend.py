@@ -377,6 +377,24 @@ class BackendTests(unittest.TestCase):
         with self.assertRaises(errors.InsufficientPrivilege):
             ada.rpc("record_push_result", event, "accepted", [])
 
+    def test_inviter_hears_who_joined_server_only(self):
+        ada, emre = new_user("Ada"), new_user("Emre")
+        token = "cd" * 32
+        ada.rpc("register_device_token", token, "sandbox")
+        emre.rpc("register_device_token", "ef" * 32, "sandbox")
+        connection = connect(ada, emre)
+        service = Api("service_role")
+        targets = service.rpc("joined_push_targets", connection)
+        self.assertEqual(targets["joiner_name"], "Emre")
+        # Only the inviter's phone, never the person who accepted.
+        self.assertEqual(targets["tokens"], [{"token": token, "environment": "sandbox"}])
+        with self.assertRaises(errors.InsufficientPrivilege):
+            ada.rpc("joined_push_targets", connection)
+        with self.assertRaises(errors.InsufficientPrivilege):
+            emre.rpc("remove_device_tokens", [token])
+        service.rpc("remove_device_tokens", [token])
+        self.assertEqual(service.rpc("joined_push_targets", connection)["tokens"], [])
+
     # Blocking and removal --------------------------------------------------
 
     def test_block_removes_connection_and_prevents_reconnecting(self):

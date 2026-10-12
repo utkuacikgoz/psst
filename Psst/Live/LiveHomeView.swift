@@ -84,6 +84,7 @@ struct LiveHomeView: View {
     @State private var superPerson: ConnectionSummary?
     @AppStorage("psst.hapticsEnabled") private var hapticsEnabled = true
     @State private var showingInvite = false
+    @State private var enteringCode = false
     @State private var showingSettings = false
     @State private var managing: ConnectionSummary?
     @State private var confirming: ConnectionAction?
@@ -106,7 +107,7 @@ struct LiveHomeView: View {
     private var showsCoach: Bool { store.showsCoach && store.hasLoadedConnections && !anySheet }
 
     private var anySheet: Bool {
-        showingFeatureIntro || superPerson != nil || showingInvite || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
+        showingFeatureIntro || superPerson != nil || showingInvite || enteringCode || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
     }
 
     var body: some View {
@@ -121,7 +122,8 @@ struct LiveHomeView: View {
                         notices
                         if store.connections.isEmpty {
                             if store.hasLoadedConnections {
-                                firstInviteBand(minHeight: Self.bandHeight(available: proxy.size.height, people: 0))
+                                firstInviteBand(minHeight: max(Tokens.personRowMinHeight, Self.bandHeight(available: proxy.size.height, people: 0) - Tokens.Band.addBandMinHeight))
+                                haveCodeBand
                             } else {
                                 // First launch on this phone: nothing remembered yet.
                                 loadingPeople(minHeight: Self.bandHeight(available: proxy.size.height, people: 0))
@@ -215,6 +217,7 @@ struct LiveHomeView: View {
         .sheet(isPresented: $showingFeatureIntro, onDismiss: { store.dismissFeatureIntro() }) { FeatureIntroSheet() }
         .sheet(item: $superPerson) { SuperPsstSheet(connection: $0) }
         .sheet(isPresented: $showingInvite) { InviteSheet() }
+        .sheet(isPresented: $enteringCode) { InviteSheet(startEntering: true) }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
         .manageConnection(menuFor: $managing, confirming: $confirming,
                           onSuper: { superPerson = $0 },
@@ -346,6 +349,32 @@ struct LiveHomeView: View {
         if let notice = store.notice {
             NoticeView(symbol: "info.circle", text: notice, actionTitle: "OK") { store.notice = nil }
         }
+    }
+
+    /// Someone invited you and the App Store ate the link: enter or paste their code.
+    private var haveCodeBand: some View {
+        Button {
+            enteringCode = true
+        } label: {
+            VStack(spacing: Tokens.Space.xs) {
+                Text("I HAVE A CODE")
+                    .font(.psst(.title3, weight: .heavy))
+                    .tracking(Tokens.Band.labelTracking)
+                Text("Someone invited you")
+                    .font(.psst(.subheadline, weight: .medium))
+            }
+            .multilineTextAlignment(.center)
+            .foregroundStyle(Color.onCanvas)
+            .padding(Tokens.Space.l)
+            .frame(maxWidth: .infinity, minHeight: Tokens.Band.addBandMinHeight)
+            .background(Color(hex: 0x5F61AE))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("I have a code")
+        .accessibilityHint("Enter or paste the invite code someone sent you.")
+        .accessibilityAddTraits(.isButton)
     }
 
     /// Option E2: before anyone accepts, home is one gold band.

@@ -6,6 +6,9 @@ struct InviteSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    /// Opens straight on entering a code ("Got a code?" on the empty home).
+    var startEntering = false
+
     private enum Mode { case choose, share, enter }
 
     @State private var mode: Mode = .choose
@@ -37,6 +40,10 @@ struct InviteSheet: View {
         .background(Color.psstCanvas.ignoresSafeArea())
         .presentationBackground(Color.psstCanvas)
         .onAppear {
+            if startEntering {
+                mode = .enter
+                codeFocused = true
+            }
             if let pending = store.pendingInviteCode {
                 store.pendingInviteCode = nil
                 code = pending
@@ -175,6 +182,18 @@ struct InviteSheet: View {
 
     // MARK: Enter
 
+    /// The code from pasted text: an invite link (…/invite/K7QX4MPA), a shared
+    /// message ("… (code K7QX 4MPA)") or the code itself, spaces and all.
+    static func inviteCode(in text: String) -> String {
+        var source = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let range = source.range(of: "/invite/") {
+            source = String(source[range.upperBound...].prefix { $0 != "?" && $0 != "#" && $0 != "/" })
+        } else if let range = source.range(of: "code", options: [.caseInsensitive, .backwards]) {
+            source = String(source[range.upperBound...])
+        }
+        return String(source.uppercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }.prefix(16))
+    }
+
     private var enterStep: some View {
         VStack(spacing: 0) {
             VStack(spacing: Tokens.Space.m) {
@@ -192,6 +211,18 @@ struct InviteSheet: View {
                     .disabled(isChecking || isAccepting)
                     .accessibilityLabel("Invite code")
                     .onChange(of: code) { preview = nil; enterError = nil }
+
+                // Copied from the invite page or a message: no paste permission prompt.
+                if code.isEmpty {
+                    PasteButton(payloadType: String.self) { strings in
+                        guard let pasted = strings.first.map(Self.inviteCode(in:)), !pasted.isEmpty else { return }
+                        code = pasted
+                        check()
+                    }
+                    .labelStyle(.titleAndIcon)
+                    .tint(.white)
+                    .foregroundStyle(Color(hex: 0x5F61AE))
+                }
 
                 if let preview {
                     Text(Self.message(for: preview.status, name: preview.inviterName ?? "them"))

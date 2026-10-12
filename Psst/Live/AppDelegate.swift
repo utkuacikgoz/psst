@@ -49,6 +49,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     ) {
         let userInfo = notification.request.content.userInfo
         Task { @MainActor in
+            // "Kim is in": on home, refreshing shows the welcome instead of a banner.
+            if Self.isJoined(userInfo), let store = self.store, store.isHomeVisible {
+                completionHandler([.sound])
+                await store.refresh()
+                return
+            }
             guard let store = self.store, let payload = SignalPayload(userInfo: userInfo), store.isHomeVisible else {
                 completionHandler([.banner, .list, .sound])
                 return
@@ -56,6 +62,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             completionHandler([.sound])
             await store.openedNotification(payload)
         }
+    }
+
+    /// The push the inviter gets when someone accepts (accept-invite function).
+    nonisolated static func isJoined(_ userInfo: [AnyHashable: Any]) -> Bool {
+        (userInfo["psst"] as? [String: Any])?["joined"] as? Bool == true
     }
 
     nonisolated func userNotificationCenter(
@@ -69,6 +80,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let action = response.actionIdentifier
         Task { @MainActor in
             defer { completionHandler() }
+            if Self.isJoined(userInfo) {
+                await self.store?.refresh()
+                return
+            }
             guard let store = self.store, let payload = SignalPayload(userInfo: userInfo) else { return }
             switch action {
             case Self.sendBackAction:

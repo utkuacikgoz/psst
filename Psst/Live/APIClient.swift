@@ -160,8 +160,14 @@ final class APIClient: PsstAPI {
         try await rpc("preview_invite", ["p_code": code])
     }
 
+    /// Through the accept-invite function, which also tells the inviter "Kim is in".
+    /// Falls back to the plain RPC if that function isn't deployed yet.
     func acceptInvite(code: String) async throws -> AcceptedInvite {
-        try await rpc("accept_invite", ["p_code": code])
+        do {
+            return try await authorizedRequest(path: "functions/v1/accept-invite", body: ["code": code])
+        } catch APIError.server(404, let error) where !error.hasPrefix("invite_") {
+            return try await rpc("accept_invite", ["p_code": code])
+        }
     }
 
     func removeConnection(_ id: UUID) async throws {

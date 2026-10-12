@@ -122,6 +122,7 @@ jobs:
           supabase functions deploy send-signal --project-ref "$SUPABASE_PROJECT_REF"
           supabase functions deploy delete-account --project-ref "$SUPABASE_PROJECT_REF"
           supabase functions deploy verify-plus --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy accept-invite --project-ref "$SUPABASE_PROJECT_REF"
 
       - name: Smoke test the deployed backend
         run: |

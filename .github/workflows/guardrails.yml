@@ -1,0 +1,15 @@
+name: Guardrails
+
+# Owner-approved features and designs must not disappear in a merge.
+# Linux only: seconds, and no macOS minutes.
+on:
+  push:
+  pull_request:
+
+jobs:
+  owner-decisions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v5
+      - run: python3 scripts/check_owner_decisions.py

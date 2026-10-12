@@ -1,6 +1,7 @@
 name: Guardrails
 
-# Owner-approved features and designs must not disappear in a merge.
+# 1. Owner-approved features and designs must not disappear in a merge.
+# 2. Every design change must carry the owner's approval (Design-Approved: trailer).
 # Linux only: seconds, and no macOS minutes.
 on:
   push:
@@ -13,3 +14,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: python3 scripts/check_owner_decisions.py
+
+  design-approval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Every design change is owner-approved
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            python3 scripts/check_design_approval.py "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+          else
+            python3 scripts/check_design_approval.py "${{ github.event.before }}" "${{ github.sha }}"
+          fi

@@ -2,6 +2,14 @@
 
 Read `CLAUDE.md` and `DESIGN.md` first. These rules come from the owner.
 
+0. **Every design change needs the owner's approval first.** Anything that
+   changes how the app, widget or site looks (layout, spacing, type, colour,
+   copy on screen, icons, motion) is proposed to the owner with a preview and
+   waits for a clear yes before it's committed. The commit then carries a
+   `Design-Approved: <what was approved, when>` trailer;
+   `scripts/check_design_approval.py` fails CI for any design file changed
+   without one. Never write that trailer without the owner's explicit approval
+   of that specific change.
 1. **Never remove or replace an owner-approved feature or design** (anything in
    DESIGN.md marked "owner pick", "owner go", "owner-approved" or
    "Owner-selected") without the owner's explicit approval in the conversation.

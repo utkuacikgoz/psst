@@ -3,7 +3,7 @@
 This repository contains only Psst, a native iPhone one-tap social app. Build the complete app incrementally from the included interaction prototype. No sibling repository, shared package, or other app is required.
 
 ## Read first
-- `AGENTS.md`: guardrails for every agent (never drop an owner-approved feature, owner-decision CI check, no unverified pushes, no unrequested macOS CI runs).
+- `AGENTS.md`: guardrails for every agent (every design change approved by the owner first, with a `Design-Approved:` trailer; never drop an owner-approved feature, owner-decision CI check, no unverified pushes, no unrequested macOS CI runs).
 - `DESIGN.md`: layout, visual tokens, feedback states, preview/purchase rules, and visual acceptance checks.
 - `README.md`: build instructions and current prototype limitations.
 

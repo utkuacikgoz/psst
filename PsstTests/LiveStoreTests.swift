@@ -40,7 +40,11 @@ final class FakeAPI: PsstAPI {
         if let listError { throw listError }
         return connections
     }
-    func listUnseen() async throws -> [UnseenSignal] { unseen }
+    var unseenCalls = 0
+    func listUnseen() async throws -> [UnseenSignal] {
+        unseenCalls += 1
+        return unseen
+    }
     func ackSignals(_ ids: [UUID]) async throws {
         acked += ids
         unseen.removeAll { ids.contains($0.id) }
@@ -149,6 +153,20 @@ final class LiveStoreTests: XCTestCase {
         _ = await (first, second)
         XCTAssertEqual(api.listCalls, 1)
         XCTAssertEqual(store.connections.count, 1)
+    }
+
+    func testOverlappingUnseenChecksShareOneRequest() async {
+        store.isHomeVisible = true
+        async let first: Void = store.showUnseenIfVisible()
+        async let second: Void = store.showUnseenIfVisible()
+        _ = await (first, second)
+        XCTAssertEqual(api.unseenCalls, 1)
+    }
+
+    func testUnseenIsNotCheckedWhileHomeIsHidden() async {
+        store.isHomeVisible = false
+        await store.showUnseenIfVisible()
+        XCTAssertEqual(api.unseenCalls, 0)
     }
 
     func testYourNameIsKeptOnThisPhoneAndForgottenOnDelete() async throws {

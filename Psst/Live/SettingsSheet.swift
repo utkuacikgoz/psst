@@ -202,8 +202,10 @@ struct SettingsSheet: View {
         .environment(\.colorScheme, .light)
         .task {
             notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
-            actions.blocked = (try? await store.api.listBlocked()) ?? []
-            actions.openInvites = (try? await store.api.listOpenInvites()) ?? []
+            async let blocked = try? await store.api.listBlocked()
+            async let invites = try? await store.api.listOpenInvites()
+            actions.blocked = await blocked ?? []
+            actions.openInvites = await invites ?? []
         }
         .manageConnection(menuFor: $managing, confirming: $confirming) {
             Task { actions.blocked = (try? await store.api.listBlocked()) ?? actions.blocked }

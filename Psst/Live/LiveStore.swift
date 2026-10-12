@@ -217,9 +217,13 @@ final class LiveStore {
 
     private func load() async {
         do {
-            connections = try await api.listConnections()
-            if let data = try? JSONEncoder().encode(connections) {
-                defaults.set(data, forKey: Self.connectionsCacheKey)
+            let latest = try await api.listConnections()
+            // Unchanged polls leave the list alone, so home doesn't redraw and the cache isn't rewritten.
+            if latest != connections {
+                connections = latest
+                if let data = try? JSONEncoder().encode(latest) {
+                    defaults.set(data, forKey: Self.connectionsCacheKey)
+                }
             }
             if !hasLoadedConnections { reorderByRecency() }
             hasLoadedConnections = true
@@ -236,10 +240,20 @@ final class LiveStore {
 
     /// Plays each connection's newest unseen signal on its row, then reports them seen.
     /// Then welcomes anyone new.
+    /// Overlapping calls (first load and home appearing) share one request.
     func showUnseenIfVisible() async {
-        if isHomeVisible, let unseen = try? await api.listUnseen(), !unseen.isEmpty { await show(unseen) }
-        welcomeNewConnections()
+        guard isHomeVisible else { return welcomeNewConnections() }
+        if let inFlight = unseenTask { return await inFlight.value }
+        let task = Task {
+            if isHomeVisible, let unseen = try? await api.listUnseen(), !unseen.isEmpty { await show(unseen) }
+            welcomeNewConnections()
+        }
+        unseenTask = task
+        await task.value
+        unseenTask = nil
     }
+
+    @ObservationIgnored private var unseenTask: Task<Void, Never>?
 
     /// Option J2: a person who just became tappable gets a full-screen welcome,
     /// once, while home is on screen. People already there on first launch don't.
@@ -287,7 +301,8 @@ final class LiveStore {
             arrivalQueue += moments
         }
         let shown = unseen.filter { signal in connections.contains { $0.id == signal.connectionId } }.map(\.id)
-        if (try? await api.ackSignals(shown)) != nil, let updated = try? await api.listConnections() {
+        if (try? await api.ackSignals(shown)) != nil, let updated = try? await api.listConnections(),
+           updated != connections {
             connections = updated
         }
     }

@@ -164,7 +164,8 @@ struct LiveHomeView: View {
         .sensoryFeedback(trigger: store.latestEffect) { _, new in hapticsEnabled && store.arrival == nil ? new?.signal.haptic : nil }
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
-            await updateNotificationStatus()
+            // Runs alongside the first refresh instead of before it.
+            Task { await updateNotificationStatus() }
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-PsstUITestLive") { await store.refresh(); return }
             #endif

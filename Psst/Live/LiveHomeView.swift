@@ -134,8 +134,10 @@ struct LiveHomeView: View {
                             // with many people each keeps a minimum and scrolls.
                             let bandHeight = Self.bandHeight(available: proxy.size.height, people: store.connections.count)
                             // O2: most recent first; drag a band to place it yourself.
+                            // Worked out once per render, not once per band.
+                            let colours = bandColors
                             ForEach(store.orderedConnections) { connection in
-                                row(connection, minHeight: bandHeight)
+                                row(connection, minHeight: bandHeight, colour: colours[connection.id])
                             }
                             addBand(minHeight: Tokens.Band.addBandMinHeight)
                         }
@@ -424,7 +426,7 @@ struct LiveHomeView: View {
     }
 
     @ViewBuilder
-    private func row(_ connection: ConnectionSummary, minHeight: CGFloat) -> some View {
+    private func row(_ connection: ConnectionSummary, minHeight: CGFloat, colour: UInt32?) -> some View {
         if Self.isPaused(store.status(for: connection)) {
             // Re-read every second so the countdown moves and the band wakes up on time.
             TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -449,7 +451,7 @@ struct LiveHomeView: View {
                 minHeight: minHeight,
                 cornerMark: dynamicTypeSize.isAccessibilitySize ? nil : Self.cornerMark(for: status),
                 isDimmed: Self.isPaused(status),
-                color: Color(hex: bandColors[connection.id] ?? personalization.colorHex(for: connection.id, name: connection.otherName)),
+                color: Color(hex: colour ?? personalization.colorHex(for: connection.id, name: connection.otherName)),
                 exchangeDate: connection.lastCreatedAt,
                 exchangeFromMe: connection.lastFromMe
             )

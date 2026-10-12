@@ -23,7 +23,8 @@ enum Tokens {
         static let wordmarkTracking: CGFloat = -2
         /// Contact names and received signal titles; scaled with Dynamic Type by callers.
         static let titleSize: CGFloat = 52
-        static let titleTracking: CGFloat = -1.5
+        // Slightly tight; tighter eats the gaps between words in Inter Tight Black.
+        static let titleTracking: CGFloat = -0.5
         /// Signal names in the picker.
         static let optionTitleSize: CGFloat = 30
         static let optionTracking: CGFloat = -0.7

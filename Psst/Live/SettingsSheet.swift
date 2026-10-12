@@ -11,7 +11,7 @@ struct SettingsSheet: View {
     @State private var savingSuper = false
     @State private var showingActivityPreview = false
     @State private var superSaveFailed = false
-    @State private var name = ""
+    @State private var editingName = false
     @State private var actions = SettingsActions()
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
     @State private var confirmingDelete = false
@@ -29,19 +29,9 @@ struct SettingsSheet: View {
             Form {
                 // ED1: you, as your people see you.
                 Section {
-                    HStack {
-                        TextField("New name", text: $name)
-                            .textContentType(.givenName)
-                            .submitLabel(.done)
-                            .onSubmit(rename)
-                            .accessibilityLabel("New name")
-                        Button("Save", action: rename)
-                            .disabled(actions.isRenaming || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                } header: {
-                    Text("Your name")
-                } footer: {
-                    if let message = actions.nameMessage { Text(message) }
+                    YouBand(name: store.myName) { editingName = true }
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.personBand(store.myName ?? "psst"))
                 }
 
                 Section {
@@ -218,11 +208,12 @@ struct SettingsSheet: View {
         .sheet(item: $superPerson) { SuperPsstSheet(connection: $0) }
         .sheet(item: $colouring) { ColourSheet(connection: $0) }
         .sheet(isPresented: $showingPlus) { PsstPlusSheet() }
+        .sheet(isPresented: $editingName) { NameEditSheet() }
         .confirmationDialog("Delete your account?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete account", role: .destructive, action: deleteAccount)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes your name, connections, and signal history from Psst's server. It can't be undone.")
+            Text("This removes your name, connections, and Psst history from Psst's server. It can't be undone.")
         }
     }
 
@@ -234,13 +225,6 @@ struct SettingsSheet: View {
             "Off. Signals still appear when you open Psst."
         default:
             "Off. You chose Not now when you started; turn them on to hear when someone pssts you."
-        }
-    }
-
-    private func rename() {
-        let draft = name
-        Task {
-            if await actions.rename(to: draft, api: store.api, save: { try await store.rename(to: $0) }), name == draft { name = "" }
         }
     }
 

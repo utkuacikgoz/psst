@@ -146,6 +146,10 @@ struct NameEditSheet: View {
     private func save() {
         guard !trimmed.isEmpty, !isSaving else { return }
         guard !unchanged else { dismiss(); return }
+        guard trimmed.count <= 40 else {
+            error = "Names can be 1 to 40 characters."
+            return
+        }
         isSaving = true
         error = nil
         Task {
@@ -155,7 +159,7 @@ struct NameEditSheet: View {
             } catch APIError.offline {
                 error = "No internet right now. Try again once you're back online."
             } catch {
-                self.error = "That didn't save. Names can be 1 to 40 characters."
+                self.error = "That didn't save. Try again in a moment."
             }
             isSaving = false
         }

@@ -33,6 +33,7 @@ CHECKS = [
     ("Typeface: Inter Tight (owner pick 25 Sep)", "Config/Info.plist", r"InterTight-Black\.ttf"),
     ("Alternate app icons", "Config/Psst.xcconfig", r"AppIcon-Night.*AppIcon-Gold.*AppIcon-Pink|AppIcon-Pink.*AppIcon-Gold.*AppIcon-Night"),
     ("Psst+ whisper sounds", "Psst/Live/PsstPlusSheet.swift", r"psst-double"),
+    ("Super Psst ✦ on each band (owner pick 12 Oct)", "Psst/Live/LiveHomeView.swift", r'Image\(systemName: "sparkle"\)'),
     ("Leaderboard podium, all time + this month (owner pick 12 Oct)", "Psst/Live/FeatureViews.swift", r'podiumBand.*Text\("This month"\)|Text\("This month"\).*podiumBand'),
     ("One exchange line with seen, no corner duplicate (owner pick 12 Oct)", "Psst/PersonRow.swift", r'Text\("· seen"\)'),
 ]

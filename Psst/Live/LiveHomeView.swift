@@ -481,6 +481,23 @@ struct LiveHomeView: View {
             .accessibilityAction(named: "Manage \(connection.otherName)") { managing = connection }
             .accessibilityAction(named: "Move up") { withAnimation { store.move(connection.id, by: -1) } }
             .accessibilityAction(named: "Move down") { withAnimation { store.move(connection.id, by: 1) } }
+            // ✦ (owner pick, 12 Oct): Super Psst without holding. It sits on top of
+            // the band, not inside the band's button, so tapping the band still sends a Psst.
+            .overlay(alignment: .bottomTrailing) {
+                Button {
+                    store.dismissSuperHint()
+                    superPerson = connection
+                } label: {
+                    Image(systemName: "sparkle")
+                        .font(.psst(.title3, weight: .bold))
+                        .foregroundStyle(Color.onBandSoft)
+                        .frame(width: Tokens.minTouch, height: Tokens.minTouch)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(Tokens.Space.s)
+                .accessibilityLabel("Super Psst for \(connection.otherName)")
+            }
             // Hold and drag onto another band to take its place. The placed order
             // stays on this phone.
             .draggable(connection.id.uuidString)

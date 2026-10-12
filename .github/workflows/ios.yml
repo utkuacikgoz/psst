@@ -62,7 +62,10 @@ jobs:
           TEST_RUNNER_PSST_SIZE_LABEL="${{ inputs.text_size }}" xcodebuild test \
             -project Psst.xcodeproj -scheme Psst -destination "id=$UDID" \
             -only-testing:"${{ inputs.tests }}" \
-            -resultBundlePath results.xcresult CODE_SIGNING_ALLOWED=NO || status=1
+            -resultBundlePath results.xcresult CODE_SIGNING_ALLOWED=NO 2>&1 | tee xcodebuild.log || status=1
+          [ "${PIPESTATUS[0]}" = 0 ] || status=1
+          # Surface each failing assertion as an annotation (readable without the log).
+          grep -E "error: -\[|Test Case .* failed" xcodebuild.log | head -20 | sed 's/^/::error::/' || true
           python3 scripts/export_screenshots.py results.xcresult shots || true
           exit $status
       - name: Publish to the screenshots branch

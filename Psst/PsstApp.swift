@@ -25,6 +25,12 @@ struct PsstApp: App {
                             }
                         }
                     }
+                    // "Offline" follows iOS's network status, not a single failed request.
+                    .task {
+                        for await available in NetworkWatcher.updates() {
+                            store.networkPathChanged(available: available)
+                        }
+                    }
                     .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                         if let url = activity.webpageURL, let code = InviteLink.code(from: url) {
                             store.pendingInviteCode = code

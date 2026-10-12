@@ -19,3 +19,19 @@ final class ExchangeLineTests: XCTestCase {
         XCTAssertEqual(PersonRow.lowercasedStart("Oct 3"), "Oct 3")
     }
 }
+
+final class TransportErrorTests: XCTestCase {
+    func testCancellationIsNotOffline() {
+        XCTAssertEqual(APIClient.apiError(for: URLError(.cancelled)), .cancelled)
+        XCTAssertEqual(APIClient.apiError(for: CancellationError()), .cancelled)
+        XCTAssertEqual(APIClient.apiError(for: URLError(.networkConnectionLost)), .offline)
+        XCTAssertEqual(APIClient.apiError(for: URLError(.timedOut)), .offline)
+    }
+
+    func testCallsThatWouldDuplicateAreNeverRetried() {
+        XCTAssertFalse(APIClient.isRetryable("rest/v1/rpc/create_invite"))
+        XCTAssertFalse(APIClient.isRetryable("rest/v1/rpc/report_user"))
+        XCTAssertTrue(APIClient.isRetryable("functions/v1/send-signal"))
+        XCTAssertTrue(APIClient.isRetryable("rest/v1/rpc/list_connections"))
+    }
+}

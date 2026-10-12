@@ -70,7 +70,12 @@ final class LiveStore {
     var arrival: Arrival?
     /// MA2: the senders still to show, oldest first, so the newest comes last.
     private(set) var arrivalQueue: [Arrival] = []
+    /// Shown as "Offline" on home. True only when iOS says there's no network, or
+    /// two requests in a row couldn't reach the server: one blip (a network handoff,
+    /// the first request after coming back to the app) isn't being offline.
     private(set) var isOffline = false
+    private(set) var networkAvailable = true
+    @ObservationIgnored private var failedInARow = 0
     private(set) var hasLoadedConnections = false
     /// A short, factual message for the home screen (e.g. a connection that ended).
     var notice: String?
@@ -201,6 +206,32 @@ final class LiveStore {
         defaults.set(name, forKey: Self.myNameKey)
     }
 
+    // MARK: Reachability
+
+    /// iOS's own network status (NWPathMonitor, wired in PsstApp).
+    func networkPathChanged(available: Bool) {
+        networkAvailable = available
+        if available {
+            failedInARow = 0
+            if isOffline {
+                isOffline = false
+                Task { await refresh() }
+            }
+        } else {
+            isOffline = true
+        }
+    }
+
+    private func noteReachable() {
+        failedInARow = 0
+        isOffline = false
+    }
+
+    private func noteUnreachable() {
+        failedInARow += 1
+        isOffline = !networkAvailable || failedInARow >= 2
+    }
+
     // MARK: Loading
 
     /// Loads the people from the server. Calls that overlap (launch, foregrounding,
@@ -227,10 +258,10 @@ final class LiveStore {
             }
             if !hasLoadedConnections { reorderByRecency() }
             hasLoadedConnections = true
-            isOffline = false
+            noteReachable()
             await showUnseenIfVisible()
         } catch APIError.offline {
-            isOffline = true
+            noteUnreachable()
         } catch APIError.signedOut {
             resetLocalAccount()
         } catch {
@@ -447,7 +478,7 @@ final class LiveStore {
         sendStates[connectionID] = .sending(eventID: eventID, signal: signal)
         do {
             let result = try await api.sendSignal(eventID: eventID, connectionID: connectionID, signal: signal)
-            isOffline = false
+            noteReachable()
             // Acceptance includes the authoritative timestamp, even if the
             // subsequent list refresh fails. Never synthesize a sent time.
             connections = connections.map { connection in
@@ -478,18 +509,18 @@ final class LiveStore {
             connections.removeAll { $0.id == connectionID }
             notice = name.map { "\($0) isn't here any more." } ?? "That person isn't here any more."
         } catch APIError.server(_, "super_daily_limit") {
-            isOffline = false
+            noteReachable()
             sendStates[connectionID] = nil
             notice = "Today's Super Psst is used. Hold a person to see when it resets."
         } catch APIError.server(429, _) {
-            isOffline = false
+            noteReachable()
             pausedUntil[connectionID] = now().addingTimeInterval(Self.pauseDuration)
             sendStates[connectionID] = .failed(eventID: eventID, signal: signal, reason: .rateLimited)
         } catch APIError.signedOut {
             sendStates[connectionID] = nil
             resetLocalAccount()
         } catch {
-            if case APIError.offline? = error as? APIError { isOffline = true }
+            if case APIError.offline? = error as? APIError { noteUnreachable() }
             sendStates[connectionID] = .failed(eventID: eventID, signal: signal, reason: .retry)
         }
     }

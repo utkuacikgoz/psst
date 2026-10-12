@@ -275,7 +275,7 @@ final class LiveStoreTests: XCTestCase {
         api.sendError = APIError.offline
         await store.tap(ada)?.value
         XCTAssertEqual(store.status(for: ada), .notSent(.psst))
-        XCTAssertTrue(store.isOffline)
+        XCTAssertFalse(store.isOffline, "One failed request is a blip, not offline")
 
         api.sendError = nil
         await store.tap(ada)?.value
@@ -520,6 +520,30 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(api.acked, [payload.eventID, payload.eventID])
         XCTAssertEqual(api.sentEventIDs, [.reply(to: payload.eventID), .reply(to: payload.eventID)])
         XCTAssertNotEqual(UUID.reply(to: payload.eventID), payload.eventID)
+    }
+
+    func testOfflineNeedsTwoFailuresInARowOrNoNetwork() async {
+        api.listError = APIError.offline
+        await store.refresh()
+        XCTAssertFalse(store.isOffline)
+        await store.refresh()
+        XCTAssertTrue(store.isOffline)
+
+        api.listError = nil
+        await store.refresh()
+        XCTAssertFalse(store.isOffline, "One success clears it")
+
+        store.networkPathChanged(available: false)
+        XCTAssertTrue(store.isOffline, "No network at all shows straight away")
+        store.networkPathChanged(available: true)
+        XCTAssertFalse(store.isOffline)
+    }
+
+    func testCancelledRequestsAreNotOffline() async {
+        api.listError = APIError.cancelled
+        await store.refresh()
+        await store.refresh()
+        XCTAssertFalse(store.isOffline)
     }
 
     func testFailedSendBackReportsFailure() async {

@@ -3,6 +3,9 @@ import Foundation
 enum APIError: Error, Equatable {
     /// No connection, timeout or similar: nothing reached the server.
     case offline
+    /// The request was cancelled (the app left the foreground, or its screen went away).
+    /// Not a sign of being offline.
+    case cancelled
     /// The server answered with an error code such as "not_connected".
     case server(status: Int, code: String)
     case signedOut
@@ -253,13 +256,7 @@ final class APIClient: PsstAPI {
         }
         request.httpBody = try JSONEncoder().encode(body)
 
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await urlSession.data(for: request)
-        } catch {
-            throw APIError.offline
-        }
+        let (data, response) = try await fetch(request, path: path)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
             throw APIError.server(status: http.statusCode, code: Self.errorCode(from: data))
@@ -273,6 +270,31 @@ final class APIClient: PsstAPI {
             if let empty = EmptyResponse() as? Response { return empty }
             throw APIError.invalidResponse
         }
+    }
+
+    /// One request, with one immediate retry when iOS reports the connection was lost:
+    /// it drops idle connections while the app is in the background, so the first
+    /// request after coming back often fails that way and succeeds on a second try.
+    /// Calls that would duplicate something if repeated are never retried.
+    private func fetch(_ request: URLRequest, path: String) async throws -> (Data, URLResponse) {
+        do {
+            return try await urlSession.data(for: request)
+        } catch let error as URLError where error.code == .networkConnectionLost && Self.isRetryable(path) {
+            do { return try await urlSession.data(for: request) } catch { throw Self.apiError(for: error) }
+        } catch {
+            throw Self.apiError(for: error)
+        }
+    }
+
+    nonisolated static func apiError(for error: Error) -> APIError {
+        if (error as? URLError)?.code == .cancelled || error is CancellationError { return .cancelled }
+        return .offline
+    }
+
+    /// Creating an invite or reporting someone twice would make two; everything
+    /// else is safe to repeat (sends reuse their event ID).
+    nonisolated static func isRetryable(_ path: String) -> Bool {
+        !["rest/v1/rpc/create_invite", "rest/v1/rpc/report_user"].contains(path)
     }
 
     /// PostgREST errors carry the code in "message"; functions use "error"; auth uses "error_code".

@@ -37,10 +37,18 @@ struct PersonRow: View {
                         .frame(minHeight: nameSize * 1.15)
                 }
                 if let exchangeDate, let exchangeFromMe {
+                    // One line (owner pick, 12 Oct): "Sent 1m ago · seen ✓". Until they
+                    // open it, just "Sent 1m ago"; no second "sent" in the corner.
                     TimelineView(.periodic(from: .now, by: 60)) { context in
-                        Text("\(exchangeFromMe ? "Sent" : "Received") · \(ExchangeTime.label(exchangeDate, now: context.date))")
-                            .font(.psst(.subheadline, weight: .semibold))
-                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: Tokens.Space.xs) {
+                            Text("\(exchangeFromMe ? "Sent" : "Received") \(Self.lowercasedStart(ExchangeTime.label(exchangeDate, now: context.date)))")
+                            if exchangeFromMe && cornerMark == "seen" {
+                                Text("· seen")
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                        .font(.psst(.subheadline, weight: .semibold))
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 // Transient sending or failure status stays separate from the timestamp.
@@ -59,7 +67,8 @@ struct PersonRow: View {
             .padding(.vertical, Tokens.Band.verticalPadding)
             .frame(maxWidth: .infinity, minHeight: minHeight)
             .overlay(alignment: .bottomTrailing) {
-                if let cornerMark, !showingEffect {
+                // Only when there's no exchange line to carry it.
+                if let cornerMark, !showingEffect, exchangeDate == nil {
                     HStack(spacing: Tokens.Space.xs) {
                         Text(cornerMark)
                         if cornerMark == "seen" { Image(systemName: "checkmark") }
@@ -86,6 +95,14 @@ struct PersonRow: View {
             guard !Task.isCancelled else { return }
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) { showingEffect = false }
         }
+    }
+}
+
+extension PersonRow {
+    /// "Just now" → "just now", "Yesterday" → "yesterday", so it reads after "Sent".
+    /// Times ("14:05") and dates ("Oct 3") stay as they are.
+    static func lowercasedStart(_ label: String) -> String {
+        label == "Just now" || label == "Yesterday" ? label.lowercased() : label
     }
 }
 

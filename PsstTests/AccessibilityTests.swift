@@ -10,3 +10,12 @@ final class AccessibilityTests: XCTestCase {
         XCTAssertEqual(Set(Personalization.colourNames.values).count, Personalization.palette.count)
     }
 }
+
+final class ExchangeLineTests: XCTestCase {
+    func testOnlyWordsAreLowercasedAfterSent() {
+        XCTAssertEqual(PersonRow.lowercasedStart("Just now"), "just now")
+        XCTAssertEqual(PersonRow.lowercasedStart("Yesterday"), "yesterday")
+        XCTAssertEqual(PersonRow.lowercasedStart("12m ago"), "12m ago")
+        XCTAssertEqual(PersonRow.lowercasedStart("Oct 3"), "Oct 3")
+    }
+}

@@ -101,58 +101,154 @@ struct FeatureIntroSheet: View {
     }
 }
 
+/// Your private leaderboard (owner pick, 12 Oct 2026): the top three as big bands
+/// in their own colours, everyone else in a list. All time or this month; sent,
+/// received or both. Only you see it.
 struct ActivityView: View {
-    @Environment(LiveStore.self) private var store
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var rows: [ActivitySummary] = []
-    @State private var received = false
-    @State private var loading = true
-    @State private var failed = false
-    private var ranked: [ActivitySummary] {
-        rows.filter { (received ? $0.receivedCount : $0.sentCount) > 0 }.sorted {
-            let a = received ? $0.receivedCount : $0.sentCount
-            let b = received ? $1.receivedCount : $1.sentCount
-            return a == b ? $0.otherName.localizedStandardCompare($1.otherName) == .orderedAscending : a > b
-        }
-    }
-    var body: some View {
-        List {
-            Section {
-                if dynamicTypeSize.isAccessibilitySize {
-                    directionPicker.pickerStyle(.inline)
-                } else {
-                    directionPicker.pickerStyle(.segmented)
-                }
-            } footer: { Text("Your exchanges over the last 30 days. Includes Super Pssts. Only you can see this.") }
-            Section(received ? "Most received from" : "Most sent to") {
-                if loading { ProgressView("Loading activity") }
-                else if failed { Button("Couldn't load activity. Try again") { Task { await load() } } }
-                else if ranked.isEmpty { Text("No exchanges yet. Your activity will appear here after you psst.").foregroundStyle(.secondary) }
-                else {
-                    ForEach(ranked) { row in
-                        HStack {
-                            Text(row.otherName)
-                            Spacer()
-                            Text("\(received ? row.receivedCount : row.sentCount)").monospacedDigit().foregroundStyle(.secondary)
-                        }.accessibilityElement(children: .combine)
-                    }
-                }
+    enum Direction: String, CaseIterable, Identifiable {
+        case sent = "Sent to", received = "Received from", both = "Both"
+        var id: String { rawValue }
+        var heading: String {
+            switch self {
+            case .sent: "Most sent to"
+            case .received: "Most received from"
+            case .both: "Most exchanged with"
             }
         }
+    }
+
+    @Environment(LiveStore.self) private var store
+    @Environment(Personalization.self) private var personalization
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var rows: [ActivitySummary] = []
+    @State private var direction: Direction = .sent
+    @State private var allTime = true
+    @State private var loading = true
+    @State private var failed = false
+    @ScaledMetric(relativeTo: .largeTitle) private var podiumName: CGFloat = 30
+    @ScaledMetric(relativeTo: .largeTitle) private var podiumCount: CGFloat = 30
+
+    private func count(_ row: ActivitySummary) -> Int {
+        switch direction {
+        case .sent: allTime ? row.sentAll : row.sentMonth
+        case .received: allTime ? row.receivedAll : row.receivedMonth
+        case .both: allTime ? row.sentAll + row.receivedAll : row.sentMonth + row.receivedMonth
+        }
+    }
+
+    private var ranked: [ActivitySummary] {
+        rows.filter { count($0) > 0 }.sorted {
+            count($0) == count($1)
+                ? $0.otherName.localizedStandardCompare($1.otherName) == .orderedAscending
+                : count($0) > count($1)
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                controls
+                    .padding(.horizontal, Tokens.Space.l)
+                    .padding(.vertical, Tokens.Space.m)
+                Text(direction.heading)
+                    .font(.psst(.footnote, weight: .bold))
+                    .tracking(Tokens.Band.labelTracking)
+                    .textCase(.uppercase)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, Tokens.Space.l)
+                    .padding(.bottom, Tokens.Space.s)
+                    .accessibilityAddTraits(.isHeader)
+                if loading {
+                    ProgressView("Loading activity").frame(maxWidth: .infinity).padding(Tokens.Space.xl)
+                } else if failed {
+                    Button("Couldn't load activity. Try again") { Task { await load() } }
+                        .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
+                } else if ranked.isEmpty {
+                    Text(allTime ? "No Pssts yet. Your leaderboard starts with your first one."
+                                 : "No Pssts this month yet.")
+                        .foregroundStyle(.secondary)
+                        .padding(Tokens.Space.l)
+                } else {
+                    ForEach(Array(ranked.prefix(3).enumerated()), id: \.element.id) { index, row in
+                        podiumBand(rank: index + 1, row: row)
+                    }
+                    ForEach(Array(ranked.dropFirst(3).enumerated()), id: \.element.id) { index, row in
+                        listRow(rank: index + 4, row: row)
+                        Divider().padding(.leading, Tokens.Space.l)
+                    }
+                }
+                Text("Only you see this. Super Pssts count too. All time counts from 30 days before this update.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(Tokens.Space.l)
+            }
+        }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle("Your Psst activity")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load() }
     }
-    private var directionPicker: some View {
-        Picker("Rank by", selection: $received) {
-            Text("Sent to").tag(false)
-            Text("Received from").tag(true)
+
+    @ViewBuilder private var controls: some View {
+        let range = Picker("Time", selection: $allTime) {
+            Text("All time").tag(true)
+            Text("This month").tag(false)
+        }
+        let who = Picker("Rank by", selection: $direction) {
+            ForEach(Direction.allCases) { Text($0.rawValue).tag($0) }
+        }
+        VStack(spacing: Tokens.Space.s) {
+            if dynamicTypeSize.isAccessibilitySize {
+                range.pickerStyle(.inline)
+                who.pickerStyle(.inline)
+            } else {
+                range.pickerStyle(.segmented)
+                who.pickerStyle(.segmented)
+            }
         }
     }
+
+    /// First, second and third: their band, their colour, the count.
+    private func podiumBand(rank: Int, row: ActivitySummary) -> some View {
+        let scale: CGFloat = rank == 1 ? 1 : rank == 2 ? 0.85 : 0.75
+        return HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.m) {
+            Text("\(rank)")
+                .font(.psst(.title3, weight: .black))
+                .foregroundStyle(Color.onBandSoft)
+            Text(row.otherName.uppercased())
+                .bandTitle(row.otherName, size: podiumName * scale, tracking: Tokens.Band.titleTracking)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("\(count(row))")
+                .font(.psst(size: podiumCount * scale, weight: .black))
+                .monospacedDigit()
+        }
+        .foregroundStyle(Color.onCanvas)
+        .padding(.horizontal, Tokens.Space.l)
+        .frame(maxWidth: .infinity, minHeight: 72 + 40 * scale)
+        .background(Color(hex: personalization.colorHex(for: row.connectionId, name: row.otherName)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Number \(rank), \(row.otherName), \(count(row))")
+    }
+
+    private func listRow(rank: Int, row: ActivitySummary) -> some View {
+        HStack(spacing: Tokens.Space.m) {
+            Text("\(rank)").monospacedDigit().foregroundStyle(.secondary).frame(minWidth: 24, alignment: .leading)
+            Text(row.otherName)
+            Spacer()
+            Text("\(count(row))").monospacedDigit().foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, Tokens.Space.l)
+        .frame(minHeight: Tokens.minTouch)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Number \(rank), \(row.otherName), \(count(row))")
+    }
+
     private func load() async {
         loading = true; failed = false
-        do { rows = try await store.api.activity() } catch { failed = true }
+        let monthStart = Calendar.current.dateInterval(of: .month, for: .now)?.start ?? .now
+        do { rows = try await store.api.activity(monthStart: monthStart) } catch { failed = true }
         loading = false
     }
 }

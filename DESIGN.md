@@ -6,7 +6,7 @@ Read `CLAUDE.md` first. This guide is self-contained for this repository. Exact 
 
 The latest owner decisions supersede earlier restrictions on persistent row
 metadata and personal-only Psst+ extras. See `docs/FEATURE_RELEASE.md` for the
-complete behavior: latest exchange time, private 30-day activity rankings,
+complete behavior: latest exchange time, private activity rankings,
 Super Psst in each person’s long-press menu (one daily total; unlimited with verified Psst+),
 optional recipient effects, one-time feature introduction and a subtle vector cat.
 Ordinary taps and replies remain free Pssts. Purple wordmark stays the default
@@ -80,6 +80,7 @@ The owner explicitly chose **Yo** after rejecting the earlier cobalt-card design
 - Accounts are anonymous and live on one phone. On a new phone you choose your name again and re-invite your people (owner decision NP1).
 - The first time home has someone to tap, a one-time dark overlay shows a tapping hand: "Tap a band to psst" / "Hold for Super Psst". Any tap only dismisses it; it never sends.
 - Design review (owner go, 12 Oct 2026): names and headlines are Inter Tight Black everywhere (no SF in brand moments); the + band is a fixed 96 pt strip so people get the height; one gold (#A66700); each person's usual colour is given in join order (keeping their old name colour when free) and home never shows two neighbours in the same usual colour; arrivals show FROM / NAME / "psst" with a PSST BACK band at the bottom; same moment uses full-size names with the halves meeting at the seam; the Super Psst sheet is the person's band; What's new shows only to people who had Psst before and have someone to psst.
+- Leaderboard and band line (owner picks, 12 Oct 2026): Your Psst activity is a podium (top three as bands in their colours with the count, everyone else in a list), switchable All time / This month and Sent to / Received from / Both; all time comes from two counts per pair kept beyond the 30-day purge. A band's exchange line reads "Sent 1m ago · seen ✓" (just "Sent 1m ago" until they open it), with no separate corner word.
 - Typeface (owner pick, 25 Sep 2026): **Inter Tight**, the same face as psstapp.fun. It's bundled in the app (Psst/Fonts, SIL Open Font License) and used through `Font.psst(...)`: Black for band names and headlines, Bold/SemiBold/Medium for lines and labels. It scales with Dynamic Type. Standard iPhone lists (Settings, Psst+, alerts) keep the system font. SF Symbols stay on the system font.
 - App icon (final, owner-approved 25 Sep 2026): the white lowercase "psst" wordmark on #713F93, matching the launch screen. Psst+ offers Night, Gold and Pink versions of the same mark.
 - The notification's button reads "Psst back".

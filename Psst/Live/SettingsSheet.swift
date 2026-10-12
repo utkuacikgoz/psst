@@ -37,7 +37,7 @@ struct SettingsSheet: View {
                 Section {
                     NavigationLink("Your Psst activity") { ActivityView() }
                 } footer: {
-                    Text("Your personal sent and received rankings over the last 30 days.")
+                    Text("Your private leaderboard, all time or this month.")
                 }
 
                 Section {

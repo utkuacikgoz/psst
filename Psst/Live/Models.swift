@@ -143,11 +143,15 @@ enum InviteLink {
 }
 
 
+/// One person on your private leaderboard: all-time counts (kept as two numbers
+/// per pair) and this month's (from the Pssts kept for 30 days).
 struct ActivitySummary: Decodable, Identifiable, Equatable {
     let connectionId: UUID
     let otherName: String
-    let sentCount: Int
-    let receivedCount: Int
+    let sentAll: Int
+    let receivedAll: Int
+    let sentMonth: Int
+    let receivedMonth: Int
     var id: UUID { connectionId }
 }
 

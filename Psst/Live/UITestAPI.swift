@@ -115,9 +115,10 @@ final class UITestAPI: PsstAPI {
 
     private var usedSuper = false
     private var superEffectsEnabled = true
-    func activity() async throws -> [ActivitySummary] {
+    func activity(monthStart: Date) async throws -> [ActivitySummary] {
         names.map { id, name in ActivitySummary(connectionId: id, otherName: name,
-            sentCount: id == emre ? 12 : 3, receivedCount: id == ada ? 18 : 2) }
+            sentAll: id == emre ? 212 : id == ada ? 148 : 31, receivedAll: id == ada ? 260 : id == emre ? 96 : 12,
+            sentMonth: id == emre ? 12 : 3, receivedMonth: id == ada ? 18 : 2) }
     }
     func superAllowance() async throws -> SuperAllowance {
         var calendar = Calendar(identifier: .gregorian)

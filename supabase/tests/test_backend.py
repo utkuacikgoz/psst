@@ -573,6 +573,29 @@ class BackendTests(unittest.TestCase):
         a.rpc("block_user", b.user_id)
         self.assertEqual(a.rows("select * from public.personal_activity()"), [])
 
+    def test_all_time_activity_survives_the_purge_and_counts_each_psst_once(self):
+        a, b, stranger = new_user("A"), new_user("B"), new_user("Stranger")
+        pair = connect(a, b)
+        first = uuid.uuid4()
+        a.rpc("send_signal", first, pair, "psst")
+        a.rpc("send_signal", first, pair, "psst")  # retry: same event, counted once
+        old = uuid.uuid4()
+        a.rpc("send_signal", old, pair, "psst")
+        b.rpc("send_signal", uuid.uuid4(), pair, "super_psst")
+        admin("update public.signal_events set created_at=now()-interval '40 days' where id=%s", old)
+        admin("select private.purge_expired()")
+        month = "now() - interval '20 days'"
+        rows = a.rows(f"select other_name,sent_all,received_all,sent_month,received_month from public.personal_activity_all({month})")
+        self.assertEqual(rows, [("B", 2, 1, 1, 1)])
+        self.assertEqual(b.rows(f"select sent_all,received_all from public.personal_activity_all({month})"), [(1, 2)])
+        self.assertEqual(stranger.rows(f"select * from public.personal_activity_all({month})"), [])
+        with self.assertRaises(errors.InsufficientPrivilege):
+            a.rows("select * from private.pair_counts")
+        with self.assertRaises(errors.InsufficientPrivilege):
+            Api("anon").rpc("personal_activity_all", None)
+        a.rpc("remove_connection", pair)
+        self.assertEqual(admin("select count(*) from private.pair_counts where connection_id = %s", pair)[0][0], 0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)

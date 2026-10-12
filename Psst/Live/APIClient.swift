@@ -14,7 +14,7 @@ enum APIError: Error, Equatable {
 protocol PsstAPI: AnyObject {
     var isSignedIn: Bool { get }
     var accountID: UUID? { get }
-    func activity() async throws -> [ActivitySummary]
+    func activity(monthStart: Date) async throws -> [ActivitySummary]
     func superAllowance() async throws -> SuperAllowance
     func setSuperEffects(_ enabled: Bool) async throws
     func verifyPlus(signedTransaction: String) async throws
@@ -43,7 +43,7 @@ protocol PsstAPI: AnyObject {
 
 extension PsstAPI {
     var accountID: UUID? { nil }
-    func activity() async throws -> [ActivitySummary] { throw APIError.server(status: 503, code: "feature_unavailable") }
+    func activity(monthStart: Date) async throws -> [ActivitySummary] { throw APIError.server(status: 503, code: "feature_unavailable") }
     func superAllowance() async throws -> SuperAllowance { throw APIError.server(status: 503, code: "feature_unavailable") }
     func setSuperEffects(_ enabled: Bool) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
     func verifyPlus(signedTransaction: String) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
@@ -73,7 +73,9 @@ final class APIClient: PsstAPI {
 
     var isSignedIn: Bool { session != nil }
     var accountID: UUID? { session?.userID }
-    func activity() async throws -> [ActivitySummary] { try await rpc("personal_activity", [String: String]()) }
+    func activity(monthStart: Date) async throws -> [ActivitySummary] {
+        try await rpc("personal_activity_all", ["p_month_start": monthStart.ISO8601Format()])
+    }
     func superAllowance() async throws -> SuperAllowance { try await rpc("super_allowance", [String: String]()) }
     func setSuperEffects(_ enabled: Bool) async throws { try await rpcVoid("set_super_effects", ["p_enabled": enabled]) }
     func verifyPlus(signedTransaction: String) async throws {

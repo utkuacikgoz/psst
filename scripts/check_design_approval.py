@@ -26,7 +26,11 @@ def git(*args):
 
 def main():
     base, head = sys.argv[1], sys.argv[2]
-    if set(base) == {"0"}:  # new branch: check just the head commit
+    def is_ancestor(a, b):
+        return subprocess.run(["git", "merge-base", "--is-ancestor", a, b], capture_output=True).returncode == 0
+    # New branch, or a rewritten history whose old tip no longer exists here:
+    # check just the head commit.
+    if set(base) == {"0"} or not is_ancestor(base, head):
         base = head + "~1"
     missing = []
     for sha in git("rev-list", "--no-merges", f"{base}..{head}").split():

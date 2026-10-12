@@ -109,9 +109,20 @@ report records the remaining device-size checks separately.
 Current main was integrated before release, retaining its widget, additional
 whisper sounds, notification setup, cache and startup improvements. App and widget
 versions are 1.0.3. The backend workflow configures purchase-verification secrets
-from existing App Store Connect credentials and Apple's public root certificate.
+using App Store Connect credentials for app metadata, a separate In-App Purchase
+key for transaction verification, and Apple’s public root certificate.
 Choose Sandbox for TestFlight purchases even when the app uses the production
 Supabase backend; choose Production for App Store purchases. Public privacy
 disclosures now include daily usage and purchase-verification records.
 
 Integrated iOS unit suite: 67 passed. PostgreSQL and Deno CI checks passed.
+
+### Apple key separation
+
+GitHub secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_KEY_P8` are only for
+App Store Connect metadata and TestFlight upload. Transaction verification requires
+`IAP_KEY_ID`, `IAP_ISSUER_ID`, and `IAP_KEY_P8`, generated under In-App Purchase.
+The deployment authenticates this key with a read-only transaction API request.
+When it is absent, paid verification fails closed and the free daily allowance
+continues to work. The deployment clears stale upload-key values from verifier
+configuration. See [Apple’s key guide](https://developer.apple.com/documentation/appstoreserverapi/creating-api-keys-to-authorize-api-requests).

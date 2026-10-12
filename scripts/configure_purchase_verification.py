@@ -8,6 +8,8 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+import urllib.error
+import uuid
 import jwt
 
 
@@ -36,14 +38,44 @@ def main():
     certificate = x509.load_der_x509_certificate(root)
     if certificate.subject != certificate.issuer or not certificate.extensions.get_extension_for_class(x509.BasicConstraints).value.ca:
         raise ValueError('Apple trust root is not a root CA')
+    # App Store Connect keys authorize metadata/upload operations only. Apple's
+    # transaction API requires the separately generated In-App Purchase key.
+    iap_id = os.environ.get('IAP_KEY_ID', '')
+    iap_issuer = os.environ.get('IAP_ISSUER_ID', '')
+    iap_raw = os.environ.get('IAP_KEY_P8', '')
+    iap_pem = ''
+    if iap_id and iap_issuer and iap_raw:
+        iap_body = ''.join(line for line in iap_raw.splitlines() if not line.startswith('-----'))
+        iap_body = ''.join(iap_body.split())
+        base64.b64decode(iap_body, validate=True)
+        iap_pem = '-----BEGIN PRIVATE KEY-----\n' + '\n'.join(iap_body[i:i+64] for i in range(0, len(iap_body), 64)) + '\n-----END PRIVATE KEY-----\n'
+        iap_token = jwt.encode({'iss': iap_issuer, 'iat': int(time.time()),
+            'exp': int(time.time()) + 600, 'aud': 'appstoreconnect-v1', 'bid': bundle},
+            iap_pem, algorithm='ES256', headers={'kid': iap_id, 'typ': 'JWT'})
+        host = 'api.storekit-sandbox.itunes.apple.com' if environment == 'Sandbox' else 'api.storekit.itunes.apple.com'
+        # Read a nonexistent test-notification status: authenticated keys return
+        # Not Found; this does not send a notification or modify any transaction.
+        probe = urllib.request.Request('https://' + host + '/inApps/v1/notifications/test/' + str(uuid.uuid4()),
+            headers={'Authorization': 'Bearer ' + iap_token})
+        try:
+            urllib.request.urlopen(probe, timeout=30).close()
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise ValueError('App Store Server API key check failed (HTTP ' + str(error.code) + ')') from None
+        print('In-App Purchase key authenticated with Apple transaction API.')
+    else:
+        iap_id = iap_issuer = ''
+        print('::warning::In-App Purchase key is missing. Unlimited Super Psst verification stays unavailable; the daily free allowance works.')
     values = {'APP_STORE_ENVIRONMENT': environment, 'APP_STORE_BUNDLE_ID': bundle,
-              'APP_STORE_APP_ID': exact[0]['id'], 'APP_STORE_ISSUER_ID': issuer,
-              'APP_STORE_KEY_ID': key_id, 'APP_STORE_PRIVATE_KEY': pem,
+              'APP_STORE_APP_ID': exact[0]['id'], 'APP_STORE_ISSUER_ID': iap_issuer,
+              'APP_STORE_KEY_ID': iap_id, 'APP_STORE_PRIVATE_KEY': iap_pem,
               'APPLE_ROOT_CA_BASE64': json.dumps([base64.b64encode(root).decode()])}
     path = Path(sys.argv[1])
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(descriptor, 'w') as output:
         for name, value in values.items():
+            if value == '':
+                continue
             output.write(name + '=' + json.dumps(value) + '\n')
     print('Purchase verification configuration prepared for ' + environment + '; credentials not printed.')
 

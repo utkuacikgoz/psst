@@ -27,3 +27,7 @@ Read `CLAUDE.md` and `DESIGN.md` first. These rules come from the owner.
    owner asks: they cost the owner money.
 5. **Tests: find the cause before changing them.** Get evidence (failure
    annotation or screenshot) first; never "fix" a test by guessing.
+6. **Commits are the owner's.** Author and committer: `Utku
+   <55285576+utkuacikgoz@users.noreply.github.com>`. No AI or tool names in
+   commit messages, trailers, PR text or branch names (no Co-Authored-By,
+   session links or "generated with" lines).

@@ -37,7 +37,11 @@ jobs:
           set -o pipefail
           xcodebuild test -project Psst.xcodeproj -scheme Psst \
             -destination "id=$(python3 scripts/pick_simulators.py any)" \
-            -only-testing:PsstTests CODE_SIGNING_ALLOWED=NO
+            -only-testing:PsstTests CODE_SIGNING_ALLOWED=NO 2>&1 | tee xcodebuild.log || {
+              # Surface compile errors and failing tests as annotations (readable without the log).
+              grep -E "error:|Test Case .* failed" xcodebuild.log | sort -u | head -30 | sed 's/^/::error::/'
+              exit 1
+            }
 
   screenshots:
     if: github.event_name == 'workflow_dispatch'

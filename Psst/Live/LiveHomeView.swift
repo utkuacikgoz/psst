@@ -104,7 +104,8 @@ struct LiveHomeView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var showsCoach: Bool { store.showsCoach && store.hasLoadedConnections && !anySheet }
+    /// The tip waits for any full-screen moment to finish, so the two never stack.
+    private var showsCoach: Bool { store.showsCoach && store.hasLoadedConnections && !anySheet && store.arrival == nil }
 
     private var anySheet: Bool {
         showingFeatureIntro || superPerson != nil || showingInvite || enteringCode || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil

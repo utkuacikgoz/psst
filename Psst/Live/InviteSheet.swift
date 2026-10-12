@@ -6,7 +6,7 @@ struct InviteSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    /// Opens straight on entering a code ("Got a code?" on the empty home).
+    /// Opens straight on entering a code ("I have a code" on the empty home).
     var startEntering = false
 
     private enum Mode { case choose, share, enter }

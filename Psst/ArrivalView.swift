@@ -92,14 +92,15 @@ struct ArrivalView: View {
         .accessibilityHint(hint)
         .accessibilityAddTraits(.isButton)
         .sensoryFeedback(trigger: trigger) { _, _ in
-            guard hapticsEnabled else { return nil }
-            return arrival.kind == .sameMoment ? .success :
-                .impact(flexibility: arrival.kind == .superPsst && superEffectsEnabled ? .solid : .soft)
+            hapticsEnabled && arrival.kind == .sameMoment ? .success : nil
         }
         .task(id: arrival.id) {
             AccessibilityNotification.Announcement(announcement).post()
             try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 150))
             trigger = arrival.id
+            if hapticsEnabled, arrival.kind == .signal || arrival.kind == .superPsst {
+                PsstHaptics.play(arrival.kind == .superPsst && superEffectsEnabled ? .superPsst : .psst)
+            }
             try? await Task.sleep(for: holdTime)
             guard !Task.isCancelled else { return }
             onDone()

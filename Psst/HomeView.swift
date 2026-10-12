@@ -44,7 +44,7 @@ struct HomeView: View {
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: arrival)
         .preferredColorScheme(.dark)
-        .sensoryFeedback(trigger: effect) { _, new in new?.signal.haptic }
+        .sensoryFeedback(trigger: effect) { _, new in arrival == nil ? new?.signal.haptic : nil }
         .task(id: exchange.activePause(for: .me)) {
             guard let until = exchange.activePause(for: .me) else { return }
             try? await Task.sleep(for: .seconds(max(0, until.timeIntervalSinceNow)))

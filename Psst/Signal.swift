@@ -15,8 +15,8 @@ enum Signal: String, CaseIterable, Identifiable, Codable {
     /// White lettering stays readable on this band colour.
     var accent: Color { Color(hex: 0x2476AA) }
     var motion: SignalMotion { SignalMotion(pop: 1.15, squashX: 1, squashY: 1, tilt: 0, hop: -4) }
-    /// Local haptic on devices that support it. Remote pushes cannot promise this.
-    var haptic: SensoryFeedback { .impact(flexibility: self == .superPsst ? .solid : .soft, intensity: 0.8) }
+    /// One very light tick when you send. Arrivals play the "ps-st" pattern (PsstHaptics).
+    var haptic: SensoryFeedback { .impact(weight: .light, intensity: 0.5) }
 }
 
 /// Parameters for the short, row-local effect. Identity values mean no movement.

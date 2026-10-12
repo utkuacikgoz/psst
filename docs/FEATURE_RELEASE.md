@@ -71,8 +71,10 @@ account. Local cosmetic purchase restoration continues to use StoreKit.
 - Accessibility-sized invitations scroll; codes wrap as two readable groups.
 - Introduction and Super sheets scroll using native containers.
 - Home rows use Dynamic Type, 44pt controls, labeled VoiceOver actions and
-  separate sent/seen feedback. Super has optional short foreground haptics and
-  a Reduce Motion-aware visual. No remote custom vibration is promised.
+  separate sent/seen feedback. Sending gives one light tick; an arrival shown in
+  the app plays a "ps-st" Core Haptics pattern timed to the whisper (Super plays
+  it stronger, twice), switchable in Settings. Super has a Reduce Motion-aware
+  visual. No remote custom vibration is promised.
 
 Primary references:
 [UI typography](https://developer.apple.com/videos/play/wwdc2020/10175/),

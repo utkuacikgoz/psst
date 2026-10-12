@@ -1,4 +1,4 @@
-# Psst — standalone Claude Code brief
+# Psst — project brief
 
 This repository contains only Psst, a native iPhone one-tap social app. Build the complete app incrementally from the included interaction prototype. No sibling repository, shared package, or other app is required.
 

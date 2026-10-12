@@ -1,6 +1,6 @@
 # Apple design audit — October 2026
 
-Scope: onboarding, invites, settings, purchases, account/error recovery, accessibility, and navigation outside the active home/Super Psst implementation. Reviewed `CLAUDE.md`, `DESIGN.md`, `docs/FEATURE_RELEASE.md`, SwiftUI source, and screenshots in `output/feature-review`. Apple guidance checked 11 October 2026. Findings distinguish visible evidence from source-level behavior that needs a device check.
+Scope: onboarding, invites, settings, purchases, account/error recovery, accessibility, and navigation outside the active home/Super Psst implementation. Reviewed `AGENTS.md`, `PROJECT.md`, `DESIGN.md`, `docs/FEATURE_RELEASE.md`, SwiftUI source, and screenshots in `output/feature-review`. Apple guidance checked 11 October 2026. Findings distinguish visible evidence from source-level behavior that needs a device check.
 
 ## Findings
 

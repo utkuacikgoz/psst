@@ -1,6 +1,6 @@
 # Psst — design implementation guide
 
-Read `CLAUDE.md` first. This guide is self-contained for this repository. Exact measurements and colours are starting specifications, not separately approved owner decisions.
+Read `PROJECT.md` first. This guide is self-contained for this repository. Exact measurements and colours are starting specifications, not separately approved owner decisions.
 
 ## October 2026 approved feature direction
 

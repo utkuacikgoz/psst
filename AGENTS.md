@@ -1,6 +1,6 @@
-# Rules for every coding agent (Codex, Claude, others)
+# Repository rules
 
-Read `CLAUDE.md` and `DESIGN.md` first. These rules come from the owner.
+Read `PROJECT.md` and `DESIGN.md` first. These rules come from the owner.
 
 0. **Every design change needs the owner's approval first.** Anything that
    changes how the app, widget or site looks (layout, spacing, type, colour,
@@ -27,7 +27,9 @@ Read `CLAUDE.md` and `DESIGN.md` first. These rules come from the owner.
    owner asks: they cost the owner money.
 5. **Tests: find the cause before changing them.** Get evidence (failure
    annotation or screenshot) first; never "fix" a test by guessing.
-6. **Commits are the owner's.** Author and committer: `Utku
-   <55285576+utkuacikgoz@users.noreply.github.com>`. No AI or tool names in
-   commit messages, trailers, PR text or branch names (no Co-Authored-By,
-   session links or "generated with" lines).
+6. **Commits are the owner's.** Use `Utku
+   <55285576+utkuacikgoz@users.noreply.github.com>` as author and committer.
+   Do not add co-author, tool, vendor, or session attribution to commits, PRs,
+   or branches. If disclosure is required, use truthful generic wording and do
+   not claim the work was done without assistance. Use `work/` for new branch
+   names.

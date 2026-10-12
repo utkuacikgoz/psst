@@ -7,8 +7,8 @@ The app has two modes:
 - **Local preview** (default, no setup): one fictional connection, Alex. Everything happens on this phone and is labelled that way.
 - **Live**, when `Config/Secrets.xcconfig` points at a Supabase project: real accounts, invites, sending, push notifications and tap-back. See [`supabase/README.md`](supabase/README.md) for setup and the two-device checklist. The development backend is deployed and passes the live server checks (`scripts/smoke_live.py`); push delivery on physical devices is not yet verified.
 
-## Start Claude Code here
-Read `CLAUDE.md`, then `DESIGN.md`. This folder is an independent repository with no dependency on another project.
+## Project notes
+Read `AGENTS.md`, `PROJECT.md`, then `DESIGN.md`. This folder is an independent repository with no dependency on another project.
 
 ## Try the local preview
 1. Tap **Alex** to play a Psst on this phone.

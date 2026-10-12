@@ -34,9 +34,9 @@ final class LiveScreenshotTests: XCTestCase {
         shot("live-02-notifications")
         notNow.tap()
 
-        // Mia's unseen Psst opens the full-screen arrival, which clears itself.
+        // Ada's unseen Psst opens the full-screen arrival, which clears itself.
         // While it shows, VoiceOver (and so this test) can't reach the bands behind it.
-        XCTAssertTrue(app.buttons["Psst from Mia"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Psst from Ada"].waitForExistence(timeout: 10))
         wait(0.4)
         shot("live-03-arrival")
         wait(2.2)
@@ -48,30 +48,31 @@ final class LiveScreenshotTests: XCTestCase {
         wait(0.5)
         shot("live-04-home")
 
-        // Answering Mia right after her Psst is a same moment.
-        app.buttons["Mia"].tap()
+        // Answering Ada right after her Psst is a same moment.
+        app.buttons["Ada"].tap()
         wait(0.7)
         shot("live-04b-same-moment")
-        wait(3.0)
+        // The bands come back once the same moment closes.
+        XCTAssertTrue(app.buttons["Emre"].waitForExistence(timeout: 8))
 
-        app.buttons["Zoe"].tap()
+        app.buttons["Emre"].tap()
         wait(0.5)
         shot("live-05-sending")
         wait(1.4)
         shot("live-06-sent")
 
-        app.buttons["Ava"].tap()
+        app.buttons["Sam"].tap()
         wait(1.2)
         shot("live-07-not-sent")
-        app.buttons["Ava"].tap()
+        app.buttons["Sam"].tap()
         wait(1.2)
         shot("live-07b-paused")
 
-        app.buttons["Zoe"].press(forDuration: 1.0)
-        XCTAssertTrue(app.buttons["Report Zoe"].waitForExistence(timeout: 5))
+        app.buttons["Emre"].press(forDuration: 1.0)
+        XCTAssertTrue(app.buttons["Report Emre"].waitForExistence(timeout: 5))
         wait(0.4)
         shot("live-09-long-press")
-        app.buttons["Report Zoe"].tap()
+        app.buttons["Report Emre"].tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
         wait(0.3)
         shot("live-09b-report-confirm")
@@ -107,10 +108,10 @@ final class LiveScreenshotTests: XCTestCase {
         shot("live-13-settings")
 
         // At the largest text sizes the people are below the fold.
-        let manageMia = app.buttons["Manage Mia"]
+        let manageMia = app.buttons["Manage Ada"]
         for _ in 0..<4 where !manageMia.isHittable { app.swipeUp() }
         manageMia.tap()
-        XCTAssertTrue(app.buttons["Remove Mia"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Remove Ada"].waitForExistence(timeout: 5))
         wait(0.6)
         shot("live-08-person")
     }

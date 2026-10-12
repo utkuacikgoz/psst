@@ -80,12 +80,11 @@ final class AppStoreScreenshotTests: XCTestCase {
         app.launchArguments += ["-PsstUITestLive", "store", "-PsstUITestPlusUnlocked"]
         app.launch()
 
-        // Let Mia's arrival play out before opening anything; the bands behind it
-        // are hidden from accessibility until it closes.
-        let arrival = app.buttons["Psst from Mia"]
-        XCTAssertTrue(arrival.waitForExistence(timeout: 10))
-        XCTAssertTrue(arrival.waitForNonExistence(timeout: 12))
-        XCTAssertTrue(app.buttons["Mia"].waitForExistence(timeout: 5))
+        // Let Mia's arrival play out before opening anything. The bands behind it
+        // are hidden from accessibility until it closes, so Mia's band appearing
+        // is the sign it has closed.
+        XCTAssertTrue(app.buttons["Psst from Mia"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Mia"].waitForExistence(timeout: 15))
         app.buttons["Psst+"].tap()
         XCTAssertTrue(app.buttons["Play Whisper"].waitForExistence(timeout: 5))
         wait(0.6)

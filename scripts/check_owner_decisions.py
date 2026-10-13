@@ -41,7 +41,7 @@ CHECKS = [
     ("Ps-st pulses when a Psst is sent (owner pick 13 Oct)", "Psst/PersonRow.swift", r"PsstRipple\(trigger: effect\?\.id\)"),
     ("Invite page: Get Psst to the App Store + Smart App Banner (owner pick 13 Oct)", "site/invite.html", r'apple-itunes-app.*id="get"'),
     ("Super Psst ✦ on each band (owner pick 12 Oct)", "Psst/Live/LiveHomeView.swift", r'Image\(systemName: "sparkle"\)'),
-    ("Leaderboard podium, all time + this month (owner pick 12 Oct)", "Psst/Live/FeatureViews.swift", r'podiumBand.*Text\("This month"\)|Text\("This month"\).*podiumBand'),
+    ("Leaderboard podium, all time (owner pick 12 Oct; This month removed 13 Oct)", "Psst/Live/FeatureViews.swift", r'func podiumBand'),
     ("One exchange line with seen, no corner duplicate (owner pick 12 Oct)", "Psst/PersonRow.swift", r'Text\("· seen"\)'),
 ]
 

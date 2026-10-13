@@ -122,7 +122,6 @@ struct ActivityView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var rows: [ActivitySummary] = []
     @State private var direction: Direction = .sent
-    @State private var allTime = true
     @State private var loading = true
     @State private var failed = false
     @ScaledMetric(relativeTo: .largeTitle) private var podiumName: CGFloat = 30
@@ -130,9 +129,9 @@ struct ActivityView: View {
 
     private func count(_ row: ActivitySummary) -> Int {
         switch direction {
-        case .sent: allTime ? row.sentAll : row.sentMonth
-        case .received: allTime ? row.receivedAll : row.receivedMonth
-        case .both: allTime ? row.sentAll + row.receivedAll : row.sentMonth + row.receivedMonth
+        case .sent: row.sentAll
+        case .received: row.receivedAll
+        case .both: row.sentAll + row.receivedAll
         }
     }
 
@@ -164,8 +163,7 @@ struct ActivityView: View {
                     Button("Couldn't load activity. Try again") { Task { await load() } }
                         .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
                 } else if ranked.isEmpty {
-                    Text(allTime ? "No Pssts yet. Your leaderboard starts with your first one."
-                                 : "No Pssts this month yet.")
+                    Text("No Pssts yet. Your leaderboard starts with your first one.")
                         .foregroundStyle(.secondary)
                         .padding(Tokens.Space.l)
                 } else {
@@ -191,21 +189,13 @@ struct ActivityView: View {
     }
 
     @ViewBuilder private var controls: some View {
-        let range = Picker("Time", selection: $allTime) {
-            Text("All time").tag(true)
-            Text("This month").tag(false)
-        }
         let who = Picker("Rank by", selection: $direction) {
             ForEach(Direction.allCases) { Text($0.rawValue).tag($0) }
         }
-        VStack(spacing: Tokens.Space.s) {
-            if dynamicTypeSize.isAccessibilitySize {
-                range.pickerStyle(.inline)
-                who.pickerStyle(.inline)
-            } else {
-                range.pickerStyle(.segmented)
-                who.pickerStyle(.segmented)
-            }
+        if dynamicTypeSize.isAccessibilitySize {
+            who.pickerStyle(.inline)
+        } else {
+            who.pickerStyle(.segmented)
         }
     }
 

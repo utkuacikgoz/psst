@@ -85,6 +85,8 @@ struct LiveHomeView: View {
     @AppStorage("psst.hapticsEnabled") private var hapticsEnabled = true
     @State private var showingInvite = false
     @State private var enteringCode = false
+    @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
     @State private var showingSettings = false
     @State private var managing: ConnectionSummary?
     @State private var confirming: ConnectionAction?
@@ -118,8 +120,15 @@ struct LiveHomeView: View {
             VStack(spacing: 0) {
                 header.padding(.horizontal, inset)
 
+                ScrollViewReader { reader in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
+                        // Pull down to search (owner pick, 13 Oct): sits just above the
+                        // first band, out of view until you pull home down.
+                        if showsSearch {
+                            searchField(inset: inset)
+                        }
+                        Color.clear.frame(height: 0).id(Self.peopleAnchor)
                         notices
                         if store.connections.isEmpty {
                             if store.hasLoadedConnections {
@@ -132,12 +141,19 @@ struct LiveHomeView: View {
                         } else {
                             // Yo classic (H2): people share the screen above a short + band;
                             // with many people each keeps a minimum and scrolls.
-                            let bandHeight = Self.bandHeight(available: proxy.size.height, people: store.connections.count)
+                            let visible = visibleConnections
+                            let bandHeight = Self.bandHeight(available: proxy.size.height, people: max(visible.count, 1))
                             // O2: most recent first; drag a band to place it yourself.
                             // Worked out once per render, not once per band.
                             let colours = bandColors
-                            ForEach(store.orderedConnections) { connection in
+                            ForEach(visible) { connection in
                                 row(connection, minHeight: bandHeight, colour: colours[connection.id])
+                            }
+                            if visible.isEmpty {
+                                Text("No one called “\(searchQuery)”")
+                                    .font(.psst(.body, weight: .semibold))
+                                    .foregroundStyle(Color.onCanvasSecondary)
+                                    .frame(maxWidth: .infinity, minHeight: Tokens.personRowMinHeight)
                             }
                             addBand(minHeight: Tokens.Band.addBandMinHeight)
                         }
@@ -146,7 +162,11 @@ struct LiveHomeView: View {
                     .padding(.bottom, Tokens.Space.l)
                 }
                 .refreshable { await store.refresh() }
+                // Start with the search field tucked above the top edge.
+                .onAppear { hideSearch(reader) }
+                .onChange(of: showsSearch) { hideSearch(reader) }
                 .pinnedFooter(!dynamicTypeSize.isAccessibilitySize, inset: inset) { settingsButton }
+                }
             }
         }
         // Behind a sheet, an arrival or the tip, VoiceOver can't reach (and tap-send) the bands.
@@ -256,6 +276,48 @@ struct LiveHomeView: View {
             && !store.connections.isEmpty && !anySheet {
             showingFeatureIntro = true
         }
+    }
+
+    // MARK: Search
+
+    /// Search appears once there are enough people to need it.
+    static let searchMinimumPeople = 5
+    private static let peopleAnchor = "people"
+
+    private var showsSearch: Bool { store.connections.count >= Self.searchMinimumPeople }
+    private var searchQuery: String { searchText.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var visibleConnections: [ConnectionSummary] {
+        guard showsSearch, !searchQuery.isEmpty else { return store.orderedConnections }
+        return store.orderedConnections.filter { $0.otherName.localizedCaseInsensitiveContains(searchQuery) }
+    }
+
+    private func hideSearch(_ reader: ScrollViewProxy) {
+        guard showsSearch, searchQuery.isEmpty else { return }
+        DispatchQueue.main.async { reader.scrollTo(Self.peopleAnchor, anchor: .top) }
+    }
+
+    private func searchField(inset: CGFloat) -> some View {
+        HStack(spacing: Tokens.Space.s) {
+            Image(systemName: "magnifyingglass").accessibilityHidden(true)
+            TextField("", text: $searchText, prompt: Text("Search people").foregroundStyle(Color.onCanvasSecondary))
+                .focused($searchFocused)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+                .accessibilityLabel("Search people")
+            if !searchText.isEmpty {
+                Button { searchText = "" } label: { Image(systemName: "xmark.circle.fill") }
+                    .frame(minWidth: Tokens.minTouch, minHeight: Tokens.minTouch)
+                    .accessibilityLabel("Clear search")
+            }
+        }
+        .font(.psst(.body, weight: .medium))
+        .foregroundStyle(Color.onCanvas)
+        .padding(.horizontal, Tokens.Space.m)
+        .frame(minHeight: Tokens.minTouch)
+        .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: Tokens.controlRadius))
+        .padding(.horizontal, inset)
+        .padding(.vertical, Tokens.Space.s)
     }
 
     /// Home's band colours top to bottom, with no two neighbours the same.

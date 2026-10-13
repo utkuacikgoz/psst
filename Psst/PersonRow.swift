@@ -34,6 +34,8 @@ struct PersonRow: View {
                     Text(name.uppercased())
                         .bandTitle(name, size: nameSize, tracking: Tokens.Band.titleTracking)
                         .fixedSize(horizontal: false, vertical: true)
+                        // While sending (owner pick, 13 Oct): light sweeps across the name.
+                        .modifier(SendingShimmer(active: isBusy))
                         .frame(minHeight: nameSize * 1.15)
                 }
                 if let exchangeDate, let exchangeFromMe {
@@ -51,11 +53,11 @@ struct PersonRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                // Transient sending or failure status stays separate from the timestamp.
-                if isBusy || !status.isEmpty {
+                // Failure or pause status stays separate from the timestamp. Sending shows
+                // on the name itself (VoiceOver still hears it in the value).
+                if !isBusy && !status.isEmpty {
                     HStack(spacing: Tokens.Space.s) {
-                        if isBusy { ProgressView().tint(.white) }
-                        else if let statusSymbol { Image(systemName: statusSymbol) }
+                        if let statusSymbol { Image(systemName: statusSymbol) }
                         Text(status).fixedSize(horizontal: false, vertical: true)
                     }
                     .font(.psst(.subheadline, weight: .medium))
@@ -103,6 +105,42 @@ extension PersonRow {
     /// Times ("14:05") and dates ("Oct 3") stay as they are.
     static func lowercasedStart(_ label: String) -> String {
         label == "Just now" || label == "Yesterday" ? label.lowercased() : label
+    }
+}
+
+/// The name dims a little and a band of full brightness sweeps across it, left to
+/// right, until the server accepts the Psst. Reduce Motion: a gentle fade instead.
+struct SendingShimmer: ViewModifier {
+    let active: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase: CGFloat = 0
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if !active {
+            // Ready to sweep again from the start next time.
+            content.onAppear { phase = 0 }
+        } else if reduceMotion {
+            content
+                .opacity(phase == 0 ? 1 : 0.55)
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 0.8).repeatForever()) { phase = 1 }
+                }
+        } else {
+            content
+                .opacity(0.5)
+                .overlay {
+                    content.mask {
+                        GeometryReader { geometry in
+                            LinearGradient(colors: [.clear, .black, .clear], startPoint: .leading, endPoint: .trailing)
+                                .frame(width: geometry.size.width * 0.6)
+                                .offset(x: geometry.size.width * (phase * 1.6 - 0.6))
+                        }
+                    }
+                }
+                .onAppear {
+                    withAnimation(.linear(duration: 1.1).repeatForever(autoreverses: false)) { phase = 1 }
+                }
+        }
     }
 }
 

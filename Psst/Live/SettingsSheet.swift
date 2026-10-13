@@ -170,7 +170,14 @@ struct SettingsSheet: View {
                     }
                     .disabled(isDeleting)
                 } footer: {
-                    if let deleteError { Text(deleteError) }
+                    VStack(spacing: Tokens.Space.l) {
+                        if let deleteError { Text(deleteError) }
+                        // The version, like Apple's own apps; long-press to copy it for support.
+                        Text(Self.versionLine)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, Tokens.Space.xl)
+                    }
                 }
             }
             .navigationTitle("Settings")
@@ -252,6 +259,16 @@ struct SettingsSheet: View {
 }
 
 /// ED1: the top of Settings. Your band in your colour, and one way to change it.
+extension SettingsSheet {
+    /// "Psst 1.0.4 (23)": the App Store version and the build number.
+    static var versionLine: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "Psst \(version) (\(build))"
+    }
+}
+
 private struct YouBand: View {
     let name: String?
     let onEdit: () -> Void

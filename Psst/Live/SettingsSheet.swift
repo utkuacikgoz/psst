@@ -131,7 +131,7 @@ struct SettingsSheet: View {
                     } header: {
                         Text("Open invites")
                     } footer: {
-                        Text(actions.inviteError ?? "Each works once. Cancel one you sent to the wrong person.")
+                        Text(actions.inviteError ?? "Each works for up to 10 people. Cancel one to stop new joins.")
                     }
                 }
 

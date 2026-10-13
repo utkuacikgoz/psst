@@ -11,6 +11,8 @@ final class UITestAPI: PsstAPI {
         case tour
         /// Signed in with no connections yet.
         case empty
+        case loadFailure
+        case settingsFailure
         case features
         case returning
         case superArrival
@@ -37,7 +39,7 @@ final class UITestAPI: PsstAPI {
             defaults.set(true, forKey: LiveStore.superHintKey)
             if scenario != .returning { defaults.set(true, forKey: LiveStore.featureIntroKey) }
         }
-        if scenario == .store {
+        if [.store, .loadFailure, .settingsFailure].contains(scenario) {
             defaults.set(true, forKey: LiveStore.coachKey)
             defaults.set(true, forKey: LiveStore.superHintKey)
             defaults.set(true, forKey: LiveStore.featureIntroKey)
@@ -55,9 +57,14 @@ final class UITestAPI: PsstAPI {
     private var lastDates: [UUID: Date] = [:]
     private var names: [UUID: String] = [:]
 
+    private let scenario: Scenario
+    private var connectionsCalls = 0
+    private var blockedCalls = 0
+    private var invitesCalls = 0
     var isSignedIn: Bool
 
     init(scenario: Scenario) {
+        self.scenario = scenario
         isSignedIn = scenario != .tour
         guard scenario != .empty else { return }
         names = scenario == .store ? [ada: "Mia", emre: "Zoe", sam: "Ava"] : [ada: "Ada", emre: "Emre", sam: "Sam"]
@@ -72,7 +79,14 @@ final class UITestAPI: PsstAPI {
     func setDisplayName(_ name: String) async throws {}
 
     func listConnections() async throws -> [ConnectionSummary] {
-        [ada, emre, sam, kim].compactMap { id in
+        connectionsCalls += 1
+        if scenario == .loadFailure, connectionsCalls == 1 {
+            // Let launch and home join the same in-flight request, as a real
+            // network response would, before presenting the retry state.
+            try await Task.sleep(for: .seconds(1))
+            throw APIError.server(status: 500, code: "server_error")
+        }
+        return [ada, emre, sam, kim].compactMap { id in
             guard let name = names[id] else { return nil }
             let event = last[id]
             return ConnectionSummary(
@@ -84,7 +98,7 @@ final class UITestAPI: PsstAPI {
         }
     }
 
-    func listUnseen() async throws -> [UnseenSignal] { unseen }
+    func listUnseen() async throws -> [UnseenSignal] { [.loadFailure, .settingsFailure].contains(scenario) ? [] : unseen }
 
     func ackSignals(_ ids: [UUID]) async throws {
         unseen.removeAll { ids.contains($0.id) }
@@ -146,10 +160,16 @@ final class UITestAPI: PsstAPI {
     func blockUser(_ id: UUID) async throws { names[id] = nil }
     func unblockUser(_ id: UUID) async throws {}
     func reportUser(_ id: UUID) async throws { names[id] = nil }
-    func listBlocked() async throws -> [BlockedPerson] { [] }
+    func listBlocked() async throws -> [BlockedPerson] {
+        blockedCalls += 1
+        if scenario == .settingsFailure, blockedCalls == 1 { throw APIError.offline }
+        return []
+    }
     private var openInvites: [String] = ["K7QX4MPA"]
     func listOpenInvites() async throws -> [OpenInvite] {
-        openInvites.map { OpenInvite(code: $0, createdAt: Date(), expiresAt: Date().addingTimeInterval(6 * 86_400)) }
+        invitesCalls += 1
+        if scenario == .settingsFailure, invitesCalls == 1 { throw APIError.offline }
+        return openInvites.map { OpenInvite(code: $0, createdAt: Date(), expiresAt: Date().addingTimeInterval(6 * 86_400)) }
     }
     func revokeInvite(code: String) async throws { openInvites.removeAll { $0 == code } }
     func setNotificationSound(_ file: String) async throws {}

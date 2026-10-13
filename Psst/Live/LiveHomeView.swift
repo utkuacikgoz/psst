@@ -163,9 +163,15 @@ struct LiveHomeView: View {
 
     private func loadingPeople(minHeight: CGFloat) -> some View {
         VStack(spacing: Tokens.Space.m) {
-            ProgressView().tint(Color.onCanvas).controlSize(.large)
-            Text(store.isOffline ? "Waiting for a connection…" : "Loading your people…")
+            if store.connectionsLoadFailed {
+                Text("Couldn't load your people.")
+                Button("Try again") { Task { await store.refresh() } }
+                    .frame(minHeight: Tokens.minTouch)
+            } else {
+                ProgressView().tint(Color.onCanvas).controlSize(.large)
+                Text(store.isOffline ? "Waiting for a connection…" : "Loading your people…")
                 .font(.psst(.subheadline, weight: .semibold))
+            }
         }
         .foregroundStyle(Color.onCanvas)
         .frame(maxWidth: .infinity, minHeight: minHeight)
@@ -483,6 +489,11 @@ struct LiveHomeView: View {
     @ViewBuilder private var notices: some View {
         if store.isExistingUser && store.featureIntroSeen && !store.superHintSeen && !store.connections.isEmpty {
             NoticeView(symbol: "sparkles", text: "Hold a person for Super Psst", actionTitle: "Got it") { store.dismissSuperHint() }
+        }
+        if store.connectionsLoadFailed && !store.connections.isEmpty {
+            NoticeView(symbol: "arrow.clockwise", text: "Couldn't refresh your people", actionTitle: "Retry") {
+                Task { await store.refresh() }
+            }
         }
         if store.isOffline {
             NoticeView(symbol: "wifi.slash", text: "Offline · taps won't get through")

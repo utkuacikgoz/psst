@@ -86,6 +86,7 @@ final class LiveStore {
     private(set) var networkAvailable = true
     @ObservationIgnored private var failedInARow = 0
     private(set) var hasLoadedConnections = false
+    private(set) var connectionsLoadFailed = false
     /// A short, factual message for the home screen (e.g. a connection that ended).
     var notice: String?
     /// Set from an invite link (https://psstapp.fun/invite/CODE or psst://invite/CODE); the home screen opens the invite sheet with it.
@@ -117,6 +118,11 @@ final class LiveStore {
     /// re-sorted while you're tapping, so a band never moves under your finger.
     private var recencyOrder: [UUID] = [] { didSet { reorder() } }
     @ObservationIgnored private var lastRegisteredToken: String?
+    @ObservationIgnored private var pendingDeviceToken: String?
+    @ObservationIgnored private var registeringToken = false
+    @ObservationIgnored private var tokenRetryAt = Date.distantPast
+    @ObservationIgnored private var tokenFailures = 0
+    @ObservationIgnored private var accountGeneration = 0
 
     static let profileKey = "psst.live.profileCreated"
     /// Screenshot runs never show the rating prompt.
@@ -261,6 +267,7 @@ final class LiveStore {
             failedInARow = 0
             if isOffline {
                 isOffline = false
+                tokenRetryAt = .distantPast
                 Task { await refresh() }
             }
         } else {
@@ -304,14 +311,18 @@ final class LiveStore {
             }
             if !hasLoadedConnections { reorderByRecency() }
             hasLoadedConnections = true
+            connectionsLoadFailed = false
             noteReachable()
+            await retryDeviceToken()
             await showUnseenIfVisible()
         } catch APIError.offline {
+            connectionsLoadFailed = true
             noteUnreachable()
         } catch APIError.signedOut {
             resetLocalAccount()
         } catch {
-            // Keep the last known list; the next refresh tries again.
+            connectionsLoadFailed = true
+            // Preserve the cached list while showing that it could not refresh.
         }
     }
 
@@ -640,10 +651,35 @@ final class LiveStore {
     }
 
     func registerDeviceToken(_ token: String) async {
-        guard token != lastRegisteredToken, api.isSignedIn, defaults.bool(forKey: Self.profileKey) else { return }
-        if (try? await api.registerDeviceToken(token, environment: AppConfig.pushEnvironment)) != nil {
-            lastRegisteredToken = token
+        if token != pendingDeviceToken {
+            pendingDeviceToken = token
+            tokenFailures = 0
+            tokenRetryAt = .distantPast
         }
+        await retryDeviceToken()
+    }
+
+    private func retryDeviceToken() async {
+        guard !registeringToken, networkAvailable, api.isSignedIn,
+              defaults.bool(forKey: Self.profileKey), now() >= tokenRetryAt,
+              let token = pendingDeviceToken, token != lastRegisteredToken else { return }
+        registeringToken = true
+        let generation = accountGeneration
+        do {
+            try await api.registerDeviceToken(token, environment: AppConfig.pushEnvironment)
+            guard generation == accountGeneration else { registeringToken = false; return }
+            lastRegisteredToken = token
+            tokenFailures = 0
+            tokenRetryAt = .distantPast
+        } catch {
+            if generation == accountGeneration, pendingDeviceToken == token {
+                tokenFailures += 1
+                tokenRetryAt = now().addingTimeInterval(min(300, 15 * pow(2, Double(min(tokenFailures - 1, 5)))))
+            }
+        }
+        registeringToken = false
+        // A newer APNs token may have arrived while this request was suspended.
+        if generation == accountGeneration, pendingDeviceToken != token { await retryDeviceToken() }
     }
 
     /// The person opened a notification: it was displayed, so it counts as seen.
@@ -740,6 +776,11 @@ final class LiveStore {
         effects = [:]
         hasLoadedConnections = false
         lastRegisteredToken = nil
+        pendingDeviceToken = nil
+        tokenFailures = 0
+        tokenRetryAt = .distantPast
+        accountGeneration += 1
+        connectionsLoadFailed = false
         phase = .needsName
         // No names left behind on the Home Screen or Lock Screen.
         WidgetBridge.publish([], unlocked: false)

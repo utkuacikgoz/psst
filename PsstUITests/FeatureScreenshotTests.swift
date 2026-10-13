@@ -9,6 +9,29 @@ final class FeatureScreenshotTests: XCTestCase {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }
+    func testRecoveryStates() {
+        var app = launch("loadFailure")
+        XCTAssertTrue(app.buttons["Try again"].waitForExistence(timeout: 15))
+        shot("recovery-home")
+        app.buttons["Try again"].tap()
+        XCTAssertTrue(app.buttons["Ada"].waitForExistence(timeout: 10))
+        app.terminate()
+
+        app = XCUIApplication()
+        app.launchArguments += ["-PsstUITestLive", "settingsFailure", "-PsstDesignScreen", "settings"]
+        app.launch()
+        let retry = app.buttons["Couldn't load blocked people. Try again"]
+        for _ in 0..<4 where !retry.isHittable { app.swipeUp() }
+        XCTAssertTrue(retry.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["No one."].exists)
+        shot("recovery-settings")
+        retry.tap()
+        XCTAssertTrue(app.staticTexts["No one."].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Couldn't load invites. Try again"].exists)
+        app.terminate()
+
+    }
+
     func testFeatureIntroduction() {
         let app = launch("returning")
         XCTAssertTrue(app.buttons["Got it"].waitForExistence(timeout: 15))

@@ -3,6 +3,32 @@ import XCTest
 
 @MainActor
 final class SettingsActionsTests: XCTestCase {
+    func testListFailuresPreserveRowsAndRecoverIndependently() async {
+        let api = FakeAPI(), actions = SettingsActions()
+        let person = BlockedPerson(userId: UUID(), displayName: "Ada", blockedAt: Date())
+        let code = invite()
+        api.blockedPeople = [person]; api.openInvites = [code]
+        await actions.load(api: api)
+        api.blockedListError = APIError.offline
+        api.openInvites = []
+        await actions.load(api: api)
+        XCTAssertTrue(actions.blockedLoadFailed)
+        XCTAssertFalse(actions.invitesLoadFailed)
+        XCTAssertEqual(actions.blocked, [person])
+        XCTAssertTrue(actions.openInvites.isEmpty)
+        api.invitesListError = APIError.offline
+        await actions.load(api: api)
+        XCTAssertTrue(actions.invitesLoadFailed)
+        api.blockedListError = nil; api.invitesListError = nil
+        api.blockedPeople = []
+        await actions.load(api: api)
+        XCTAssertFalse(actions.blockedLoadFailed)
+        XCTAssertFalse(actions.invitesLoadFailed)
+        XCTAssertTrue(actions.listsLoaded)
+        XCTAssertTrue(actions.blocked.isEmpty)
+        XCTAssertFalse(actions.loadingLists)
+    }
+
     private func invite() -> OpenInvite {
         OpenInvite(code: "ABCDEFGH", createdAt: Date(), expiresAt: Date().addingTimeInterval(3600))
     }

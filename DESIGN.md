@@ -154,3 +154,12 @@ Send Super Psst remains explicit. VoiceOver exposes the same action. Home has
 no header action, repeated Super buttons or person-choice sheet. The introduction
 and first-use hint explain the gesture. This supersedes the rejected placement
 proposals and restores the original one-tap home behavior.
+
+### Recovery states — owner-approved 13 Oct 2026
+
+Home shows a load error with Try again when no people could be fetched, or a
+Retry notice alongside cached people when refreshing fails. Settings keeps
+known rows and shows loading or retry states for blocked people and open
+invites; a failed request never becomes “No one.” The owner approved these
+native previews while excluding the proposed Psst+ verification recovery UI.
+Existing layouts and purchase verification remain in place.

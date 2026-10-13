@@ -110,8 +110,12 @@ struct SettingsSheet: View {
                 }
 
                 // PI2: invites nobody has used yet, each cancellable.
-                if !actions.openInvites.isEmpty {
+                if !actions.openInvites.isEmpty || actions.invitesLoadFailed || !actions.listsLoaded {
                     Section {
+                        if actions.invitesLoadFailed {
+                            Button("Couldn't load invites. Try again") { Task { await actions.load(api: store.api) } }
+                                .disabled(actions.loadingLists)
+                        } else if !actions.listsLoaded { ProgressView("Loading invites…") }
                         ForEach(actions.openInvites) { invite in
                             HStack {
                                 Text(invite.displayCode)
@@ -136,7 +140,11 @@ struct SettingsSheet: View {
                 }
 
                 Section {
-                    if actions.blocked.isEmpty {
+                    if actions.blockedLoadFailed {
+                        Button("Couldn't load blocked people. Try again") { Task { await actions.load(api: store.api) } }
+                            .disabled(actions.loadingLists)
+                    } else if !actions.listsLoaded { ProgressView("Loading blocked people…") }
+                    else if actions.blocked.isEmpty {
                         Text("No one.").foregroundStyle(.secondary)
                     }
                     ForEach(actions.blocked) { person in
@@ -203,13 +211,10 @@ struct SettingsSheet: View {
         .environment(\.colorScheme, .light)
         .task {
             notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
-            async let blocked = try? await store.api.listBlocked()
-            async let invites = try? await store.api.listOpenInvites()
-            actions.blocked = await blocked ?? []
-            actions.openInvites = await invites ?? []
+            await actions.load(api: store.api)
         }
         .manageConnection(menuFor: $managing, confirming: $confirming, onDone: {
-            Task { actions.blocked = (try? await store.api.listBlocked()) ?? actions.blocked }
+            Task { await actions.load(api: store.api) }
         }, onSuper: { superPerson = $0 },
            onColour: { if purchases.isUnlocked { colouring = $0 } else { showingPlus = true } })
         .sheet(item: $superPerson) { SuperPsstSheet(connection: $0) }

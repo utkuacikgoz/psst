@@ -6,6 +6,30 @@ import Observation
 final class SettingsActions {
     var openInvites: [OpenInvite] = []
     var blocked: [BlockedPerson] = []
+    private(set) var loadingLists = false
+    private(set) var listsLoaded = false
+    private(set) var blockedLoadFailed = false
+    private(set) var invitesLoadFailed = false
+
+    func load(api: any PsstAPI) async {
+        guard !loadingLists else { return }
+        loadingLists = true
+        defer { loadingLists = false; listsLoaded = true }
+        async let people: Void = loadBlocked(api: api)
+        async let invites: Void = loadInvites(api: api)
+        _ = await (people, invites)
+    }
+
+    private func loadBlocked(api: any PsstAPI) async {
+        do { blocked = try await api.listBlocked(); blockedLoadFailed = false }
+        catch { blockedLoadFailed = true }
+    }
+
+    private func loadInvites(api: any PsstAPI) async {
+        do { openInvites = try await api.listOpenInvites(); invitesLoadFailed = false }
+        catch { invitesLoadFailed = true }
+    }
+
     private(set) var revoking: Set<String> = []
     private(set) var unblocking: Set<UUID> = []
     private(set) var isRenaming = false

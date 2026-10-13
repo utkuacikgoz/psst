@@ -11,6 +11,16 @@ final class FakeAPI: PsstAPI {
     var acked: [UUID] = []
     var sendError: Error?
     var sameMoment = false
+    var tokenError: Error?
+    var registeredTokens: [String] = []
+    var holdTokens = false
+    private var heldTokens: [CheckedContinuation<Void, Never>] = []
+    var pendingTokenCount: Int { heldTokens.count }
+    func releaseToken() { heldTokens.removeFirst().resume() }
+    var blockedPeople: [BlockedPerson] = []
+    var openInvites: [OpenInvite] = []
+    var blockedListError: Error?
+    var invitesListError: Error?
     var listError: Error?
     var renameError: Error?
     var revokeError: Error?
@@ -75,8 +85,8 @@ final class FakeAPI: PsstAPI {
         if let unblockError { throw unblockError }
     }
     func reportUser(_ id: UUID) async throws {}
-    func listBlocked() async throws -> [BlockedPerson] { [] }
-    func listOpenInvites() async throws -> [OpenInvite] { [] }
+    func listBlocked() async throws -> [BlockedPerson] { if let blockedListError { throw blockedListError }; return blockedPeople }
+    func listOpenInvites() async throws -> [OpenInvite] { if let invitesListError { throw invitesListError }; return openInvites }
     func revokeInvite(code: String) async throws {
         revokedCodes.append(code)
         if holdRevokes { await withCheckedContinuation { heldRevokes.append($0) } }
@@ -85,7 +95,11 @@ final class FakeAPI: PsstAPI {
     func setNotificationSound(_ file: String) async throws {}
     var reportedStatuses: [Bool] = []
     func setNotificationStatus(_ enabled: Bool) async throws { reportedStatuses.append(enabled) }
-    func registerDeviceToken(_ token: String, environment: String) async throws {}
+    func registerDeviceToken(_ token: String, environment: String) async throws {
+        registeredTokens.append(token)
+        if holdTokens { await withCheckedContinuation { heldTokens.append($0) } }
+        if let tokenError { throw tokenError }
+    }
     func deleteAccount() async throws { isSignedIn = false }
     func signOutLocally() { isSignedIn = false }
 }
@@ -117,6 +131,84 @@ final class LiveStoreTests: XCTestCase {
 
     override func tearDown() async throws {
         defaults.removePersistentDomain(forName: suite)
+    }
+
+    func testConnectionFailureIsVisibleAndRetryClearsIt() async {
+        api.listError = APIError.server(status: 500, code: "server_error")
+        await store.refresh()
+        XCTAssertTrue(store.connectionsLoadFailed)
+        XCTAssertFalse(store.hasLoadedConnections)
+        api.listError = nil
+        api.connections = [connection()]
+        await store.refresh()
+        XCTAssertFalse(store.connectionsLoadFailed)
+        XCTAssertTrue(store.hasLoadedConnections)
+        let cached = store.connections
+        api.listError = APIError.offline
+        await store.refresh()
+        XCTAssertTrue(store.connectionsLoadFailed)
+        XCTAssertEqual(store.connections, cached)
+    }
+
+    func testPushRegistrationRetriesWithBackoffAndDeduplicatesSuccess() async throws {
+        try await store.createProfile(name: "Ada")
+        api.tokenError = APIError.offline
+        await store.registerDeviceToken("current")
+        await store.refresh()
+        XCTAssertEqual(api.registeredTokens, ["current"])
+        clock = clock.addingTimeInterval(15)
+        await store.refresh()
+        XCTAssertEqual(api.registeredTokens, ["current", "current"])
+        api.tokenError = nil
+        clock = clock.addingTimeInterval(29)
+        await store.refresh()
+        XCTAssertEqual(api.registeredTokens.count, 2)
+        clock = clock.addingTimeInterval(1)
+        await store.refresh()
+        await store.registerDeviceToken("current")
+        XCTAssertEqual(api.registeredTokens.count, 3)
+    }
+
+    func testDeletingAccountForgetsFailedPushToken() async throws {
+        try await store.createProfile(name: "Ada")
+        api.tokenError = APIError.offline
+        await store.registerDeviceToken("old-account-token")
+        try await store.deleteAccount()
+        api.tokenError = nil
+        try await store.createProfile(name: "New")
+        clock = clock.addingTimeInterval(300)
+        await store.refresh()
+        XCTAssertEqual(api.registeredTokens, ["old-account-token"])
+        await store.registerDeviceToken("fresh-token")
+        XCTAssertEqual(api.registeredTokens, ["old-account-token", "fresh-token"])
+    }
+
+    func testReconnectRetriesPendingPushTokenImmediately() async throws {
+        try await store.createProfile(name: "Ada")
+        api.tokenError = APIError.offline
+        await store.registerDeviceToken("current")
+        store.networkPathChanged(available: false)
+        api.tokenError = nil
+        store.networkPathChanged(available: true)
+        await store.refresh()
+        XCTAssertEqual(api.registeredTokens, ["current", "current"])
+    }
+
+    func testPushTokenBeforeProfileIsRetainedAndNewestTokenWinsInFlight() async throws {
+        await store.registerDeviceToken("first")
+        XCTAssertTrue(api.registeredTokens.isEmpty)
+        try await store.createProfile(name: "Ada")
+        api.holdTokens = true
+        let request = Task { await store.refresh() }
+        while api.pendingTokenCount == 0 { await Task.yield() }
+        await store.registerDeviceToken("newest")
+        await store.registerDeviceToken("newest")
+        XCTAssertEqual(api.registeredTokens, ["first"])
+        api.holdTokens = false
+        api.releaseToken()
+        await request.value
+        await store.refresh()
+        XCTAssertEqual(api.registeredTokens, ["first", "newest"])
     }
 
     // MARK: Onboarding

@@ -19,13 +19,18 @@ Deno.serve((req) => handleVerifyPlus(req, {
     // Sandbox with the same production build. Sandbox purchases need a tester
     // account on this app's team, so this opens nothing to the public.
     const env = Deno.env.get("APP_STORE_ENVIRONMENT");
-    if (env !== "Sandbox" && env !== "Production") throw new Error("Not configured");
+    if (env !== "Sandbox" && env !== "Production") {
+      console.error("verify-plus failed config", "APP_STORE_ENVIRONMENT not set");
+      throw new Error("Not configured");
+    }
     const order = env === "Production" ? [Environment.PRODUCTION, Environment.SANDBOX] : [Environment.SANDBOX];
     let lastError: unknown;
     for (const environment of order) {
       try {
         return await verifyIn(environment, proof);
       } catch (error) {
+        // The reason only, never the proof or a key: read back by the diagnose-purchases workflow.
+        console.error("verify-plus failed", environment, describe(error));
         lastError = error;
       }
     }
@@ -39,7 +44,10 @@ Deno.serve((req) => handleVerifyPlus(req, {
     const { error } = await service.rpc("record_verified_plus", {
       p_user_id: userId, p_original_id: purchase.originalTransactionId, p_active: purchase.active,
     });
-    if (error) throw new Error("Record refused");
+    if (error) {
+      console.error("verify-plus failed record", error.code ?? "", error.message);
+      throw new Error("Record refused");
+    }
   },
 }));
 
@@ -64,4 +72,13 @@ async function verifyIn(environment: Environment, proof: string) {
   return { originalTransactionId: current.originalTransactionId,
     appAccountToken: current.appAccountToken,
     active: current.revocationDate === undefined };
+}
+
+/** Apple's library errors carry a status (verification) or an HTTP status and API error code. */
+function describe(error: unknown): string {
+  const e = error as { name?: string; message?: string; status?: unknown; httpStatusCode?: unknown; apiError?: unknown; errorMessage?: unknown };
+  return [e?.name, e?.message, e?.status !== undefined ? `status=${e.status}` : "",
+    e?.httpStatusCode !== undefined ? `http=${e.httpStatusCode}` : "",
+    e?.apiError !== undefined ? `apiError=${e.apiError}` : "",
+    e?.errorMessage ? `apple=${e.errorMessage}` : ""].filter(Boolean).join(" ");
 }

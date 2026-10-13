@@ -36,6 +36,7 @@ CHECKS = [
     ("Version at the bottom of Settings (owner pick 13 Oct)", "Psst/Live/SettingsSheet.swift", r"versionLine"),
     ("Pull-down search on home (owner pick 13 Oct)", "Psst/Live/LiveHomeView.swift", r"searchField\(inset:"),
     ("Shimmer on the name while sending (owner pick 13 Oct)", "Psst/PersonRow.swift", r"SendingShimmer\(active: isBusy\)"),
+    ("Ps-st pulses when a Psst is sent (owner pick 13 Oct)", "Psst/PersonRow.swift", r"PsstRipple\(trigger: effect\?\.id\)"),
     ("Invite page: Get Psst to the App Store + Smart App Banner (owner pick 13 Oct)", "site/invite.html", r'apple-itunes-app.*id="get"'),
     ("Super Psst ✦ on each band (owner pick 12 Oct)", "Psst/Live/LiveHomeView.swift", r'Image\(systemName: "sparkle"\)'),
     ("Leaderboard podium, all time + this month (owner pick 12 Oct)", "Psst/Live/FeatureViews.swift", r'podiumBand.*Text\("This month"\)|Text\("This month"\).*podiumBand'),

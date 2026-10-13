@@ -22,22 +22,27 @@ struct PersonRow: View {
 
     @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = Tokens.Band.titleSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var showingEffect = false
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: Tokens.Space.m) {
-                if showingEffect, let effect {
-                    SignalGlyph(signal: effect.signal, trigger: effect.id, baseSize: 52, tint: .white)
-                        .frame(minHeight: nameSize * 1.15)
-                } else {
-                    Text(name.uppercased())
-                        .bandTitle(name, size: nameSize, tracking: Tokens.Band.titleTracking)
-                        .fixedSize(horizontal: false, vertical: true)
-                        // While sending (owner pick, 13 Oct): light sweeps across the name.
-                        .modifier(SendingShimmer(active: isBusy))
-                        .frame(minHeight: nameSize * 1.15)
-                }
+                Text(name.uppercased())
+                    .bandTitle(name, size: nameSize, tracking: Tokens.Band.titleTracking)
+                    .fixedSize(horizontal: false, vertical: true)
+                    // While sending (owner pick, 13 Oct): light sweeps across the name.
+                    .modifier(SendingShimmer(active: isBusy))
+                    // Sent (owner pick, 13 Oct, "Ps-st"): the name bumps twice with the pulses.
+                    .keyframeAnimator(initialValue: 1.0, trigger: effect?.id) { content, scale in
+                        content.scaleEffect(reduceMotion ? 1 : CGFloat(scale))
+                    } keyframes: { _ in
+                        KeyframeTrack {
+                            CubicKeyframe(1.06, duration: 0.13)
+                            CubicKeyframe(1.0, duration: 0.19)
+                            CubicKeyframe(1.1, duration: 0.14)
+                            CubicKeyframe(1.0, duration: 0.34)
+                        }
+                    }
+                    .frame(minHeight: nameSize * 1.15)
                 if let exchangeDate, let exchangeFromMe {
                     // One line (owner pick, 12 Oct): "Sent 1m ago · seen ✓". Until they
                     // open it, just "Sent 1m ago"; no second "sent" in the corner.
@@ -68,9 +73,11 @@ struct PersonRow: View {
             .padding(.horizontal, Tokens.Space.xl)
             .padding(.vertical, Tokens.Band.verticalPadding)
             .frame(maxWidth: .infinity, minHeight: minHeight)
+            .background { PsstRipple(trigger: effect?.id) }
+            .clipped()
             .overlay(alignment: .bottomTrailing) {
                 // Only when there's no exchange line to carry it.
-                if let cornerMark, !showingEffect, exchangeDate == nil {
+                if let cornerMark, exchangeDate == nil {
                     HStack(spacing: Tokens.Space.xs) {
                         Text(cornerMark)
                         if cornerMark == "seen" { Image(systemName: "checkmark") }
@@ -90,13 +97,6 @@ struct PersonRow: View {
                              exchangeDate.map { "\(exchangeFromMe == true ? "Sent" : "Received") \($0.formatted(date: .complete, time: .shortened))" } ?? ""].filter { !$0.isEmpty }.joined(separator: ", "))
         .accessibilityHint(accessibilityHint)
         .accessibilityAddTraits(.isButton)
-        .task(id: effect?.id) {
-            guard effect != nil else { return }
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) { showingEffect = true }
-            try? await Task.sleep(for: .milliseconds(850))
-            guard !Task.isCancelled else { return }
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) { showingEffect = false }
-        }
     }
 }
 
@@ -105,6 +105,100 @@ extension PersonRow {
     /// Times ("14:05") and dates ("Oct 3") stay as they are.
     static func lowercasedStart(_ label: String) -> String {
         label == "Just now" || label == "Yesterday" ? label.lowercased() : label
+    }
+}
+
+/// "Ps-st" (owner pick, 13 Oct 2026): two strong pulses on the band when a Psst
+/// goes out or comes in, timed like the whisper and the vibration: a ring, then a
+/// ring with a flash of light. Reduce Motion: one soft flash, no movement.
+struct PsstRipple: View {
+    let trigger: UUID?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private struct Pose {
+        var ring1: CGFloat = 0, ring1Opacity: Double = 0
+        var ring2: CGFloat = 0, ring2Opacity: Double = 0
+        var flash: CGFloat = 0, flashOpacity: Double = 0
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let reach = max(geometry.size.width, geometry.size.height) * 1.6
+            Group {
+                if reduceMotion { softFlash(reach: reach) } else { pulses(reach: reach) }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func shapes(_ pose: Pose, reach: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.5))
+                .frame(width: reach * pose.flash, height: reach * pose.flash)
+                .opacity(pose.flashOpacity)
+            Circle()
+                .stroke(Color.white, lineWidth: 6)
+                .frame(width: reach * pose.ring1, height: reach * pose.ring1)
+                .opacity(pose.ring1Opacity)
+            Circle()
+                .stroke(Color.white, lineWidth: 6)
+                .frame(width: reach * pose.ring2, height: reach * pose.ring2)
+                .opacity(pose.ring2Opacity)
+        }
+    }
+
+    private func pulses(reach: CGFloat) -> some View {
+        KeyframeAnimator(initialValue: Pose(), trigger: trigger) { pose in
+            shapes(pose, reach: reach)
+        } keyframes: { _ in
+            // ps: a ring.
+            KeyframeTrack(\.ring1) {
+                MoveKeyframe(0)
+                LinearKeyframe(1, duration: 0.7, timingCurve: .easeOut)
+            }
+            KeyframeTrack(\.ring1Opacity) {
+                MoveKeyframe(0.95)
+                LinearKeyframe(0, duration: 0.7)
+            }
+            // st: a ring and a flash, a third of a second later.
+            KeyframeTrack(\.ring2) {
+                MoveKeyframe(0)
+                LinearKeyframe(0, duration: 0.32)
+                LinearKeyframe(1, duration: 0.9, timingCurve: .easeOut)
+            }
+            KeyframeTrack(\.ring2Opacity) {
+                MoveKeyframe(0)
+                LinearKeyframe(0, duration: 0.32)
+                MoveKeyframe(0.95)
+                LinearKeyframe(0, duration: 0.9)
+            }
+            KeyframeTrack(\.flash) {
+                MoveKeyframe(0)
+                LinearKeyframe(0, duration: 0.32)
+                LinearKeyframe(0.6, duration: 0.5, timingCurve: .easeOut)
+            }
+            KeyframeTrack(\.flashOpacity) {
+                MoveKeyframe(0)
+                LinearKeyframe(0, duration: 0.32)
+                MoveKeyframe(0.9)
+                LinearKeyframe(0, duration: 0.5)
+            }
+        }
+    }
+
+    private func softFlash(reach: CGFloat) -> some View {
+        KeyframeAnimator(initialValue: Pose(), trigger: trigger) { pose in
+            shapes(pose, reach: reach)
+        } keyframes: { _ in
+            KeyframeTrack(\.flash) { MoveKeyframe(2) }
+            KeyframeTrack(\.flashOpacity) {
+                MoveKeyframe(0.35)
+                LinearKeyframe(0, duration: 0.5)
+            }
+        }
     }
 }
 

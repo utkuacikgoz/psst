@@ -14,20 +14,8 @@ enum Signal: String, CaseIterable, Identifiable, Codable {
     var symbolName: String { "ellipsis.message" }
     /// White lettering stays readable on this band colour.
     var accent: Color { Color(hex: 0x2476AA) }
-    var motion: SignalMotion { SignalMotion(pop: 1.15, squashX: 1, squashY: 1, tilt: 0, hop: -4) }
     /// One very light tick when you send. Arrivals play the "ps-st" pattern (PsstHaptics).
     var haptic: SensoryFeedback { .impact(weight: .light, intensity: 0.5) }
-}
-
-/// Parameters for the short, row-local effect. Identity values mean no movement.
-struct SignalMotion {
-    var pop: Double
-    var squashX: Double
-    var squashY: Double
-    var tilt: Double
-    var hop: Double
-
-    static let still = SignalMotion(pop: 1, squashX: 1, squashY: 1, tilt: 0, hop: 0)
 }
 
 /// One playback of an effect. A new `id` replays it.

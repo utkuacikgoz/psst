@@ -188,7 +188,8 @@ struct LiveHomeView: View {
 
                 ScrollViewReader { reader in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
+                    // Lazy: only the bands on screen are built, so hundreds of people scroll smoothly.
+                    LazyVStack(alignment: .leading, spacing: 0) {
                         // Pull down to search (owner pick, 13 Oct): sits just above the
                         // first band, out of view until you pull home down.
                         if showsSearch {

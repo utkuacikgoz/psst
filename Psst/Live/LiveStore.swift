@@ -60,7 +60,7 @@ final class LiveStore {
     /// Your own name as last saved on this phone (ED1). Nil on installs from
     /// before it was kept; Settings then asks you to add it.
     private(set) var myName: String?
-    private(set) var connections: [ConnectionSummary] = []
+    private(set) var connections: [ConnectionSummary] = [] { didSet { reorder() } }
     private(set) var sendStates: [UUID: SendState] = [:]
     /// The effect currently playing on each row, keyed by connection. A new event ID replays it.
     private(set) var effects: [UUID: EffectTrigger] = [:]
@@ -112,10 +112,10 @@ final class LiveStore {
     @ObservationIgnored private var lastTapAt: [UUID: Date] = [:]
     private var pausedUntil: [UUID: Date] = [:]
     /// People the user placed by dragging, top first. Kept on this device only.
-    private(set) var pinnedOrder: [UUID] = []
+    private(set) var pinnedOrder: [UUID] = [] { didSet { reorder() } }
     /// Everyone else, most recent first, as of the last time home appeared. Not
     /// re-sorted while you're tapping, so a band never moves under your finger.
-    private var recencyOrder: [UUID] = []
+    private var recencyOrder: [UUID] = [] { didSet { reorder() } }
     @ObservationIgnored private var lastRegisteredToken: String?
 
     static let profileKey = "psst.live.profileCreated"
@@ -143,6 +143,7 @@ final class LiveStore {
             connections = cached
             reorderByRecency()
         }
+        reorder()
     }
 
     // MARK: Onboarding
@@ -442,14 +443,18 @@ final class LiveStore {
 
     /// Pinned people first in the order placed, then new people, then everyone
     /// else most recent first.
-    var orderedConnections: [ConnectionSummary] {
+    /// Worked out when the people or their order change, not on every read, so a
+    /// long list isn't re-sorted each time home redraws.
+    private(set) var orderedConnections: [ConnectionSummary] = []
+
+    private func reorder() {
         let byID = Dictionary(connections.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let pinnedIDs = Set(pinnedOrder)
         let pinned = pinnedOrder.compactMap { byID[$0] }
         let known = recencyOrder.filter { byID[$0] != nil && !pinnedIDs.contains($0) }
         let knownIDs = Set(known)
         let new = Self.byRecency(connections.filter { !pinnedIDs.contains($0.id) && !knownIDs.contains($0.id) })
-        return pinned + new + known.compactMap { byID[$0] }
+        orderedConnections = pinned + new + known.compactMap { byID[$0] }
     }
 
     /// Called when home appears, never mid-tapping.

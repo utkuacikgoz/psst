@@ -1,8 +1,8 @@
 name: Diagnose purchases
 
-# Manual, Linux only. Prints why verify-plus refused purchases in the last day
-# (the reason lines the function logs; never proofs or keys), and checks that
-# Apple's certificate-status service answers from a server.
+# Manual, Linux only. Prints why verify-plus refused purchases recently (the
+# reasons it records server-side; never proofs or keys), and checks that Apple's
+# certificate-status service answers from a server.
 on:
   workflow_dispatch:
     inputs:
@@ -22,10 +22,14 @@ jobs:
       SUPABASE_PROJECT_REF: ${{ inputs.target == 'production' && secrets.SUPABASE_PROJECT_REF_PROD || secrets.SUPABASE_PROJECT_REF }}
     steps:
       - uses: actions/checkout@v5
-      - name: verify-plus failures, last 24 hours
-        run: python3 scripts/diagnose_purchases.py
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
       - name: Apple certificate status check from a server
+        continue-on-error: true
         run: deno run --allow-all scripts/check_apple_ocsp.ts
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Recent verify-plus failures
+        run: python3 scripts/diagnose_purchases.py

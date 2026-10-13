@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
-"""Print verify-plus failure reasons from the Supabase function logs (last 24 hours)."""
+"""Print why verify-plus refused purchases recently (server-only table; no proofs or keys)."""
 import datetime
 import json
 import os
-import urllib.parse
+import subprocess
 import urllib.request
 
 ref = os.environ["SUPABASE_PROJECT_REF"]
-token = os.environ["SUPABASE_ACCESS_TOKEN"]
-end = datetime.datetime.now(datetime.timezone.utc)
-start = end - datetime.timedelta(hours=23, minutes=59)
-sql = ("select timestamp, event_message from function_logs "
-       "where event_message like '%verify-plus failed%' order by timestamp desc limit 50")
-query = urllib.parse.urlencode({"sql": sql, "iso_timestamp_start": start.isoformat(), "iso_timestamp_end": end.isoformat()})
-request = urllib.request.Request(
-    f"https://api.supabase.com/v1/projects/{ref}/analytics/endpoints/logs.all?{query}",
-    headers={"Authorization": f"Bearer {token}"})
-body = json.load(urllib.request.urlopen(request, timeout=60))
-if body.get("error"):
-    raise SystemExit(f"Log query failed: {body['error']}")
-rows = body.get("result") or []
-print(f"{len(rows)} verify-plus failure line(s) in the last 24 hours.")
+keys = json.loads(subprocess.run(["supabase", "projects", "api-keys", "--project-ref", ref, "-o", "json"],
+                                 check=True, capture_output=True, text=True).stdout)
+pick = next((k for k in keys if k.get("name") == "service_role"), None) \
+    or next((k for k in keys if k.get("type") == "secret"), None)
+if not pick:
+    raise SystemExit("Couldn't read the project's service key")
+key = pick["api_key"]
+print(f"::add-mask::{key}")
+headers = {"apikey": key, "Content-Type": "application/json"}
+if key.startswith("eyJ"):
+    headers["Authorization"] = f"Bearer {key}"
+request = urllib.request.Request(f"https://{ref}.supabase.co/rest/v1/rpc/recent_purchase_failures",
+                                 data=b"{}", headers=headers, method="POST")
+rows = json.load(urllib.request.urlopen(request, timeout=60))
+print(f"{len(rows)} verify-plus failure(s) on record (last 7 days, newest first).")
 for row in rows:
-    stamp = datetime.datetime.fromtimestamp(int(row["timestamp"]) / 1_000_000, datetime.timezone.utc)
-    print(stamp.strftime("%Y-%m-%d %H:%M:%S UTC"), row["event_message"].strip())
+    print(row["at"], "|", row["stage"], "|", row["reason"])

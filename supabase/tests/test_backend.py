@@ -438,6 +438,19 @@ class BackendTests(unittest.TestCase):
         with self.assertRaises(errors.InsufficientPrivilege):
             ada.rpc("record_push_result", event, "accepted", [])
 
+    def test_purchase_failure_reasons_are_server_only_and_capped(self):
+        service = Api("service_role")
+        for i in range(505):
+            service.rpc("log_purchase_failure", "verify Production", f"reason {i}")
+        rows = service.rows("select * from public.recent_purchase_failures()")
+        self.assertEqual(rows[0][2], "reason 504")
+        self.assertLessEqual(admin("select count(*) from private.purchase_failures")[0][0], 500)
+        ada = new_user("Ada")
+        with self.assertRaises(errors.InsufficientPrivilege):
+            ada.rpc("log_purchase_failure", "x", "y")
+        with self.assertRaises(errors.InsufficientPrivilege):
+            ada.rows("select * from public.recent_purchase_failures()")
+
     def test_inviter_hears_who_joined_server_only(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         token = "cd" * 32

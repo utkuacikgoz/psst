@@ -20,7 +20,7 @@ Deno.serve((req) => handleVerifyPlus(req, {
     // account on this app's team, so this opens nothing to the public.
     const env = Deno.env.get("APP_STORE_ENVIRONMENT");
     if (env !== "Sandbox" && env !== "Production") {
-      console.error("verify-plus failed config", "APP_STORE_ENVIRONMENT not set");
+      await logFailure("config", "APP_STORE_ENVIRONMENT not set");
       throw new Error("Not configured");
     }
     const order = env === "Production" ? [Environment.PRODUCTION, Environment.SANDBOX] : [Environment.SANDBOX];
@@ -29,8 +29,7 @@ Deno.serve((req) => handleVerifyPlus(req, {
       try {
         return await verifyIn(environment, proof);
       } catch (error) {
-        // The reason only, never the proof or a key: read back by the diagnose-purchases workflow.
-        console.error("verify-plus failed", environment, describe(error));
+        await logFailure(`verify ${environment}`, describe(error));
         lastError = error;
       }
     }
@@ -45,7 +44,7 @@ Deno.serve((req) => handleVerifyPlus(req, {
       p_user_id: userId, p_original_id: purchase.originalTransactionId, p_active: purchase.active,
     });
     if (error) {
-      console.error("verify-plus failed record", error.code ?? "", error.message);
+      await logFailure("record", `${error.code ?? ""} ${error.message}`);
       throw new Error("Record refused");
     }
   },
@@ -72,6 +71,16 @@ async function verifyIn(environment: Environment, proof: string) {
   return { originalTransactionId: current.originalTransactionId,
     appAccountToken: current.appAccountToken,
     active: current.revocationDate === undefined };
+}
+
+/** The reason only, never the proof or a key: read back by the diagnose-purchases workflow. */
+async function logFailure(stage: string, reason: string) {
+  console.error("verify-plus failed", stage, reason);
+  try {
+    await service.rpc("log_purchase_failure", { p_stage: stage, p_reason: reason });
+  } catch {
+    // Diagnostics never change the answer.
+  }
 }
 
 /** Apple's library errors carry a status (verification) or an HTTP status and API error code. */

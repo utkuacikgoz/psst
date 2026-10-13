@@ -228,8 +228,8 @@ final class LiveStore {
     static let updateDismissedKey = "psst.updateDismissedBuild"
     static let appStoreURL = URL(string: "https://apps.apple.com/app/id6815764359")!
 
-    static var currentBuild: Int { Int(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "") ?? 0 }
-    static var currentVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
+    nonisolated static var currentBuild: Int { Int(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "") ?? 0 }
+    nonisolated static var currentVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
 
     /// Compares this build with the server's requirements, and reports the version
     /// once per launch. If the server can't be reached, nothing changes: an

@@ -14,30 +14,22 @@ Deno.serve((req) => handleVerifyPlus(req, {
     return error ? null : user?.id ?? null;
   },
   async verify(proof) {
-    // Fail closed unless explicitly configured. Sandbox transactions never unlock
-    // production: the environment is a server setting, not a client argument.
+    // Fail closed unless explicitly configured. In Production, Apple's guidance is
+    // to check Production first and then Sandbox: TestFlight and App Review buy in
+    // Sandbox with the same production build. Sandbox purchases need a tester
+    // account on this app's team, so this opens nothing to the public.
     const env = Deno.env.get("APP_STORE_ENVIRONMENT");
     if (env !== "Sandbox" && env !== "Production") throw new Error("Not configured");
-    const environment = env === "Production" ? Environment.PRODUCTION : Environment.SANDBOX;
-    const bundle = Deno.env.get("APP_STORE_BUNDLE_ID")!;
-    const roots: string[] = JSON.parse(Deno.env.get("APPLE_ROOT_CA_BASE64") ?? "[]");
-    if (!roots.length) throw new Error("Missing trust roots");
-    const verifier = new SignedDataVerifier(roots.map(root => Buffer.from(root, "base64")), true,
-      environment, bundle, env === "Production" ? Number(Deno.env.get("APP_STORE_APP_ID")) : undefined);
-    const device = await verifier.verifyAndDecodeTransaction(proof);
-    if (device.productId !== "psstplus.unlock" || !device.transactionId || !device.originalTransactionId) {
-      throw new Error("Invalid product");
+    const order = env === "Production" ? [Environment.PRODUCTION, Environment.SANDBOX] : [Environment.SANDBOX];
+    let lastError: unknown;
+    for (const environment of order) {
+      try {
+        return await verifyIn(environment, proof);
+      } catch (error) {
+        lastError = error;
+      }
     }
-    const apple = new AppStoreServerAPIClient(Deno.env.get("APP_STORE_PRIVATE_KEY")!,
-      Deno.env.get("APP_STORE_KEY_ID")!, Deno.env.get("APP_STORE_ISSUER_ID")!, bundle, environment);
-    const info = await apple.getTransactionInfo(device.transactionId);
-    const current = await verifier.verifyAndDecodeTransaction(info.signedTransactionInfo!);
-    if (current.productId !== "psstplus.unlock" || current.originalTransactionId !== device.originalTransactionId) {
-      throw new Error("Invalid transaction");
-    }
-    return { originalTransactionId: current.originalTransactionId,
-      appAccountToken: current.appAccountToken,
-      active: current.revocationDate === undefined };
+    throw lastError;
   },
   async isCurrent(userId) {
     const { data, error } = await service.rpc("plus_is_current", { p_user_id: userId });
@@ -50,3 +42,26 @@ Deno.serve((req) => handleVerifyPlus(req, {
     if (error) throw new Error("Record refused");
   },
 }));
+
+async function verifyIn(environment: Environment, proof: string) {
+  const bundle = Deno.env.get("APP_STORE_BUNDLE_ID")!;
+  const roots: string[] = JSON.parse(Deno.env.get("APPLE_ROOT_CA_BASE64") ?? "[]");
+  if (!roots.length) throw new Error("Missing trust roots");
+  const production = environment === Environment.PRODUCTION;
+  const verifier = new SignedDataVerifier(roots.map(root => Buffer.from(root, "base64")), true,
+    environment, bundle, production ? Number(Deno.env.get("APP_STORE_APP_ID")) : undefined);
+  const device = await verifier.verifyAndDecodeTransaction(proof);
+  if (device.productId !== "psstplus.unlock" || !device.transactionId || !device.originalTransactionId) {
+    throw new Error("Invalid product");
+  }
+  const apple = new AppStoreServerAPIClient(Deno.env.get("APP_STORE_PRIVATE_KEY")!,
+    Deno.env.get("APP_STORE_KEY_ID")!, Deno.env.get("APP_STORE_ISSUER_ID")!, bundle, environment);
+  const info = await apple.getTransactionInfo(device.transactionId);
+  const current = await verifier.verifyAndDecodeTransaction(info.signedTransactionInfo!);
+  if (current.productId !== "psstplus.unlock" || current.originalTransactionId !== device.originalTransactionId) {
+    throw new Error("Invalid transaction");
+  }
+  return { originalTransactionId: current.originalTransactionId,
+    appAccountToken: current.appAccountToken,
+    active: current.revocationDate === undefined };
+}

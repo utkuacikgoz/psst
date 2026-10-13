@@ -125,7 +125,7 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 
 ## 1.0.3
 
-Submit build **1.0.3 (22)**. Choose **Manually release this version**: keep the backend's purchase environment on Sandbox during review (App Review buys with sandbox accounts), then redeploy with Production and release.
+Submit build **1.0.3 (22)**. The backend runs with Production purchases and also accepts Sandbox ones (TestFlight and App Review buy in Sandbox), so no switch is needed around review.
 
 Before submitting, create two fresh review codes for the Psst Team profile:
 

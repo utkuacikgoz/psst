@@ -6,7 +6,7 @@
 
 1. Install the **production** TestFlight build on your own iPhone. Start it with a clear display name, e.g. **Psst Team**.
 2. On home, tap the gold **+** band → **Share my invite**. Write down the code, then do it once more for a second code, in case two reviewers try.
-   - Each code works **once** and expires after **7 days**. Make fresh ones for every submission.
+   - Since 1.0.4 each code lets up to **10** people join, within **7 days**. Make fresh ones for every submission.
    - Settings → Open invites shows which codes are still unused.
 3. Paste the notes below into App Store Connect → the version → **App Review Information → Notes**, with your two codes filled in.
 4. **Sign-in required:** No. There's no login; the account is created anonymously.
@@ -23,7 +23,7 @@ from public.profiles p, (values ('PSSTTEAM'), ('PSSTBACK')) as v(code)
 where p.display_name = 'Psst Team';
 ```
 
-For a later submission, pick two new unused codes; each works once.
+For a later submission, pick two new unused codes. Codes inserted this way take the table default: up to 10 joins since 1.0.4 (codes made before that work once).
 
 ## While in review
 
@@ -180,3 +180,69 @@ Unlimited Super Psst, colours, icons, sounds, widgets
 App Privacy (App Store Connect → App Privacy), add to what's already declared:
 - Purchases → Purchase History: App Functionality, linked to the user, not used for tracking (purchase verification record).
 - Usage Data → Product Interaction: App Functionality, linked to the user, not used for tracking (daily Super Psst allowance; the leaderboard's two counts per connection).
+
+## 1.0.4
+
+Submit the TestFlight build that carries everything below (fill in the build number once it's uploaded). Like 1.0.3, the backend accepts both Production and Sandbox purchases, so there's no switch to make around review.
+
+**Before submitting:**
+1. Create two fresh review codes for the Psst Team profile. Each now lets up to 10 people join, so one code is enough even if two reviewers try; the second is a backup.
+
+   ```sql
+   insert into public.invites (code, inviter_id, expires_at)
+   select v.code, p.id, now() + interval '30 days'
+   from public.profiles p, (values ('PSSTJOIN'), ('PSSTNOW1')) as v(code)
+   where p.display_name = 'Psst Team';
+   ```
+
+2. Check the forced-update settings are off. The submitted build must not be below `min_build`:
+
+   ```sql
+   select min_build, latest_build, latest_version from public.app_config;
+   ```
+
+   After approval and release, set `latest_build` / `latest_version` to the new build, which shows "A new Psst is ready" to people on older builds (docs/METRICS.md).
+
+**What's New in This Version:**
+
+```
+• One invite code now works for up to 10 friends — drop it in your group chat
+• Search your people: pull down on home
+• A new sent effect, and a clearer Super Psst screen
+• Your all-time Psst leaderboard
+• Psst+ purchases now always unlock unlimited Super Pssts
+• Faster, steadier, and fewer false "offline" messages
+```
+
+**Notes for the reviewer:**
+
+```
+Psst lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
+
+What's new in 1.0.4:
+- An invite code can now be used by up to 10 people within 7 days (each person who joins gets their own private, two-way connection with the inviter; nobody else sees it). The inviter can cancel a code in Settings → Open invites.
+- Pull down on home to search your people (appears once you have 5 or more).
+- The Super Psst sheet now shows each state clearly. When today's free Super Psst is used, it offers Psst+ (one-time purchase) with its App Store price, plus "Restore purchase" and a free normal Psst.
+- Settings shows the app version. The app reports its version to our server so we can tell people when an update is available.
+
+To try it with a real person (our team):
+1. Open the app, enter any name, and choose whether to allow notifications.
+2. On home, tap "I have a code" and enter:  PSSTJOIN
+   (backup code:  PSSTNOW1)
+3. Tap Connect. A band for "Psst Team" appears on home.
+4. Tap the band to send a Psst; tap ✦ for a Super Psst. We'll psst you back within a few minutes during review hours. If both of you psst within 10 seconds, both phones show SAME MOMENT.
+5. Long-press a notification to use "Psst back" without opening the app.
+
+Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. Settings → Delete account removes all server data immediately.
+
+Psst+ (in-app purchase "psstplus.unlock", non-consumable): home → "Psst+" next to Settings → Unlock, or from the Super Psst sheet once today's free one is used ("Unlock Psst+"). It adds unlimited Super Psst, per-person band colours, alternate app icons, whisper sounds and Home Screen / Lock Screen widgets. "Restore purchase" is on both sheets. The purchase is verified with Apple's App Store Server API. Pssting, replies and invites are free.
+
+Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
+```
+
+**App Privacy** (App Store Connect → App Privacy). Add this to what's already declared:
+- **Diagnostics → Other Diagnostic Data:** App Functionality, linked to the user, not used for tracking. This is the app version and build saved on the account, used to offer and require updates.
+
+The other 1.0.4 changes collect nothing new:
+- Invites joined per code are already covered by the existing account and contacts-free connection data.
+- Purchase verification failure reasons are stored on the server without any account or purchase identifiers.

@@ -694,6 +694,16 @@ final class LiveParsingTests: XCTestCase {
                                                       "effect_id": "duck"]]))
     }
 
+    func testReusableInviteSaysHowManyPeople() throws {
+        let reusable = try APIClient.decoder.decode(CreatedInvite.self, from: Data(
+            #"{"code": "ABCDEFGH", "expires_at": "2026-10-20T10:00:00+00:00", "max_uses": 10}"#.utf8))
+        XCTAssertEqual(reusable.usesLine, "Works for up to 10 people")
+        // An older server sends no max_uses: those codes work once.
+        let single = try APIClient.decoder.decode(CreatedInvite.self, from: Data(
+            #"{"code": "ABCDEFGH", "expires_at": "2026-10-20T10:00:00+00:00"}"#.utf8))
+        XCTAssertEqual(single.usesLine, "Works once")
+    }
+
     func testInviteLinks() {
         XCTAssertEqual(InviteLink.code(from: URL(string: "psst://invite/abcd-efgh")!), "ABCDEFGH")
         XCTAssertEqual(CreatedInvite(code: "ABCDEFGH", expiresAt: Date()).link.absoluteString, "https://psstapp.fun/invite/ABCDEFGH")

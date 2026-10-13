@@ -40,6 +40,14 @@ struct SendResult: Decodable, Equatable {
 struct CreatedInvite: Decodable, Equatable {
     let code: String
     let expiresAt: Date
+    /// How many people the code can join (10 since 13 Oct 2026); absent from older servers, so once.
+    var maxUses: Int?
+
+    /// "Works for up to 10 people", or "Works once" for a single-use code.
+    var usesLine: String {
+        let uses = maxUses ?? 1
+        return uses > 1 ? "Works for up to \(uses) people" : "Works once"
+    }
 
     /// A web link, so it works for people who don't have Psst yet: with the app
     /// installed it opens the app (universal link); without, a page on

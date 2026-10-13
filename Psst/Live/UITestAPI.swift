@@ -130,7 +130,7 @@ final class UITestAPI: PsstAPI {
     func setSuperEffects(_ enabled: Bool) async throws { superEffectsEnabled = enabled }
 
     func createInvite() async throws -> CreatedInvite {
-        CreatedInvite(code: "K7QX4MPA", expiresAt: Date().addingTimeInterval(7 * 86_400))
+        CreatedInvite(code: "K7QX4MPA", expiresAt: Date().addingTimeInterval(7 * 86_400), maxUses: 10)
     }
 
     func previewInvite(code: String) async throws -> InvitePreview {

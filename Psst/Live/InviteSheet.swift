@@ -83,7 +83,7 @@ struct InviteSheet: View {
         VStack(spacing: 0) {
             MischiefCat().frame(width: 48, height: 40)
                 .frame(maxWidth: .infinity).padding(.top, Tokens.Space.s)
-            chooserBand(title: "Share my invite", subtitle: "Send a link to one person", color: .inviteGold) {
+            chooserBand(title: "Share my invite", subtitle: "Send a link to your friends", color: .inviteGold) {
                 withAnimation { mode = .share }
                 if invite == nil { create() }
             }
@@ -130,7 +130,7 @@ struct InviteSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                         .accessibilityLabel("Invite code \(invite.code.map(String.init).joined(separator: " "))")
-                    Text("Works once · expires \(invite.expiresAt.formatted(date: .abbreviated, time: .omitted))")
+                    Text("\(invite.usesLine) · expires \(invite.expiresAt.formatted(date: .abbreviated, time: .omitted))")
                         .font(.psst(.subheadline, weight: .medium))
                 } else if let createError {
                     Label(createError, systemImage: "exclamationmark.circle")

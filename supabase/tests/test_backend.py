@@ -123,6 +123,7 @@ class BackendTests(unittest.TestCase):
         expired = ada.rpc("create_invite")["code"]
         open_code = ada.rpc("create_invite")["code"]
         emre.rpc("accept_invite", used)
+        admin("update public.invites set max_uses = 1 where code = %s", used)  # now full
         ada.rpc("revoke_invite", cancelled)
         admin("update public.invites set expires_at = now() - interval '1 minute' where code = %s", expired)
         self.assertEqual([r[0] for r in ada.rows("select code from public.list_open_invites()")], [open_code])
@@ -153,6 +154,7 @@ class BackendTests(unittest.TestCase):
 
         used = ada.rpc("create_invite")["code"]
         emre.rpc("accept_invite", used)
+        admin("update public.invites set max_uses = 1 where code = %s", used)  # a full code
         # Someone else (wrong account) opening an already-used link.
         self.assertEqual(sam.rpc("preview_invite", used), {"status": "used", "inviter_name": None})
         with self.fails("invite_used", 409):
@@ -174,6 +176,61 @@ class BackendTests(unittest.TestCase):
 
         with self.fails("invite_invalid", 404):
             sam.rpc("accept_invite", "NOPE2345")
+
+    def test_one_code_joins_up_to_ten_people(self):
+        ada = new_user("Ada")
+        invite = ada.rpc("create_invite")
+        self.assertEqual(invite["max_uses"], 10)
+        code = invite["code"]
+        friends = [new_user(f"Friend{i}") for i in range(11)]
+        connections = [f.rpc("accept_invite", code)["connection_id"] for f in friends[:10]]
+        self.assertEqual(len(set(connections)), 10, "each join is its own connection")
+        self.assertEqual(friends[10].rpc("preview_invite", code)["status"], "used")
+        with self.fails("invite_used", 409):
+            friends[10].rpc("accept_invite", code)
+        # Joining again is harmless and doesn't use up a place.
+        self.assertEqual(friends[0].rpc("accept_invite", code)["status"], "already_connected")
+        self.assertEqual(admin("select uses from public.invites where code = %s", code)[0][0], 10)
+        self.assertEqual(ada.rows("select code from public.list_open_invites()"), [], "a full code isn't open")
+        # Each inviter push names the right person.
+        service = Api("service_role")
+        self.assertEqual(service.rpc("joined_push_targets", connections[0])["joiner_name"], "Friend0")
+        self.assertEqual(service.rpc("joined_push_targets", connections[9])["joiner_name"], "Friend9")
+
+    def test_concurrent_joins_never_pass_the_limit(self):
+        ada = new_user("Ada")
+        code = ada.rpc("create_invite")["code"]
+        admin("update public.invites set max_uses = 3 where code = %s", code)
+        friends = [new_user(f"Racer{i}") for i in range(8)]
+
+        def join(friend):
+            try:
+                return friend.rpc("accept_invite", code)["status"]
+            except psycopg.Error as error:
+                return error.diag.message_primary
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(join, friends))
+        self.assertEqual(sorted(results), ["accepted"] * 3 + ["invite_used"] * 5)
+        self.assertEqual(admin("select uses from public.invites where code = %s", code)[0][0], 3)
+
+    def test_cancelling_a_used_code_keeps_who_joined(self):
+        ada, emre, sam = new_user("Ada"), new_user("Emre"), new_user("Sam")
+        code = ada.rpc("create_invite")["code"]
+        emre.rpc("accept_invite", code)
+        ada.rpc("revoke_invite", code)
+        with self.fails("invite_revoked", 410):
+            sam.rpc("accept_invite", code)
+        self.assertEqual(len(emre.rows("select * from public.list_connections()")), 1)
+
+    def test_a_used_code_stays_open_when_new_ones_are_made(self):
+        ada, emre = new_user("Ada"), new_user("Emre")
+        group = ada.rpc("create_invite")["code"]
+        emre.rpc("accept_invite", group)
+        for _ in range(6):
+            ada.rpc("create_invite")
+        open_codes = {r[0] for r in ada.rows("select code from public.list_open_invites()")}
+        self.assertIn(group, open_codes)
 
     def test_only_inviter_can_revoke(self):
         ada, sam = new_user("Ada"), new_user("Sam")

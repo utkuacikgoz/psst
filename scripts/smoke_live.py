@@ -84,7 +84,7 @@ try:
     check("Emre accepts; the connection exists", status == 200 and connection, body)
 
     status, body = sam.rpc("preview_invite", p_code=code)
-    check("Sam sees the used invite as used", isinstance(body, dict) and body.get("status") == "used", body)
+    check("A used invite stays open for the next friend (reusable codes)", isinstance(body, dict) and body.get("status") == "pending", body)
 
     event = str(uuid.uuid4())
     status, body = ada.send(event, connection, "psst")

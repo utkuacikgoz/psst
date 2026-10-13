@@ -75,7 +75,9 @@ def main():
     values = {'APP_STORE_ENVIRONMENT': environment, 'APP_STORE_BUNDLE_ID': bundle,
               'APP_STORE_APP_ID': exact[0]['id'], 'APP_STORE_ISSUER_ID': iap_issuer,
               'APP_STORE_KEY_ID': iap_id, 'APP_STORE_PRIVATE_KEY': iap_pem,
-              'APPLE_ROOT_CA_BASE64': json.dumps([base64.b64encode(root).decode()])}
+              # Plain comma-separated base64: a JSON list here was quoted twice in the
+              # env file and reached the function as [\"...\"], breaking every check.
+              'APPLE_ROOT_CA_BASE64': base64.b64encode(root).decode()}
     path = Path(sys.argv[1])
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(descriptor, 'w') as output:

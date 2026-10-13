@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { AppStoreServerAPIClient, Environment, SignedDataVerifier } from "npm:@apple/app-store-server-library@3.1.0";
 import { handleVerifyPlus } from "./handler.ts";
+import { parseRoots } from "./roots.ts";
 
 const url = Deno.env.get("SUPABASE_URL")!;
 const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -52,7 +53,7 @@ Deno.serve((req) => handleVerifyPlus(req, {
 
 async function verifyIn(environment: Environment, proof: string) {
   const bundle = Deno.env.get("APP_STORE_BUNDLE_ID")!;
-  const roots: string[] = JSON.parse(Deno.env.get("APPLE_ROOT_CA_BASE64") ?? "[]");
+  const roots = parseRoots(Deno.env.get("APPLE_ROOT_CA_BASE64") ?? "");
   if (!roots.length) throw new Error("Missing trust roots");
   const production = environment === Environment.PRODUCTION;
   const verifier = new SignedDataVerifier(roots.map(root => Buffer.from(root, "base64")), true,

@@ -40,6 +40,7 @@ CHECKS = [
     ("Soft update notice strip (owner pick 13 Oct)", "Psst/Live/LiveHomeView.swift", r"A new Psst is ready"),
     ("Ps-st pulses when a Psst is sent (owner pick 13 Oct)", "Psst/PersonRow.swift", r"PsstRipple\(trigger: effect\?\.id\)"),
     ("Invite page: Get Psst to the App Store + Smart App Banner (owner pick 13 Oct)", "site/invite.html", r'apple-itunes-app.*id="get"'),
+    ("Super Psst sheet Direction A: Psst+ offer when used (owner pick 13 Oct)", "Psst/Live/FeatureViews.swift", r'UNLOCK PSST\+'),
     ("Super Psst ✦ on each band (owner pick 12 Oct)", "Psst/Live/LiveHomeView.swift", r'Image\(systemName: "sparkle"\)'),
     ("Leaderboard podium, all time (owner pick 12 Oct; This month removed 13 Oct)", "Psst/Live/FeatureViews.swift", r'func podiumBand'),
     ("One exchange line with seen, no corner duplicate (owner pick 12 Oct)", "Psst/PersonRow.swift", r'Text\("· seen"\)'),

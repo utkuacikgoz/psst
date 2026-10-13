@@ -248,31 +248,51 @@ struct SuperPsstSheet: View {
     @Environment(LiveStore.self) private var store
     @Environment(Purchases.self) private var purchases
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(Personalization.self) private var personalization
     @State private var allowance: SuperAllowance?
     @State private var loading = true
+    @State private var checkingPlus = false
     @State private var failed = false
     @State private var verificationFailed = false
     @State private var showingPlus = false
-    @Environment(\.scenePhase) private var scenePhase
-    @Environment(Personalization.self) private var personalization
+    /// This sheet sent a Super Psst and is waiting for the server's answer.
+    @State private var sending = false
+    /// Set once the server accepts: plays the Ps-st pulse, then the sheet closes.
+    @State private var sentID: UUID?
     @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 40
+    @ScaledMetric(relativeTo: .largeTitle) private var compactTitleSize: CGFloat = 34
+    @ScaledMetric(relativeTo: .largeTitle) private var plusTitleSize: CGFloat = 28
 
-    private func isAvailable(at date: Date) -> Bool {
-        guard let allowance else { return false }
-        return allowance.unlimited || allowance.remaining > 0 || date >= allowance.resetsAt
+    /// Every state the sheet can show (owner pick: Direction A, 13 Oct 2026).
+    private enum Mode: Equatable {
+        case gone, sending, sent, superFailed, earlierFailed
+        case paused(until: Date)
+        case loading, couldntLoad, available, unlimited
+        case used(resetsAt: Date)
     }
 
-    private var sendBlocked: Bool {
-        let status = store.status(for: connection)
-        if case .notSent = status { return true }
-        return LiveHomeView.isBusy(status) || LiveHomeView.isPaused(status)
+    private func mode(at date: Date) -> Mode {
+        if sentID != nil { return .sent }
+        if !store.connections.contains(where: { $0.id == connection.id }) { return .gone }
+        switch store.status(for: connection) {
+        case .sending: return .sending
+        case .notSent(let signal): return signal == .superPsst ? .superFailed : .earlierFailed
+        case .paused(_, let until) where until > date: return .paused(until: until)
+        default: break
+        }
+        if loading { return .loading }
+        guard let allowance, !failed else { return .couldntLoad }
+        if allowance.unlimited { return .unlimited }
+        return allowance.remaining > 0 || date >= allowance.resetsAt ? .available : .used(resetsAt: allowance.resetsAt)
     }
 
-    /// Their band, full screen: the cat, SUPER PSST, how many you have, and one
-    /// white band to send. Everything else is a single quiet line.
+    /// Their band, full screen: the cat, SUPER PSST for NAME, one status line and
+    /// one white band. Each state changes only the status line and what the band does;
+    /// when today's free one is used, a calm Psst+ block appears in the middle.
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            let available = isAvailable(at: context.date)
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let mode = mode(at: context.date)
             VStack(spacing: 0) {
                 HStack {
                     Spacer()
@@ -280,105 +300,352 @@ struct SuperPsstSheet: View {
                         .font(.psst(.body, weight: .semibold))
                         .frame(minWidth: Tokens.minTouch, minHeight: Tokens.minTouch)
                         .padding(.horizontal, Tokens.Space.l)
+                        .opacity(mode == .sending || mode == .sent ? 0.5 : 1)
                 }
                 ScrollView {
-                    VStack(spacing: Tokens.Space.l) {
-                        MischiefCat().frame(width: 84, height: 68)
-                        VStack(spacing: Tokens.Space.xs) {
-                            Text("SUPER PSST")
-                                .bandTitle("Super Psst", size: titleSize, tracking: Tokens.Band.titleTracking)
-                                .accessibilityAddTraits(.isHeader)
-                            Text("for \(connection.otherName)")
-                                .font(.psst(.title3, weight: .bold))
-                        }
-                        .accessibilityElement(children: .combine)
-                        allowanceLine(available: available)
-                        notes
-                    }
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, Tokens.sheetInset)
-                    .padding(.vertical, Tokens.Space.xl)
-                    .frame(maxWidth: .infinity)
+                    content(mode, now: context.date)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Tokens.sheetInset)
+                        .padding(.vertical, Tokens.Space.l)
+                        .frame(maxWidth: .infinity)
                 }
-                if !purchases.isUnlocked {
-                    Button("Unlimited with Psst+") { showingPlus = true }
-                        .font(.psst(.subheadline, weight: .bold))
-                        .frame(minHeight: Tokens.minTouch)
-                        .padding(.bottom, Tokens.Space.s)
-                }
-                Button { Task { await submit() } } label: {
-                    Text("SEND SUPER PSST")
-                        .font(.psst(.title3, weight: .black))
-                        .tracking(Tokens.Band.labelTracking)
-                        .foregroundStyle(Color(hex: bandHex))
-                        .frame(maxWidth: .infinity, minHeight: 64)
-                        .background(Color.surface.opacity(available && !sendBlocked && !loading ? 1 : 0.4))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(!available || sendBlocked || loading)
-                .accessibilityLabel("Send Super Psst")
+                .scrollBounceBehavior(.basedOnSize)
+                footer(mode, now: context.date)
             }
             .foregroundStyle(Color.onCanvas)
+            .background { PsstRipple(trigger: sentID) }
+            .clipped()
         }
         .background(Color(hex: bandHex).ignoresSafeArea())
         .presentationBackground(Color(hex: bandHex))
         .task(id: scenePhase) { if scenePhase == .active { await load() } }
+        .onChange(of: store.status(for: connection)) { _, status in statusChanged(status) }
+        .onChange(of: purchases.isUnlocked) { _, unlocked in if unlocked { Task { await load() } } }
         .sheet(isPresented: $showingPlus, onDismiss: { Task { await load() } }) { PsstPlusSheet() }
     }
 
     private var bandHex: UInt32 { personalization.colorHex(for: connection.id, name: connection.otherName) }
+    private var name: String { connection.otherName }
 
-    @ViewBuilder private func allowanceLine(available: Bool) -> some View {
-        if loading {
-            ProgressView("Checking today's Super Psst").tint(.white)
-        } else if failed {
-            Button("Couldn't check. Try again") { Task { await load() } }
-                .font(.psst(.body, weight: .bold))
-                .frame(minHeight: Tokens.minTouch)
-        } else if let allowance {
+    // MARK: Middle
+
+    @ViewBuilder private func content(_ mode: Mode, now: Date) -> some View {
+        switch mode {
+        case .gone:
+            VStack(spacing: Tokens.Space.l) {
+                MischiefCat().frame(width: 84, height: 68).opacity(0.55)
+                Text("\(name) isn't here any more".uppercased())
+                    .bandTitle("\(name) isn't here any more", size: titleSize, tracking: Tokens.Band.titleTracking)
+                    .accessibilityAddTraits(.isHeader)
+                detail("They left or removed the connection. Your Super Psst wasn't used.")
+            }
+        case .used(let resetsAt) where !purchases.isUnlocked:
+            VStack(spacing: Tokens.Space.m) {
+                head(compact: true)
+                statusLine("Used for today", detail: resetLine(resetsAt, now: now))
+                plusOffer
+                if let message = purchaseMessage { note(message) }
+                note("Pssting, replies and invites are always free.")
+            }
+        default:
+            VStack(spacing: Tokens.Space.l) {
+                head(title: mode == .sent ? "SENT" : "SUPER PSST", dimmed: isDimmed(mode))
+                middle(mode, now: now)
+            }
+        }
+    }
+
+    private func isDimmed(_ mode: Mode) -> Bool {
+        switch mode {
+        case .couldntLoad, .earlierFailed, .paused: true
+        default: false
+        }
+    }
+
+    private var purchaseMessage: String? {
+        switch purchases.state {
+        case .failed(let message): message
+        case .pending: "Waiting for approval. Psst+ unlocks when it's approved."
+        default: nil
+        }
+    }
+
+    private func head(title: String = "SUPER PSST", dimmed: Bool = false, compact: Bool = false) -> some View {
+        VStack(spacing: compact ? Tokens.Space.m : Tokens.Space.l) {
+            MischiefCat().frame(width: compact ? 64 : 84, height: compact ? 52 : 68)
             VStack(spacing: Tokens.Space.xs) {
-                Text(allowance.unlimited ? "Unlimited Super Pssts" : (available ? "1 available today" : "Used for today"))
-                    .font(.psst(.headline, weight: .bold))
-                if !available {
-                    Text("Next one: \(allowance.resetsAt.formatted(date: .abbreviated, time: .shortened))")
+                Text(title)
+                    .bandTitle(title.capitalized, size: compact ? compactTitleSize : titleSize, tracking: Tokens.Band.titleTracking)
+                    .accessibilityAddTraits(.isHeader)
+                Text("for \(name)")
+                    .font(.psst(.title3, weight: .bold))
+                if !compact {
+                    Text("Double whisper.")
                         .font(.psst(.subheadline, weight: .medium))
                         .foregroundStyle(Color.onBandSoft)
                 }
             }
         }
+        .opacity(dimmed ? 0.55 : 1)
     }
 
-    @ViewBuilder private var notes: some View {
-        VStack(spacing: Tokens.Space.xs) {
-            switch store.status(for: connection) {
-            case .notSent: Text("Retry your pending Psst first.")
-            case .sending: Text("A Psst is already sending.")
-            case .paused: Text("A little breather. Try again shortly.")
-            default: EmptyView()
+    @ViewBuilder private func middle(_ mode: Mode, now: Date) -> some View {
+        switch mode {
+        case .available:
+            sparkleLine("1 available today")
+            if verificationFailed { couldntConfirm(stillFree: true) } else { soundNote }
+        case .unlimited:
+            VStack(spacing: Tokens.Space.xs) {
+                sparkleLine("Unlimited Super Pssts")
+                detail("With Psst+. Thank you.")
             }
-            if verificationFailed {
-                Text("Couldn't verify Psst+ for unlimited sends. Your free daily Super Psst still works if unused.")
+            soundNote
+        case .used(let resetsAt):
+            // Psst+ bought on this phone but not confirmed yet: never offer it again.
+            statusLine("Used for today", detail: resetLine(resetsAt, now: now))
+            couldntConfirm(stillFree: false)
+        case .loading:
+            if checkingPlus {
+                HStack(spacing: Tokens.Space.s) {
+                    ProgressView().tint(Color.onCanvas)
+                    Text("Checking Psst+…").font(.psst(.headline, weight: .bold))
+                }
+            } else {
+                VStack(spacing: Tokens.Space.s) {
+                    Capsule().fill(Color.onCanvas.opacity(0.25)).frame(width: 160, height: 14)
+                        .modifier(SendingShimmer(active: true))
+                        .accessibilityHidden(true)
+                    note("Checking today's Super Psst…")
+                }
             }
-            Text("Their sound settings still apply.")
+            soundNote
+        case .couldntLoad:
+            if store.isOffline {
+                statusLine("You're offline", detail: "Super Psst needs a connection. Nothing was sent.")
+            } else {
+                statusLine("Couldn't reach Psst", detail: "Try again in a moment.")
+            }
+        case .sending:
+            sparkleLine("Sending…").opacity(0.6)
+        case .sent:
+            note("Closing…")
+        case .superFailed:
+            statusLine("Didn't make it", detail: "Trying again won't use another Super Psst.")
+        case .earlierFailed:
+            statusLine("Your last Psst to \(name) didn't make it", detail: "Send that one first, then your Super Psst.")
+        case .paused:
+            statusLine("A little breather", detail: "You've pssted \(name) a lot this minute.")
+        case .gone:
+            EmptyView()
         }
-        .font(.psst(.footnote, weight: .medium))
-        .foregroundStyle(Color.onBandSoft)
+    }
+
+    /// The upgrade when today's free one is used: what it is, and that it's one purchase.
+    private var plusOffer: some View {
+        VStack(spacing: Tokens.Space.xs) {
+            Text("PSST+")
+                .bandTitle("Psst+", size: plusTitleSize, tracking: Tokens.Band.titleTracking)
+            Text("Unlimited Super Pssts, plus colours, app icons, whisper sounds and widgets.")
+                .font(.psst(.callout, weight: .bold))
+            Text("One purchase. Yours for good. No subscription.")
+                .font(.psst(.footnote, weight: .medium))
+                .foregroundStyle(Color.onBandSoft)
+        }
         .fixedSize(horizontal: false, vertical: true)
+        .padding(.vertical, Tokens.Space.l)
+        .padding(.horizontal, Tokens.sheetInset)
+        .frame(maxWidth: .infinity)
+        .background(Color.bandShade)
+        .padding(.horizontal, -Tokens.sheetInset)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Psst+ couldn't be confirmed: say so plainly, offer both fixes, never block the free one.
+    private func couldntConfirm(stillFree: Bool) -> some View {
+        VStack(spacing: Tokens.Space.xs) {
+            Text("Couldn't confirm Psst+ just now.")
+                .font(.psst(.callout, weight: .bold))
+            Text(stillFree ? "Today's free Super Psst still works. Unlimited comes back once Psst+ is confirmed."
+                           : "Unlimited comes back once Psst+ is confirmed.")
+                .font(.psst(.footnote, weight: .medium))
+                .foregroundStyle(Color.onBandSoft)
+            HStack(spacing: Tokens.Space.l) {
+                Button("Try again") { Task { await load() } }
+                Button("Restore purchase") { Task { await purchases.restore(); await load() } }
+            }
+            .font(.psst(.subheadline, weight: .bold))
+            .frame(minHeight: Tokens.minTouch)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.vertical, Tokens.Space.m)
+        .padding(.horizontal, Tokens.sheetInset)
+        .frame(maxWidth: .infinity)
+        .background(Color.bandShade)
+        .padding(.horizontal, -Tokens.sheetInset)
+    }
+
+    private func statusLine(_ title: String, detail text: String?) -> some View {
+        VStack(spacing: Tokens.Space.xs) {
+            Text(title).font(.psst(.headline, weight: .bold))
+            if let text { detail(text) }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func sparkleLine(_ text: String) -> some View {
+        HStack(spacing: Tokens.Space.s) {
+            Image(systemName: "sparkle").accessibilityHidden(true)
+            Text(text)
+        }
+        .font(.psst(.headline, weight: .bold))
+    }
+
+    private func detail(_ text: String) -> some View {
+        Text(text)
+            .font(.psst(.subheadline, weight: .medium))
+            .foregroundStyle(Color.onBandSoft)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .font(.psst(.footnote, weight: .medium))
+            .foregroundStyle(Color.onBandSoft)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var soundNote: some View { note("Their sound settings still apply.") }
+
+    /// "Next free one at 3:00 AM · in 6 h 12 m": a plain fact, never a purchase timer.
+    private func resetLine(_ resetsAt: Date, now: Date) -> String {
+        let minutes = max(1, Int(resetsAt.timeIntervalSince(now) / 60))
+        let wait = minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) m" : "\(minutes) m"
+        return "Next free one at \(resetsAt.formatted(date: .omitted, time: .shortened)) · in \(wait)"
+    }
+
+    // MARK: Band
+
+    @ViewBuilder private func footer(_ mode: Mode, now: Date) -> some View {
+        VStack(spacing: 0) {
+            switch mode {
+            case .available:
+                if !purchases.isUnlocked && !verificationFailed {
+                    Button("Unlimited with Psst+") { showingPlus = true }
+                        .font(.psst(.subheadline, weight: .bold))
+                        .frame(minHeight: Tokens.minTouch)
+                        .padding(.bottom, Tokens.Space.s)
+                }
+                band("SEND SUPER PSST", label: "Send Super Psst") { Task { await submit() } }
+            case .unlimited:
+                band("SEND SUPER PSST", label: "Send Super Psst") { Task { await submit() } }
+            case .loading:
+                band("SEND SUPER PSST", label: "Send Super Psst", enabled: false) {}
+            case .used where !purchases.isUnlocked:
+                band(unlockTitle, label: "Unlock Psst+", enabled: purchases.state != .purchasing,
+                     sweeping: purchases.state == .purchasing) { unlock() }
+                HStack(spacing: Tokens.Space.l) {
+                    Button("Restore purchase") { Task { await purchases.restore(); await load() } }
+                    Button("Send \(name) a Psst") { store.tap(connection); dismiss() }
+                }
+                .font(.psst(.subheadline, weight: .bold))
+                .frame(minHeight: Tokens.minTouch)
+                .padding(.top, Tokens.Space.xs)
+            case .used, .couldntLoad, .superFailed:
+                band("TRY AGAIN", label: "Try again") {
+                    if mode == .superFailed {
+                        // Same event ID: it can't send twice or use a second free one.
+                        sending = true
+                        store.tap(connection)
+                    } else {
+                        Task { await load() }
+                    }
+                }
+            case .sending:
+                band("SENDING…", label: "Sending", enabled: false, sweeping: true) {}
+            case .sent:
+                band("SUPER PSST SENT", label: "Super Psst sent") { dismiss() }
+            case .earlierFailed:
+                band("RETRY THAT PSST", label: "Retry that Psst") { store.tap(connection) }
+            case .paused(let until):
+                let seconds = max(0, Int(until.timeIntervalSince(now).rounded(.up)))
+                band("TRY AGAIN IN \(seconds / 60):\(String(format: "%02d", seconds % 60))",
+                     label: "Try again in \(seconds) seconds", enabled: false) {}
+            case .gone:
+                band("CLOSE", label: "Close") { dismiss() }
+            }
+        }
+    }
+
+    private var unlockTitle: String {
+        purchases.displayPrice.map { "UNLOCK PSST+ · \($0)" } ?? "UNLOCK PSST+"
+    }
+
+    private func band(_ title: String, label: String, enabled: Bool = true, sweeping: Bool = false,
+                      action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.psst(.title3, weight: .black))
+                .tracking(Tokens.Band.labelTracking)
+                .foregroundStyle(Color(hex: bandHex))
+                .modifier(SendingShimmer(active: sweeping))
+                .padding(.horizontal, Tokens.Space.l)
+                .frame(maxWidth: .infinity, minHeight: 64)
+                .background(Color.surface.opacity(enabled || sweeping ? 1 : 0.4))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+    }
+
+    // MARK: Actions
+
+    /// Apple's purchase sheet straight from here; the full Psst+ sheet when the
+    /// App Store product hasn't loaded (it shows why and offers Try again).
+    private func unlock() {
+        if purchases.product == nil {
+            showingPlus = true
+        } else {
+            Task { await purchases.buy(accountID: store.api.accountID) }
+        }
+    }
+
+    private func statusChanged(_ status: LiveRowStatus) {
+        guard sending else { return }
+        switch status {
+        case .sending, .notSent:
+            break // Still going, or "Didn't make it" with Try again.
+        case .sent(.superPsst):
+            sending = false
+            sentID = UUID()
+            Task {
+                try? await Task.sleep(for: .seconds(1.1))
+                dismiss()
+            }
+        default:
+            // Refused (today's one already used elsewhere) or paused: show the fresh state.
+            sending = false
+            Task { await load(showProgress: false) }
+        }
     }
 
     private func submit() async {
         // Recheck quota and purchase status at the action, rather than trusting an
         // allowance loaded minutes ago while this sheet was open.
-        await load()
+        await load(showProgress: false)
         guard let allowance, !failed, allowance.unlimited || allowance.remaining > 0 else { return }
-        if store.sendSuper(connection) != nil { dismiss() }
+        if store.sendSuper(connection) != nil { sending = true }
     }
-    private func load() async {
-        loading = true; failed = false; verificationFailed = false
+
+    private func load(showProgress: Bool = true) async {
+        if showProgress { loading = true }
+        failed = false
+        verificationFailed = false
         if let proof = purchases.signedTransaction {
+            checkingPlus = showProgress
             do { try await store.api.verifyPlus(signedTransaction: proof) }
             catch { verificationFailed = true }
+            checkingPlus = false
         }
         do { allowance = try await store.api.superAllowance() } catch { failed = true }
         loading = false

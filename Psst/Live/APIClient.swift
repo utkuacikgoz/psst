@@ -106,19 +106,40 @@ final class APIClient: PsstAPI {
         setSession(response.session)
     }
 
+    /// Callers that need a fresh token at the same moment share one refresh: the
+    /// refresh token rotates, so two parallel refreshes would invalidate each other.
+    private var refreshing: Task<AuthSession, Error>?
+
     private func refreshIfNeeded(force: Bool = false) async throws -> AuthSession {
         guard let current = session else { throw APIError.signedOut }
         guard force || current.expiresAt.timeIntervalSinceNow < 60 else { return current }
+        if let refreshing { return try await refreshing.value }
+        let task = Task { try await self.refresh(current) }
+        refreshing = task
+        defer { refreshing = nil }
+        return try await task.value
+    }
+
+    private func refresh(_ current: AuthSession) async throws -> AuthSession {
         do {
             let response: AuthResponse = try await request(
                 path: "auth/v1/token?grant_type=refresh_token",
                 body: ["refresh_token": current.refreshToken], authorized: false)
             setSession(response.session)
             return response.session
-        } catch APIError.server(let status, _) where (400..<500).contains(status) {
+        } catch APIError.server(let status, let code) {
+            // Accounts are anonymous: signing out loses them for good. Only a session
+            // the server says is gone ends it; rate limits and hiccups are temporary.
+            guard Self.isDeadSession(status: status, code: code) else { throw APIError.offline }
             signOutLocally()
             throw APIError.signedOut
         }
+    }
+
+    nonisolated static func isDeadSession(status: Int, code: String) -> Bool {
+        let dead: Set<String> = ["refresh_token_not_found", "refresh_token_already_used", "session_not_found",
+                                 "session_expired", "user_not_found", "user_banned", "invalid_grant", "bad_jwt"]
+        return [400, 401, 403].contains(status) && dead.contains(code)
     }
 
     private func setSession(_ new: AuthSession?) {

@@ -67,7 +67,16 @@ final class LiveStore {
     /// The most recent effect anywhere, for a single haptic per event.
     private(set) var latestEffect: EffectTrigger?
     /// A Psst that just arrived, shown full screen for a moment (R2).
-    var arrival: Arrival?
+    var arrival: Arrival? {
+        didSet {
+            if let arrival, arrival.id != oldValue?.id { arrivalShown(arrival) }
+        }
+    }
+    /// A sender's unseen Pssts, reported seen only once their moment is on screen.
+    @ObservationIgnored private var pendingAcks: [UUID: [UUID]] = [:]
+    /// Moments already shown, so a failed "seen" report doesn't replay them.
+    @ObservationIgnored private var displayed: Set<UUID> = []
+    @ObservationIgnored private var ackTask: Task<Void, Never>?
     /// MA2: the senders still to show, oldest first, so the newest comes last.
     private(set) var arrivalQueue: [Arrival] = []
     /// Shown as "Offline" on home. True only when iOS says there's no network, or
@@ -99,6 +108,7 @@ final class LiveStore {
     private let defaults: UserDefaults
     private let now: () -> Date
     private let sentDisplayDuration: Duration
+    private let sendBackRetryDelay: Duration
     @ObservationIgnored private var lastTapAt: [UUID: Date] = [:]
     private var pausedUntil: [UUID: Date] = [:]
     /// People the user placed by dragging, top first. Kept on this device only.
@@ -114,8 +124,9 @@ final class LiveStore {
     static let notificationChoiceKey = "psst.live.notificationChoiceMade"
 
     init(api: PsstAPI, defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init,
-         sentDisplayDuration: Duration = .seconds(2)) {
+         sentDisplayDuration: Duration = .seconds(2), sendBackRetryDelay: Duration = .seconds(2)) {
         self.api = api
+        self.sendBackRetryDelay = sendBackRetryDelay
         self.defaults = defaults
         self.now = now
         self.sentDisplayDuration = sentDisplayDuration
@@ -325,14 +336,38 @@ final class LiveStore {
                     kind: s.signal == .superPsst ? .superPsst : (s.sameMoment == true ? .sameMoment : .signal),
                     position: many ? index + 1 : nil, total: many ? senders.count : nil)
         }
-        if arrival == nil, let first = moments.first {
-            arrival = first
-            arrivalQueue = Array(moments.dropFirst())
-        } else {
-            arrivalQueue += moments
+        // "Seen" is reported when each sender's moment is actually on screen, not
+        // when it's queued: three senders at once aren't all seen in the first second.
+        for sender in senders {
+            pendingAcks[sender.id] = unseen.filter { $0.connectionId == sender.connectionId }.map(\.id)
         }
-        let shown = unseen.filter { signal in connections.contains { $0.id == signal.connectionId } }.map(\.id)
-        if (try? await api.ackSignals(shown)) != nil, let updated = try? await api.listConnections(),
+        // Already shown (its "seen" report failed): report it now, don't show it twice.
+        let alreadyShown = moments.filter { displayed.contains($0.id) }
+        for moment in alreadyShown {
+            if let ids = pendingAcks.removeValue(forKey: moment.id) { await ack(ids) }
+        }
+        let waiting = Set(arrivalQueue.map(\.id) + [arrival?.id].compactMap { $0 })
+        let fresh = moments.filter { !displayed.contains($0.id) && !waiting.contains($0.id) }
+        if arrival == nil, let first = fresh.first {
+            arrival = first
+            arrivalQueue = Array(fresh.dropFirst())
+        } else {
+            arrivalQueue += fresh
+        }
+        await ackTask?.value
+    }
+
+    private func arrivalShown(_ shown: Arrival) {
+        displayed.insert(shown.id)
+        guard let ids = pendingAcks.removeValue(forKey: shown.id) else { return }
+        ackTask = Task { await ack(ids) }
+    }
+
+    /// Waits for the latest "seen" report (tests).
+    func waitForAcks() async { await ackTask?.value }
+
+    private func ack(_ ids: [UUID]) async {
+        if (try? await api.ackSignals(ids)) != nil, let updated = try? await api.listConnections(),
            updated != connections {
             connections = updated
         }
@@ -579,8 +614,15 @@ final class LiveStore {
         play(EffectTrigger(id: payload.eventID, signal: signal), on: payload.connectionID)
         await refresh()
         if let sender = connections.first(where: { $0.id == payload.connectionID }) {
-            arrival = Arrival(id: payload.eventID, connectionID: sender.id, senderName: sender.otherName,
-                              kind: signal == .superPsst ? .superPsst : (payload.sameMoment ? .sameMoment : .signal))
+            let opened = Arrival(id: payload.eventID, connectionID: sender.id, senderName: sender.otherName,
+                                 kind: signal == .superPsst ? .superPsst : (payload.sameMoment ? .sameMoment : .signal))
+            // Never cut off a moment that's on screen: the opened one plays next.
+            if arrival == nil {
+                arrival = opened
+            } else if arrival?.id != opened.id {
+                arrivalQueue.removeAll { $0.id == opened.id }
+                arrivalQueue.insert(opened, at: 0)
+            }
         }
     }
 
@@ -612,13 +654,21 @@ final class LiveStore {
     /// so a repeated action can't send twice. Returns false if it wasn't sent.
     func sendBack(_ payload: SignalPayload) async -> Bool {
         try? await api.ackSignals([payload.eventID])
-        do {
-            _ = try await api.sendSignal(eventID: .reply(to: payload.eventID),
-                                         connectionID: payload.connectionID, signal: .psst)
-            return true
-        } catch {
-            return false
+        let reply = UUID.reply(to: payload.eventID)
+        for attempt in 0..<2 {
+            do {
+                _ = try await api.sendSignal(eventID: reply, connectionID: payload.connectionID, signal: .psst)
+                return true
+            } catch APIError.offline where attempt == 0 {
+                // One more try shortly: the reply ID is fixed, so it can't send twice.
+                try? await Task.sleep(for: sendBackRetryDelay)
+            } catch APIError.server(let status, _) where status >= 500 && attempt == 0 {
+                try? await Task.sleep(for: sendBackRetryDelay)
+            } catch {
+                return false
+            }
         }
+        return false
     }
 
     // MARK: Account
@@ -643,6 +693,8 @@ final class LiveStore {
         coachDismissed = false
         arrival = nil
         arrivalQueue = []
+        pendingAcks = [:]
+        displayed = []
         pausedUntil = [:]
         connections = []
         sendStates = [:]
@@ -650,5 +702,7 @@ final class LiveStore {
         hasLoadedConnections = false
         lastRegisteredToken = nil
         phase = .needsName
+        // No names left behind on the Home Screen or Lock Screen.
+        WidgetBridge.publish([], unlocked: false)
     }
 }

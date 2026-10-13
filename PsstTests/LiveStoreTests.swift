@@ -104,7 +104,7 @@ final class LiveStoreTests: XCTestCase {
         suite = "LiveStoreTests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)
         api = FakeAPI()
-        store = LiveStore(api: api, defaults: defaults, now: { [unowned self] in self.clock }, sentDisplayDuration: .zero)
+        store = LiveStore(api: api, defaults: defaults, now: { [unowned self] in self.clock }, sentDisplayDuration: .zero, sendBackRetryDelay: .zero)
     }
 
     override func tearDown() async throws {
@@ -544,6 +544,46 @@ final class LiveStoreTests: XCTestCase {
         await store.refresh()
         await store.refresh()
         XCTAssertFalse(store.isOffline)
+    }
+
+    func testPsstBackFromANotificationRetriesOnceWithTheSameID() async {
+        api.sendError = APIError.offline
+        let payload = SignalPayload(eventID: UUID(), connectionID: UUID(), signal: .psst)
+        let sent = await store.sendBack(payload)
+        XCTAssertFalse(sent)
+        XCTAssertEqual(api.sentEventIDs, [.reply(to: payload.eventID), .reply(to: payload.eventID)])
+    }
+
+    func testSeenIsReportedWhenEachMomentIsShownNotWhenQueued() async {
+        let ada = connection(), bo = connection()
+        api.connections = [ada, bo]
+        let fromAda = UnseenSignal(id: UUID(), connectionId: ada.id, senderId: UUID(), senderName: "Ada",
+                                   effectId: "psst", createdAt: Date(timeIntervalSince1970: 1))
+        let fromBo = UnseenSignal(id: UUID(), connectionId: bo.id, senderId: UUID(), senderName: "Bo",
+                                  effectId: "psst", createdAt: Date(timeIntervalSince1970: 2))
+        api.unseen = [fromAda, fromBo]
+        store.isHomeVisible = true
+        await store.refresh()
+        XCTAssertEqual(api.acked, [fromAda.id], "Only the moment on screen")
+        store.nextArrival()
+        await store.waitForAcks()
+        XCTAssertEqual(api.acked, [fromAda.id, fromBo.id])
+    }
+
+    func testOpeningANotificationDoesNotCutOffTheMomentOnScreen() async {
+        let ada = connection(), bo = connection()
+        api.connections = [ada, bo]
+        api.unseen = [UnseenSignal(id: UUID(), connectionId: ada.id, senderId: UUID(), senderName: "Ada",
+                                   effectId: "psst", createdAt: Date())]
+        store.isHomeVisible = true
+        await store.refresh()
+        let onScreen = store.arrival
+        XCTAssertNotNil(onScreen)
+        let payload = SignalPayload(eventID: UUID(), connectionID: bo.id, signal: .psst)
+        await store.openedNotification(payload)
+        XCTAssertEqual(store.arrival?.id, onScreen?.id)
+        store.nextArrival()
+        XCTAssertEqual(store.arrival?.id, payload.eventID)
     }
 
     func testFailedSendBackReportsFailure() async {

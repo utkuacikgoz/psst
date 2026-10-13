@@ -31,6 +31,7 @@ function fakeDeps(t: PushTargets | null, results: Record<string, ApnsResult | Er
       return r instanceof Error ? Promise.reject(r) : Promise.resolve(r);
     },
     nowSeconds: () => 1000,
+    sleep: () => Promise.resolve(),
   };
   return { deps, recorded, sent };
 }
@@ -104,4 +105,18 @@ Deno.test("Super Psst keeps sender identity and carries the distinct sound", () 
   assertEquals(payload.aps.sound, "psst-super.wav");
   assertEquals(payload.psst.effect_id, "psst");
   assertEquals(payload.psst.super_psst, true);
+});
+
+Deno.test("a busy or failing APNs gets one retry with the same push", async () => {
+  const replies: ApnsResult[] = [{ status: 503 }, { status: 200 }];
+  const sent: string[] = [];
+  const deps: DeliverDeps = {
+    pushTargets: () => Promise.resolve(targets({ tokens: [{ token: "t1", environment: "sandbox" }] })),
+    recordPushResult: () => Promise.resolve(),
+    sendPush: (token) => { sent.push(token); return Promise.resolve(replies.shift()!); },
+    nowSeconds: () => 1000,
+    sleep: () => Promise.resolve(),
+  };
+  assertEquals(await deliver(EVENT, deps), "accepted");
+  assertEquals(sent, ["t1", "t1"]);
 });

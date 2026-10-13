@@ -25,6 +25,13 @@ export interface DeliverDeps {
     options: { apnsId: string; expiresAt: number },
   ): Promise<ApnsResult>;
   nowSeconds(): number;
+  /** Waits before the one retry (tests pass a no-op). */
+  sleep?(ms: number): Promise<void>;
+}
+
+/** APNs is briefly overloaded or failing: worth one more try. */
+export function isTransient(result: ApnsResult): boolean {
+  return result.status === 429 || result.status >= 500;
 }
 
 const EFFECT_TITLES: Record<string, string> = {
@@ -81,7 +88,12 @@ export async function deliver(eventId: string, deps: DeliverDeps): Promise<PushS
   const outcomes = await Promise.all(
     targets.tokens.map(async ({ token, environment }) => {
       try {
-        const result = await deps.sendPush(token, environment, payload, { apnsId: eventId, expiresAt });
+        let result = await deps.sendPush(token, environment, payload, { apnsId: eventId, expiresAt });
+        if (isTransient(result)) {
+          // Same apns-id, so APNs never shows it twice.
+          await (deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))))(1000);
+          result = await deps.sendPush(token, environment, payload, { apnsId: eventId, expiresAt });
+        }
         return { token, outcome: classify(result) };
       } catch {
         return { token, outcome: "failed" as const };

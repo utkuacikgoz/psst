@@ -183,7 +183,11 @@ class BackendTests(unittest.TestCase):
 
     def test_invite_limit(self):
         ada = new_user("Ada")
-        for _ in range(5):
+        codes = [ada.rpc("create_invite")["code"] for _ in range(6)]
+        # A 6th open invite retires the oldest, so sharing never gets stuck.
+        open_codes = {r[0] for r in ada.rows("select code from public.list_open_invites()")}
+        self.assertEqual(open_codes, set(codes[1:]))
+        for _ in range(14):
             ada.rpc("create_invite")
         with self.fails("too_many_invites", 429):
             ada.rpc("create_invite")
@@ -535,14 +539,27 @@ class BackendTests(unittest.TestCase):
         self.assertTrue(a.rpc("super_allowance")["unlimited"])
         for _ in range(2): a.rpc("send_signal", uuid.uuid4(), pair, "super_psst")
         original = admin("select original_transaction_id from private.plus_entitlements where user_id=%s", a.user_id)[0][0]
-        with self.fails("purchase_already_linked", 409):
-            admin("select public.record_verified_plus(%s,%s,true)", b.user_id, original)
+        # Restoring on a new account moves the purchase there.
+        admin("select public.record_verified_plus(%s,%s,true)", b.user_id, original)
+        self.assertTrue(b.rpc("super_allowance")["unlimited"])
+        self.assertFalse(a.rpc("super_allowance")["unlimited"])
+        with self.assertRaises(errors.InsufficientPrivilege):
+            a.rpc("plus_is_current", a.user_id)
+        self.assertTrue(admin("select public.plus_is_current(%s)", b.user_id)[0][0])
         admin("select public.record_verified_plus(%s,%s,false)", a.user_id, original)
+        self.assertFalse(b.rpc("super_allowance")["unlimited"])
         self.assertFalse(a.rpc("super_allowance")["unlimited"])
         with self.fails("super_daily_limit", 409): a.rpc("send_signal", uuid.uuid4(), pair, "super_psst")
         admin("select public.record_verified_plus(%s,%s,true)", a.user_id, original)
         admin("update private.plus_entitlements set valid_until=now()-interval '1 minute' where user_id=%s", a.user_id)
         with self.fails("super_daily_limit", 409): a.rpc("send_signal", uuid.uuid4(), pair, "super_psst")
+
+    def test_connected_people_see_only_each_others_name(self):
+        ada, emre = new_user("Ada"), new_user("Emre")
+        connect(ada, emre)
+        self.assertEqual(sorted(r[0] for r in ada.rows("select display_name from public.profiles")), ["Ada", "Emre"])
+        with self.assertRaises(errors.InsufficientPrivilege):
+            ada.rows("select notification_sound from public.profiles")
 
     def test_recipient_can_mute_super_without_changing_sender_event(self):
         a, b = new_user("A"), new_user("B")

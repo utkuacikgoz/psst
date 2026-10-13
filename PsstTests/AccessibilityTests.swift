@@ -35,3 +35,15 @@ final class TransportErrorTests: XCTestCase {
         XCTAssertTrue(APIClient.isRetryable("rest/v1/rpc/list_connections"))
     }
 }
+
+final class SessionTests: XCTestCase {
+    /// Only a session the server says is gone signs you out; anything else is temporary.
+    func testOnlyAGoneSessionSignsOut() {
+        XCTAssertTrue(APIClient.isDeadSession(status: 400, code: "refresh_token_not_found"))
+        XCTAssertTrue(APIClient.isDeadSession(status: 400, code: "invalid_grant"))
+        XCTAssertFalse(APIClient.isDeadSession(status: 429, code: "over_request_rate_limit"))
+        XCTAssertFalse(APIClient.isDeadSession(status: 408, code: "unknown"))
+        XCTAssertFalse(APIClient.isDeadSession(status: 400, code: "unknown"))
+        XCTAssertFalse(APIClient.isDeadSession(status: 500, code: "invalid_grant"))
+    }
+}

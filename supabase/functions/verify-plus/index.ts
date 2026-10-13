@@ -39,6 +39,10 @@ Deno.serve((req) => handleVerifyPlus(req, {
       appAccountToken: current.appAccountToken,
       active: current.revocationDate === undefined };
   },
+  async isCurrent(userId) {
+    const { data, error } = await service.rpc("plus_is_current", { p_user_id: userId });
+    return !error && data === true;
+  },
   async record(userId, purchase) {
     const { error } = await service.rpc("record_verified_plus", {
       p_user_id: userId, p_original_id: purchase.originalTransactionId, p_active: purchase.active,

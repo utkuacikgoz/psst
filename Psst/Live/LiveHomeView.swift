@@ -4,8 +4,23 @@ import UserNotifications
 
 struct LiveRootView: View {
     @Environment(LiveStore.self) private var store
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        Group {
+            if store.updateRequired {
+                UpdateRequiredView()
+            } else {
+                phaseView
+            }
+        }
+        // On launch and each return to the app: is this build still allowed to connect?
+        .task(id: scenePhase) {
+            if scenePhase == .active { await store.checkForUpdate() }
+        }
+    }
+
+    @ViewBuilder private var phaseView: some View {
         Group {
             switch store.phase {
             case .loading:
@@ -36,6 +51,56 @@ struct LiveRootView: View {
                 await store.prepareInvitedIntro(code: code)
             }
         }
+    }
+}
+
+/// Forced update (owner pick, 13 Oct 2026): shown only when the server's minimum
+/// build is above this one. One way forward: the App Store.
+struct UpdateRequiredView: View {
+    @Environment(\.openURL) private var openURL
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 40
+
+    var body: some View {
+        GeometryReader { proxy in
+            let inset = Tokens.sideInset(forWidth: proxy.size.width)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("psst")
+                    .font(.psst(size: Tokens.Band.wordmarkSize, weight: .heavy))
+                    .tracking(Tokens.Band.wordmarkTracking)
+                    .padding(.horizontal, inset)
+                    .padding(.vertical, Tokens.Space.l)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Tokens.Space.m) {
+                        Text("Time for a quick update")
+                            .font(.psst(size: titleSize, weight: .heavy))
+                            .tracking(Tokens.Band.titleTracking)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("This version of Psst can't connect any more. The new one is free and takes a few seconds.")
+                            .font(.psst(.body, weight: .medium))
+                            .foregroundStyle(Color.onCanvasSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, inset)
+                    .padding(.top, Tokens.Space.xxl)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                Button { openURL(LiveStore.appStoreURL) } label: {
+                    Text("UPDATE PSST")
+                        .font(.psst(.title3, weight: .black))
+                        .tracking(Tokens.Band.labelTracking)
+                        .foregroundStyle(Color.psstCanvas)
+                        .frame(maxWidth: .infinity, minHeight: 64)
+                        .background(Color.surface)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Update Psst")
+                .accessibilityHint("Opens Psst in the App Store.")
+            }
+            .foregroundStyle(Color.onCanvas)
+        }
+        .background(Color.psstCanvas.ignoresSafeArea())
     }
 }
 
@@ -73,6 +138,7 @@ struct InvitedIntroView: View {
 
 struct LiveHomeView: View {
     @Environment(LiveStore.self) private var store
+    @Environment(\.openURL) private var openURL
     @Environment(Purchases.self) private var purchases
     @Environment(Personalization.self) private var personalization
     @Environment(\.scenePhase) private var scenePhase
@@ -429,6 +495,12 @@ struct LiveHomeView: View {
                 }
             }
         }
+        // Soft update (owner pick, 13 Oct 2026): once per new version.
+        if store.updateAvailable != nil {
+            NoticeView(symbol: "sparkles", text: "A new Psst is ready", actionTitle: "Update",
+                       action: { openURL(LiveStore.appStoreURL) },
+                       onDismiss: { withAnimation { store.dismissUpdate() } })
+        }
         if let notice = store.notice {
             NoticeView(symbol: "info.circle", text: notice, actionTitle: "OK") { store.notice = nil }
         }
@@ -647,6 +719,7 @@ struct NoticeView: View {
     let text: String
     var actionTitle: String?
     var action: (() -> Void)?
+    var onDismiss: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s) {
@@ -658,6 +731,12 @@ struct NoticeView: View {
                     .font(.psst(.subheadline, weight: .bold))
                     .underline()
                     .frame(minHeight: Tokens.minTouch)
+            }
+            if let onDismiss {
+                Button(action: onDismiss) { Image(systemName: "xmark") }
+                    .font(.psst(.subheadline, weight: .bold))
+                    .frame(minWidth: Tokens.minTouch, minHeight: Tokens.minTouch)
+                    .accessibilityLabel("Not now")
             }
         }
         .font(.psst(.subheadline, weight: .semibold))

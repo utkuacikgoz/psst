@@ -217,6 +217,40 @@ final class LiveStore {
         defaults.set(name, forKey: Self.myNameKey)
     }
 
+    // MARK: App version
+
+    /// Below the server's minimum build: Psst asks for an update and nothing else.
+    private(set) var updateRequired = false
+    /// A newer version is out (its version text), until dismissed for that build.
+    private(set) var updateAvailable: String?
+    @ObservationIgnored private var latestBuild = 0
+    @ObservationIgnored private var reportedVersion = false
+    static let updateDismissedKey = "psst.updateDismissedBuild"
+    static let appStoreURL = URL(string: "https://apps.apple.com/app/id6815764359")!
+
+    static var currentBuild: Int { Int(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "") ?? 0 }
+    static var currentVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
+
+    /// Compares this build with the server's requirements, and reports the version
+    /// once per launch. If the server can't be reached, nothing changes: an
+    /// unreachable check never locks anyone out.
+    func checkForUpdate(build: Int = LiveStore.currentBuild, version: String = LiveStore.currentVersion) async {
+        guard build > 0, let requirements = try? await api.appRequirements() else { return }
+        updateRequired = build < requirements.minBuild
+        latestBuild = requirements.latestBuild
+        let dismissed = defaults.integer(forKey: Self.updateDismissedKey)
+        updateAvailable = requirements.latestBuild > build && requirements.latestBuild > dismissed
+            ? (requirements.latestVersion ?? "") : nil
+        if api.isSignedIn, defaults.bool(forKey: Self.profileKey), !reportedVersion {
+            reportedVersion = (try? await api.reportAppVersion(version, build: build)) != nil
+        }
+    }
+
+    func dismissUpdate() {
+        defaults.set(latestBuild, forKey: Self.updateDismissedKey)
+        updateAvailable = nil
+    }
+
     // MARK: Reachability
 
     /// iOS's own network status (NWPathMonitor, wired in PsstApp).

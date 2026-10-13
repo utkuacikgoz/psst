@@ -161,3 +161,10 @@ struct SuperAllowance: Decodable, Equatable {
     let resetsAt: Date
     let effectsEnabled: Bool
 }
+
+/// The oldest build allowed to connect and the newest one out (server app_config).
+struct AppRequirements: Decodable, Equatable {
+    let minBuild: Int
+    let latestBuild: Int
+    let latestVersion: String?
+}

@@ -41,6 +41,14 @@ final class FakeAPI: PsstAPI {
         return connections
     }
     var unseenCalls = 0
+    var requirements = AppRequirements(minBuild: 0, latestBuild: 0, latestVersion: nil)
+    var requirementsError: Error?
+    var reportedVersions: [String] = []
+    func appRequirements() async throws -> AppRequirements {
+        if let requirementsError { throw requirementsError }
+        return requirements
+    }
+    func reportAppVersion(_ version: String, build: Int) async throws { reportedVersions.append("\(version) (\(build))") }
     func listUnseen() async throws -> [UnseenSignal] {
         unseenCalls += 1
         return unseen
@@ -584,6 +592,24 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(store.arrival?.id, onScreen?.id)
         store.nextArrival()
         XCTAssertEqual(store.arrival?.id, payload.eventID)
+    }
+
+    func testUpdateRequiredOnlyBelowTheMinimumAndNeverWhenUnreachable() async {
+        api.requirements = AppRequirements(minBuild: 24, latestBuild: 25, latestVersion: "1.0.5")
+        await store.checkForUpdate(build: 23, version: "1.0.4")
+        XCTAssertTrue(store.updateRequired)
+        await store.checkForUpdate(build: 24, version: "1.0.4")
+        XCTAssertFalse(store.updateRequired)
+        XCTAssertEqual(store.updateAvailable, "1.0.5")
+
+        store.dismissUpdate()
+        await store.checkForUpdate(build: 24, version: "1.0.4")
+        XCTAssertNil(store.updateAvailable, "Dismissed for this version")
+
+        api.requirementsError = APIError.offline
+        api.requirements = AppRequirements(minBuild: 99, latestBuild: 99, latestVersion: "9")
+        await store.checkForUpdate(build: 24, version: "1.0.4")
+        XCTAssertFalse(store.updateRequired, "Can't reach the server: never lock anyone out")
     }
 
     func testFailedSendBackReportsFailure() async {

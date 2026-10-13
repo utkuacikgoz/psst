@@ -87,3 +87,20 @@ Re-running a day replaces its row. Past days can be rebuilt only while their sig
 - A download is not a user, and a signal is not a relationship. The numbers to watch are **returning pairs**: two people who exchange on more than one day.
 - `push_failed` and `push_no_devices` count APNs hand-offs, not delivery. The "seen" state in the app is the only evidence a Psst was actually shown.
 - Psst+ purchases happen in Apple's systems. Read those in App Store Connect → Sales and Trends; the server doesn't record them.
+
+
+## App versions in use
+
+Every account reports the version it last opened Psst with (from 1.0.4 on; older installs show as unknown):
+
+```sql
+select coalesce(app_version || ' (' || app_build || ')', 'before 1.0.4') as version, count(*) as accounts
+from public.profiles group by 1 order by 2 desc;
+```
+
+Force or suggest an update (no app release needed):
+
+```sql
+update public.app_config set min_build = 24;                                  -- below this: "Time for a quick update"
+update public.app_config set latest_build = 25, latest_version = '1.0.5';     -- "A new Psst is ready" strip
+```

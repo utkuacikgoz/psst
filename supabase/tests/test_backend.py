@@ -561,6 +561,23 @@ class BackendTests(unittest.TestCase):
         with self.assertRaises(errors.InsufficientPrivilege):
             ada.rows("select notification_sound from public.profiles")
 
+    def test_app_versions_are_reported_privately_and_requirements_are_public(self):
+        ada, emre = new_user("Ada"), new_user("Emre")
+        connect(ada, emre)
+        ada.rpc("report_app_version", "1.0.4", 24)
+        self.assertEqual(admin("select app_version, app_build from public.profiles where id = %s", ada.user_id),
+                         [("1.0.4", 24)])
+        with self.assertRaises(errors.InsufficientPrivilege):
+            emre.rows("select app_version from public.profiles")
+        with self.fails("invalid_version", 422):
+            ada.rpc("report_app_version", "x" * 30, 1)
+        self.assertEqual(Api("anon").rpc("app_requirements")["min_build"], 0)
+        admin("update public.app_config set min_build = 24, latest_build = 25, latest_version = '1.0.5'")
+        self.assertEqual(ada.rpc("app_requirements"), {"min_build": 24, "latest_build": 25, "latest_version": "1.0.5"})
+        with self.assertRaises(errors.InsufficientPrivilege):
+            ada.rows("update public.app_config set min_build = 0")
+        admin("update public.app_config set min_build = 0, latest_build = 0, latest_version = null")
+
     def test_recipient_can_mute_super_without_changing_sender_event(self):
         a, b = new_user("A"), new_user("B")
         pair = connect(a, b)

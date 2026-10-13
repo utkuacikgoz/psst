@@ -40,6 +40,8 @@ protocol PsstAPI: AnyObject {
     func setNotificationSound(_ file: String) async throws
     func setNotificationStatus(_ enabled: Bool) async throws
     func registerDeviceToken(_ token: String, environment: String) async throws
+    func appRequirements() async throws -> AppRequirements
+    func reportAppVersion(_ version: String, build: Int) async throws
     func deleteAccount() async throws
     func signOutLocally()
 }
@@ -50,6 +52,8 @@ extension PsstAPI {
     func superAllowance() async throws -> SuperAllowance { throw APIError.server(status: 503, code: "feature_unavailable") }
     func setSuperEffects(_ enabled: Bool) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
     func verifyPlus(signedTransaction: String) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
+    func appRequirements() async throws -> AppRequirements { AppRequirements(minBuild: 0, latestBuild: 0, latestVersion: nil) }
+    func reportAppVersion(_ version: String, build: Int) async throws {}
 }
 
 struct AuthSession: Codable, Equatable {
@@ -234,6 +238,16 @@ final class APIClient: PsstAPI {
 
     func registerDeviceToken(_ token: String, environment: String) async throws {
         try await rpcVoid("register_device_token", ["p_token": token, "p_environment": environment])
+    }
+
+    /// Readable before sign-in (anon key only), so onboarding can ask for an update too.
+    func appRequirements() async throws -> AppRequirements {
+        try await request(path: "rest/v1/rpc/app_requirements", body: [String: String](), authorized: false)
+    }
+
+    func reportAppVersion(_ version: String, build: Int) async throws {
+        struct Params: Encodable { let p_version: String; let p_build: Int }
+        try await rpcVoid("report_app_version", Params(p_version: version, p_build: build))
     }
 
     func deleteAccount() async throws {

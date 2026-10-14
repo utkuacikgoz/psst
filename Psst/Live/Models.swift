@@ -10,6 +10,8 @@ struct ConnectionSummary: Codable, Identifiable, Equatable {
     let lastCreatedAt: Date?
     let lastSeenAt: Date?
     let unseenCount: Int
+    /// Days in a row you've both pssted (3A); 0 or absent when there's no live streak.
+    var streakDays: Int? = nil
 
     var id: UUID { connectionId }
     var lastSignal: Signal? { lastEffect.flatMap(Signal.init(rawValue:)) }

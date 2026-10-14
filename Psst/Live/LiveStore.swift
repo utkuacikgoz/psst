@@ -316,11 +316,40 @@ final class LiveStore {
 
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
 
+    // MARK: Streaks (3A)
+
+    /// "7 days in a row" shows on a band for a moment when its streak grows (3+).
+    private(set) var streakMoments: [UUID: Int] = [:]
+    @ObservationIgnored private var reportedTimeZone: String?
+    static let streakMomentDuration: Duration = .seconds(3)
+
+    private func noteStreaks(from old: [ConnectionSummary], to new: [ConnectionSummary]) {
+        let before = Dictionary(old.map { ($0.id, $0.streakDays ?? 0) }, uniquingKeysWith: { first, _ in first })
+        for connection in new {
+            let days = connection.streakDays ?? 0
+            guard days >= 3, let previous = before[connection.id], days > previous else { continue }
+            streakMoments[connection.id] = days
+            Task { [weak self] in
+                try? await Task.sleep(for: Self.streakMomentDuration)
+                if self?.streakMoments[connection.id] == days { self?.streakMoments[connection.id] = nil }
+            }
+        }
+    }
+
+    /// A day is the person's own day, so the server keeps the phone's time zone. Once per
+    /// launch, and again if it changes (travel).
+    private func reportTimeZone() async {
+        let zone = TimeZone.current.identifier
+        guard zone != reportedTimeZone else { return }
+        if (try? await api.setTimeZone(zone)) != nil { reportedTimeZone = zone }
+    }
+
     private func load() async {
         do {
             let latest = try await api.listConnections()
             // Unchanged polls leave the list alone, so home doesn't redraw and the cache isn't rewritten.
             if latest != connections {
+                noteStreaks(from: connections, to: latest)
                 connections = latest
                 if let data = try? JSONEncoder().encode(latest) {
                     defaults.set(data, forKey: Self.connectionsCacheKey)
@@ -331,6 +360,7 @@ final class LiveStore {
             connectionsLoadFailed = false
             noteReachable()
             await retryDeviceToken()
+            await reportTimeZone()
             await showUnseenIfVisible()
         } catch APIError.offline {
             connectionsLoadFailed = true
@@ -589,7 +619,7 @@ final class LiveStore {
                 return ConnectionSummary(connectionId: connection.id, otherId: connection.otherId,
                     otherName: connection.otherName, lastEventId: result.id, lastFromMe: true,
                     lastEffect: signal.rawValue, lastCreatedAt: result.createdAt, lastSeenAt: nil,
-                    unseenCount: connection.unseenCount)
+                    unseenCount: connection.unseenCount, streakDays: connection.streakDays)
             }
             if result.sameMoment == true, let name = connections.first(where: { $0.id == connectionID })?.otherName {
                 arrival = Arrival(id: eventID, connectionID: connectionID, senderName: name, kind: .sameMoment)
@@ -779,6 +809,8 @@ final class LiveStore {
         defaults.removeObject(forKey: Self.connectionsCacheKey)
         defaults.removeObject(forKey: Self.activityCacheKey)
         activity = []
+        streakMoments = [:]
+        reportedTimeZone = nil
         myName = nil
         pinnedOrder = []
         recencyOrder = []

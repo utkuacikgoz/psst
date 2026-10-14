@@ -673,7 +673,9 @@ struct LiveHomeView: View {
                 isDimmed: Self.isPaused(status),
                 color: Color(hex: colour ?? personalization.colorHex(for: connection.id, name: connection.otherName)),
                 exchangeDate: connection.lastCreatedAt,
-                exchangeFromMe: connection.lastFromMe
+                exchangeFromMe: connection.lastFromMe,
+                streakDays: connection.streakDays ?? 0,
+                streakMoment: store.streakMoments[connection.id]
             )
             // Remove, block and report: a long press here, the VoiceOver action,
             // or Settings → People. Each explains itself before acting.

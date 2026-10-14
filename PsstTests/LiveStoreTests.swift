@@ -272,6 +272,18 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(ActivityView.ranks(for: []), [])
     }
 
+    func testAGrowingStreakShowsItsMomentFromThreeDays() async {
+        var kim = connection(name: "Kim")
+        kim.streakDays = 2
+        api.connections = [kim]
+        await store.refresh()
+        XCTAssertTrue(store.streakMoments.isEmpty)
+        kim.streakDays = 3
+        api.connections = [kim]
+        await store.refresh()
+        XCTAssertEqual(store.streakMoments[kim.id], 3, "3 days in a row")
+    }
+
     func testOverlappingRefreshesShareOneRequest() async {
         api.connections = [connection()]
         async let first: Void = store.refresh()

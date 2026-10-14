@@ -451,6 +451,43 @@ class BackendTests(unittest.TestCase):
         with self.assertRaises(errors.InsufficientPrivilege):
             ada.rows("select * from public.recent_purchase_failures()")
 
+    def test_streak_counts_days_both_pssted_by_their_own_calendar(self):
+        import datetime
+        ada, emre, sam = new_user("Ada"), new_user("Emre"), new_user("Sam")
+        for person in (ada, emre, sam):
+            person.rpc("set_time_zone", "Europe/Istanbul")
+        today = datetime.datetime.now(datetime.timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0)
+
+        def psst(conn, sender, recipient, days_ago):
+            admin("insert into public.signal_events (id, connection_id, sender_id, recipient_id, effect_id, created_at) "
+                  "values (gen_random_uuid(), %s, %s, %s, 'psst', %s)",
+                  conn, sender.user_id, recipient.user_id, today - datetime.timedelta(days=days_ago))
+
+        def streak(viewer, conn):
+            return [r[0] for r in viewer.rows("select streak_days from public.list_connections() where connection_id = %s", conn)][0]
+
+        pair = connect(ada, emre)
+        psst(pair, ada, emre, 2); psst(pair, emre, ada, 2)   # day 1
+        psst(pair, ada, emre, 1)                             # only one side so far
+        self.assertEqual(streak(ada, pair), 0, "day 1 was the day before yesterday, yesterday isn't complete")
+        psst(pair, emre, ada, 1)                             # day 2: yesterday complete
+        self.assertEqual(streak(ada, pair), 2, "alive today: it can still go on")
+        psst(pair, ada, emre, 0); psst(pair, ada, emre, 0); psst(pair, emre, ada, 0)  # day 3, extra Pssts count once
+        self.assertEqual(streak(ada, pair), 3)
+        self.assertEqual(streak(emre, pair), 3, "the same for both")
+
+        # A missed day ends it; an old streak isn't shown.
+        old = connect(ada, sam)
+        psst(old, ada, sam, 5); psst(old, sam, ada, 5); psst(old, ada, sam, 4); psst(old, sam, ada, 4)
+        self.assertEqual(streak(ada, old), 0)
+        psst(old, ada, sam, 0); psst(old, sam, ada, 0)
+        self.assertEqual(streak(ada, old), 1, "starts again from one")
+
+        with self.fails("invalid_time_zone", 400):
+            ada.rpc("set_time_zone", "Mars/Base")
+        with self.assertRaises(errors.InsufficientPrivilege):
+            emre.rows("select time_zone from public.profiles")
+
     def test_inviter_hears_who_joined_server_only(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         token = "cd" * 32

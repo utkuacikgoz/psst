@@ -94,7 +94,8 @@ final class UITestAPI: PsstAPI {
                 lastEventId: event == nil ? nil : UUID(), lastFromMe: event?.fromMe,
                 lastEffect: event?.signal.rawValue, lastCreatedAt: event == nil ? nil : lastDates[id],
                 lastSeenAt: event?.seen == true ? Date() : nil,
-                unseenCount: unseen.filter { $0.connectionId == id }.count)
+                unseenCount: unseen.filter { $0.connectionId == id }.count,
+                streakDays: id == emre ? 6 : nil)
         }
     }
 

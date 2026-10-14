@@ -19,6 +19,11 @@ struct PersonRow: View {
     var color: Color? = nil
     var exchangeDate: Date? = nil
     var exchangeFromMe: Bool? = nil
+    /// 3A (owner pick, 14 Oct): a live streak of 3+ days shows as a flame and the
+    /// number in the bottom-left corner, mirroring the Super Psst mark.
+    var streakDays = 0
+    /// Set for a few seconds when the streak just grew: "7 days in a row".
+    var streakMoment: Int? = nil
 
     @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = Tokens.Band.titleSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -58,6 +63,15 @@ struct PersonRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                // The moment a streak grows: one line for a few seconds (3A).
+                if let streakMoment {
+                    HStack(spacing: Tokens.Space.xs) {
+                        Image(systemName: "flame.fill")
+                        Text("\(streakMoment) days in a row")
+                    }
+                    .font(.psst(.subheadline, weight: .bold))
+                    .transition(.opacity)
+                }
                 // Failure or pause status stays separate from the timestamp. Sending shows
                 // on the name itself (VoiceOver still hears it in the value).
                 if !isBusy && !status.isEmpty {
@@ -88,6 +102,28 @@ struct PersonRow: View {
             }
             .background { PsstRipple(trigger: effect?.id) }
             .clipped()
+            .overlay(alignment: .bottomLeading) {
+                if streakDays >= 3 {
+                    HStack(spacing: Tokens.Space.xs) {
+                        Image(systemName: "flame.fill")
+                        Text("\(streakDays)").monospacedDigit()
+                    }
+                    .font(.psst(.footnote, weight: .bold))
+                    .foregroundStyle(Color.onBandSoft)
+                    .keyframeAnimator(initialValue: 1.0, trigger: streakMoment) { content, scale in
+                        content.scaleEffect(reduceMotion ? 1 : CGFloat(scale), anchor: .leading)
+                    } keyframes: { _ in
+                        KeyframeTrack {
+                            CubicKeyframe(1.35, duration: 0.15)
+                            CubicKeyframe(1.0, duration: 0.35)
+                        }
+                    }
+                    .frame(minHeight: Tokens.minTouch)
+                    .padding(.horizontal, Tokens.Space.l)
+                    .padding(.vertical, Tokens.Space.s)
+                    .accessibilityHidden(true)
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 // Only when there's no exchange line to carry it.
                 if let cornerMark, exchangeDate == nil {
@@ -107,6 +143,7 @@ struct PersonRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name)
         .accessibilityValue([status, cornerMark.map { "Psst \($0)" } ?? "",
+                             streakDays >= 3 ? "\(streakDays)-day streak" : "",
                              exchangeDate.map { "\(exchangeFromMe == true ? "Sent" : "Received") \($0.formatted(date: .complete, time: .shortened))" } ?? ""].filter { !$0.isEmpty }.joined(separator: ", "))
         .accessibilityHint(accessibilityHint)
         .accessibilityAddTraits(.isButton)

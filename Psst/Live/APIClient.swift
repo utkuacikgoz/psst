@@ -42,6 +42,7 @@ protocol PsstAPI: AnyObject {
     func registerDeviceToken(_ token: String, environment: String) async throws
     func appRequirements() async throws -> AppRequirements
     func reportAppVersion(_ version: String, build: Int) async throws
+    func setTimeZone(_ identifier: String) async throws
     func deleteAccount() async throws
     func signOutLocally()
 }
@@ -54,6 +55,7 @@ extension PsstAPI {
     func verifyPlus(signedTransaction: String) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
     func appRequirements() async throws -> AppRequirements { AppRequirements(minBuild: 0, latestBuild: 0, latestVersion: nil) }
     func reportAppVersion(_ version: String, build: Int) async throws {}
+    func setTimeZone(_ identifier: String) async throws {}
 }
 
 struct AuthSession: Codable, Equatable {
@@ -248,6 +250,10 @@ final class APIClient: PsstAPI {
     func reportAppVersion(_ version: String, build: Int) async throws {
         struct Params: Encodable { let p_version: String; let p_build: Int }
         try await rpcVoid("report_app_version", Params(p_version: version, p_build: build))
+    }
+
+    func setTimeZone(_ identifier: String) async throws {
+        try await rpcVoid("set_time_zone", ["p_time_zone": identifier])
     }
 
     func deleteAccount() async throws {

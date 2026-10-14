@@ -38,6 +38,10 @@
     {
       "source": "/invite/:code",
       "destination": "/invite"
+    },
+    {
+      "source": "/p/:code",
+      "destination": "/api/psst?code=:code"
     }
   ]
 }

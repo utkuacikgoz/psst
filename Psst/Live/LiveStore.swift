@@ -468,7 +468,9 @@ final class LiveStore {
         let moments = senders.enumerated().map { index, s in
             Arrival(id: s.id, connectionID: s.connectionId, senderName: s.senderName,
                     kind: s.signal == .superPsst ? .superPsst : (s.sameMoment == true ? .sameMoment : .signal),
-                    position: many ? index + 1 : nil, total: many ? senders.count : nil)
+                    position: many ? index + 1 : nil, total: many ? senders.count : nil,
+                    note: heldPsstConnections.remove(s.connectionId) == nil ? nil
+                        : "Sent \(PersonRow.lowercasedStart(ExchangeTime.label(s.createdAt, now: now()))), before you had Psst")
         }
         // "Seen" is reported when each sender's moment is actually on screen, not
         // when it's queued: three senders at once aren't all seen in the first second.
@@ -721,9 +723,14 @@ final class LiveStore {
 
     func acceptInvite(code: String) async throws -> UUID? {
         let result = try await api.acceptInvite(code: code)
+        if result.heldPsst == true, let id = result.connectionId { heldPsstConnections.insert(id) }
         await refresh()
         return result.connectionId
     }
+
+    /// Joined through a Psst that was the invite (5A): its arrival says it was sent
+    /// before they had Psst.
+    @ObservationIgnored private var heldPsstConnections: Set<UUID> = []
 
     // MARK: Notifications
 

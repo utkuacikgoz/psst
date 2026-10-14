@@ -2,9 +2,18 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["9D78WTZAD8.com.belevate.psst"],
+        "appIDs": [
+          "9D78WTZAD8.com.belevate.psst"
+        ],
         "components": [
-          { "/": "/invite/*", "comment": "Invite links open in Psst" }
+          {
+            "/": "/invite/*",
+            "comment": "Invite links open in Psst"
+          },
+          {
+            "/": "/p/*",
+            "comment": "A Psst that is the invite opens in Psst"
+          }
         ]
       }
     ]

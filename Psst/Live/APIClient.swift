@@ -28,6 +28,7 @@ protocol PsstAPI: AnyObject {
     func ackSignals(_ ids: [UUID]) async throws
     func sendSignal(eventID: UUID, connectionID: UUID, signal: Signal) async throws -> SendResult
     func createInvite() async throws -> CreatedInvite
+    func createPsstInvite() async throws -> CreatedInvite
     func previewInvite(code: String) async throws -> InvitePreview
     func acceptInvite(code: String) async throws -> AcceptedInvite
     func removeConnection(_ id: UUID) async throws
@@ -59,6 +60,7 @@ extension PsstAPI {
     func appRequirements() async throws -> AppRequirements { AppRequirements(minBuild: 0, latestBuild: 0, latestVersion: nil) }
     func reportAppVersion(_ version: String, build: Int) async throws {}
     func setTimeZone(_ identifier: String) async throws {}
+    func createPsstInvite() async throws -> CreatedInvite { throw APIError.server(status: 503, code: "feature_unavailable") }
     func weeklyRecap() async throws -> WeeklyRecap { throw APIError.server(status: 503, code: "feature_unavailable") }
     func weeklyRecapStatus() async throws -> WeeklyRecapStatus { throw APIError.server(status: 503, code: "feature_unavailable") }
     func setWeeklyRecap(_ enabled: Bool) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
@@ -192,6 +194,9 @@ final class APIClient: PsstAPI {
 
     func createInvite() async throws -> CreatedInvite {
         try await rpc("create_invite", [String: String]())
+    }
+    func createPsstInvite() async throws -> CreatedInvite {
+        try await rpc("create_psst_invite", [String: String]())
     }
 
     func previewInvite(code: String) async throws -> InvitePreview {

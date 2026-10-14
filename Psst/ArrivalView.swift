@@ -13,6 +13,8 @@ struct Arrival: Identifiable, Equatable {
     /// MA2: when several people pssted, each gets a moment; "2 of 3".
     var position: Int? = nil
     var total: Int? = nil
+    /// One quiet line under "psst", e.g. "Sent yesterday, before you had Psst" (5A).
+    var note: String? = nil
 }
 
 /// The person's colour fills the screen for a moment, then it settles back
@@ -180,9 +182,14 @@ struct ArrivalView: View {
                                 .tracking(Tokens.Band.wordmarkTracking)
                         }
                     } else if isPsst {
-                        Text("psst")
-                            .font(.psst(size: psstSize, weight: .heavy))
-                            .tracking(Tokens.Band.wordmarkTracking)
+                        VStack(spacing: Tokens.Space.s) {
+                            Text("psst")
+                                .font(.psst(size: psstSize, weight: .heavy))
+                                .tracking(Tokens.Band.wordmarkTracking)
+                            if let note = arrival.note {
+                                Text(note).font(.psst(.subheadline, weight: .semibold))
+                            }
+                        }
                     } else {
                         Text("IS IN")
                             .bandTitle("is in", size: nameSize, tracking: Tokens.Band.titleTracking)

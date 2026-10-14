@@ -18,6 +18,11 @@ struct InviteSheet: View {
     @State private var isCreating = false
     @State private var createError: String?
 
+    // Psst someone new (5A)
+    @State private var psstShare: PsstShare?
+    @State private var creatingPsst = false
+    @State private var psstError: String?
+
     // Enter
     @State private var code = ""
     @State private var preview: InvitePreview?
@@ -39,6 +44,7 @@ struct InviteSheet: View {
         .foregroundStyle(Color.onCanvas)
         .background(Color.psstCanvas.ignoresSafeArea())
         .presentationBackground(Color.psstCanvas)
+        .sheet(item: $psstShare) { ActivityView(items: $0.items) }
         .onAppear {
             if startEntering {
                 mode = .enter
@@ -83,6 +89,10 @@ struct InviteSheet: View {
         VStack(spacing: 0) {
             MischiefCat().frame(width: 48, height: 40)
                 .frame(maxWidth: .infinity).padding(.top, Tokens.Space.s)
+            // 5A (owner pick, 14 Oct): psst someone who isn't on Psst; the Psst is the invite.
+            chooserBand(title: "Psst someone new",
+                        subtitle: psstError ?? (creatingPsst ? "Getting your Psst ready…" : "Not on Psst yet? Your Psst is the invite."),
+                        color: Color(hex: 0xAC3E68), tag: "NEW") { createPsst() }
             chooserBand(title: "Share my invite", subtitle: "Send a link to your friends", color: .inviteGold) {
                 withAnimation { mode = .share }
                 if invite == nil { create() }
@@ -94,9 +104,19 @@ struct InviteSheet: View {
         }
     }
 
-    private func chooserBand(title: String, subtitle: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func chooserBand(title: String, subtitle: String, color: Color, tag: String? = nil,
+                             action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: Tokens.Space.s) {
+                if let tag {
+                    Text(tag)
+                        .font(.psst(.caption, weight: .black))
+                        .tracking(Tokens.Band.labelTracking)
+                        .foregroundStyle(color)
+                        .padding(.horizontal, Tokens.Space.s)
+                        .padding(.vertical, 2)
+                        .background(Color.surface)
+                }
                 Text(title.uppercased())
                     .bandTitle(title, size: bandTitleSize, tracking: Tokens.Band.titleTracking)
                     .fixedSize(horizontal: false, vertical: true)
@@ -159,6 +179,26 @@ struct InviteSheet: View {
                         .background(Color.surface)
                 }
             }
+        }
+    }
+
+    /// Makes a one-person link holding your Psst, then opens the share sheet (5A).
+    private func createPsst() {
+        guard !creatingPsst else { return }
+        creatingPsst = true
+        psstError = nil
+        Task {
+            do {
+                let invite = try await store.api.createPsstInvite()
+                psstShare = PsstShare(items: ["I pssted you. Open it to see, and psst me back.", invite.link])
+            } catch APIError.server(_, "too_many_invites") {
+                psstError = "That's a lot of invites today. Try again tomorrow."
+            } catch APIError.offline {
+                psstError = "No internet right now. Try again once you're online."
+            } catch {
+                psstError = "Your Psst didn't get ready. Try again?"
+            }
+            creatingPsst = false
         }
     }
 
@@ -313,4 +353,21 @@ struct InviteSheet: View {
             isAccepting = false
         }
     }
+}
+
+/// What the share sheet sends for a Psst that is the invite.
+struct PsstShare: Identifiable {
+    let id = UUID()
+    let items: [Any]
+}
+
+/// The system share sheet (Messages, WhatsApp, anything).
+struct ActivityView: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }

@@ -42,6 +42,7 @@ CHECKS = [
     ("Invite page: Get Psst to the App Store + Smart App Banner (owner pick 13 Oct)", "site/invite.html", r'apple-itunes-app.*id="get"'),
     ("Super Psst sheet Direction A: Psst+ offer when used (owner pick 13 Oct)", "Psst/Live/FeatureViews.swift", r'UNLOCK PSST\+'),
     ("Super Psst corner button on each band: the nudge mark (owner pick 12 Oct; ✦ replaced by nudge 1A, 14 Oct)", "Psst/Live/LiveHomeView.swift", r'NudgeMark\(eyes:'),
+    ("The Psst is the invite: PSST SOMEONE NEW band (owner pick 5A, 14 Oct)", "Psst/Live/InviteSheet.swift", r'chooserBand\(title: "Psst someone new"'),
     ("Weekly recap: opt-in strip and full-screen recap (owner pick 4A, 14 Oct)", "Psst/Live/FeatureViews.swift", r'struct WeeklyRecapView'),
     ("Streak corner flame from 3 days (owner pick 3A, 14 Oct)", "Psst/PersonRow.swift", r'if streakDays >= 3'),
     ("Cats in the pull gaps: I'm here! / Psst! (owner pick 2A, 14 Oct)", "Psst/Live/LiveHomeView.swift", r'PullCat\(text: "I\'m here!"'),

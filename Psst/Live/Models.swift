@@ -54,7 +54,10 @@ struct CreatedInvite: Decodable, Equatable {
     /// A web link, so it works for people who don't have Psst yet: with the app
     /// installed it opens the app (universal link); without, a page on
     /// psstapp.fun shows the code and where to get Psst.
-    var link: URL { URL(string: "https://\(InviteLink.webHost)/invite/\(code)")! }
+    /// "psst" for a Psst that is the invite (5A); its link says "Utku pssted you".
+    var kind: String? = nil
+
+    var link: URL { URL(string: "https://\(InviteLink.webHost)/\(kind == "psst" ? "p" : "invite")/\(code)")! }
     /// "ABCD EFGH" for reading aloud or typing.
     var displayCode: String { code.count == 8 ? "\(code.prefix(4)) \(code.suffix(4))" : code }
 }
@@ -64,6 +67,8 @@ struct OpenInvite: Decodable, Identifiable, Equatable {
     let code: String
     let createdAt: Date
     let expiresAt: Date
+    /// "psst" for a Psst waiting for someone new (5A); absent or "code" otherwise.
+    var kind: String? = nil
 
     var id: String { code }
     var displayCode: String { code.count == 8 ? "\(code.prefix(4)) \(code.suffix(4))" : code }
@@ -81,6 +86,8 @@ struct InvitePreview: Decodable, Equatable {
 struct AcceptedInvite: Decodable, Equatable {
     let status: String
     let connectionId: UUID?
+    /// They joined through a Psst that was the invite (5A): it arrives as their first.
+    var heldPsst: Bool? = nil
 }
 
 struct BlockedPerson: Decodable, Identifiable, Equatable {
@@ -132,14 +139,15 @@ extension UUID {
 enum InviteLink {
     static let webHost = "psstapp.fun"
 
-    /// Reads the code from https://psstapp.fun/invite/ABCDEFGH (a universal link)
-    /// or the older psst://invite/ABCDEFGH.
+    /// Reads the code from https://psstapp.fun/invite/ABCDEFGH or /p/ABCDEFGH (a Psst
+    /// that is the invite; universal links) or the older psst://invite/ABCDEFGH.
     static func code(from url: URL) -> String? {
         let scheme = url.scheme?.lowercased(), host = url.host?.lowercased()
         var parts = url.pathComponents.filter { $0 != "/" }
         if scheme == "psst", host == "invite" {
             // psst://invite/CODE: the code is the whole path.
-        } else if scheme == "https", host == webHost || host == "www.\(webHost)", parts.first?.lowercased() == "invite" {
+        } else if scheme == "https", host == webHost || host == "www.\(webHost)",
+                  ["invite", "p"].contains(parts.first?.lowercased() ?? "") {
             parts.removeFirst()
         } else {
             return nil

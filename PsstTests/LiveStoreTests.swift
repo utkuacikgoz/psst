@@ -870,6 +870,8 @@ final class LiveParsingTests: XCTestCase {
         XCTAssertEqual(InviteLink.code(from: URL(string: "psst://invite/abcd-efgh")!), "ABCDEFGH")
         XCTAssertEqual(CreatedInvite(code: "ABCDEFGH", expiresAt: Date()).link.absoluteString, "https://psstapp.fun/invite/ABCDEFGH")
         XCTAssertEqual(InviteLink.code(from: URL(string: "https://psstapp.fun/invite/k7qx4mpa")!), "K7QX4MPA")
+        XCTAssertEqual(InviteLink.code(from: URL(string: "https://psstapp.fun/p/k7qx4mpa")!), "K7QX4MPA", "a Psst that is the invite")
+        XCTAssertEqual(CreatedInvite(code: "ABCDEFGH", expiresAt: Date(), kind: "psst").link.absoluteString, "https://psstapp.fun/p/ABCDEFGH")
         XCTAssertEqual(InviteLink.code(from: URL(string: "https://www.psstapp.fun/invite/K7QX-4MPA")!), "K7QX4MPA")
         XCTAssertNil(InviteLink.code(from: URL(string: "https://psstapp.fun/privacy")!))
         XCTAssertNil(InviteLink.code(from: URL(string: "https://example.com/invite/ABCD")!))

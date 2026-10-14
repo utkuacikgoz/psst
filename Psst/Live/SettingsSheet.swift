@@ -128,9 +128,14 @@ struct SettingsSheet: View {
                         } else if !actions.listsLoaded { ProgressView("Loading invites…") }
                         ForEach(actions.openInvites) { invite in
                             HStack {
-                                Text(invite.displayCode)
-                                    .font(.body.monospaced())
-                                    .accessibilityLabel("Invite code \(invite.code.map(String.init).joined(separator: " "))")
+                                if invite.kind == "psst" {
+                                    // 5A: a Psst waiting for someone new to open it.
+                                    Text("Psst waiting")
+                                } else {
+                                    Text(invite.displayCode)
+                                        .font(.body.monospaced())
+                                        .accessibilityLabel("Invite code \(invite.code.map(String.init).joined(separator: " "))")
+                                }
                                 Spacer()
                                 Text(invite.expiresAt, format: .relative(presentation: .named))
                                     .font(.subheadline)

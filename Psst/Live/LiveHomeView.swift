@@ -151,8 +151,9 @@ struct LiveHomeView: View {
     @State private var scrollHeight: CGFloat = 0
     /// How far home is pulled down past its top (2A: the cat shows, and a far enough
     /// pull refreshes), and where the list's end sits, for the cat under the + band.
-    @State private var pull: CGFloat = 0
-    @State private var listEnd: CGFloat = .infinity
+    /// Only flips when a cat should show or hide, not on every scrolled point.
+    @State private var topCatShowing = false
+    @State private var endCatShowing = false
     @State private var pullArmed = true
     @State private var superPerson: ConnectionSummary?
     @AppStorage("psst.hapticsEnabled") private var hapticsEnabled = true
@@ -207,8 +208,6 @@ struct LiveHomeView: View {
                 ScrollView {
                     // Lazy: only the bands on screen are built, so hundreds of people scroll smoothly.
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        Color.clear.frame(height: 0)
-                            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.scrollSpace)).minY } action: { pulled($0) }
                         // Pull down to search (owner pick, 13 Oct): sits just above the
                         // first band, out of view until you pull home down.
                         if showsSearch {
@@ -246,11 +245,14 @@ struct LiveHomeView: View {
                             if !dynamicTypeSize.isAccessibilitySize {
                                 // 2A: push up past the end and a cat pops up in the + band's gold.
                                 Color.clear.frame(height: 0)
-                                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.scrollSpace)).minY } action: { listEnd = $0 }
+                                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.scrollSpace)).minY } action: { end in
+                                        let showing = end < scrollHeight - 12
+                                        if showing != endCatShowing { endCatShowing = showing }
+                                    }
                                     .overlay(alignment: .top) {
                                         Color.addBand.frame(height: proxy.size.height)
                                             .overlay(alignment: .top) {
-                                                if listEnd < scrollHeight - 12 {
+                                                if endCatShowing {
                                                     PullCat(text: "Psst!", eyes: .addBand).padding(.top, Tokens.Space.m)
                                                 }
                                             }
@@ -262,6 +264,9 @@ struct LiveHomeView: View {
                         if dynamicTypeSize.isAccessibilitySize { settingsButton }
                     }
                     .padding(.bottom, bottomPadding)
+                    // How far the list is pulled down (2A). Measured on the stack itself: a
+                    // zero-height first row doing this stopped the lazy stack building any band.
+                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.scrollSpace)).minY } action: { pulled($0) }
                 }
                 .coordinateSpace(.named(Self.scrollSpace))
                 // Everyone fits: no scroll bar. Pulling down opens the gap in the first band's
@@ -271,7 +276,7 @@ struct LiveHomeView: View {
                 .background(alignment: .top) {
                     pullGapColour.frame(height: max(0, space / 2))
                         .overlay(alignment: .top) {
-                            if pull > 12 && !store.connections.isEmpty {
+                            if topCatShowing && !store.connections.isEmpty {
                                 PullCat(text: "I'm here!", eyes: showsSearch ? .psstCanvas : pullGapColour)
                                     .padding(.top, Tokens.Space.m)
                             }
@@ -639,11 +644,12 @@ struct LiveHomeView: View {
     /// can't be hidden on one screen only. One refresh per pull; it re-arms once the
     /// list is back at rest.
     private func pulled(_ offset: CGFloat) {
-        pull = offset
+        let showing = offset > 12
+        if showing != topCatShowing { topCatShowing = showing }
         if offset > Self.pullToRefresh, pullArmed {
             pullArmed = false
             Task { await store.refresh() }
-        } else if offset < 4 {
+        } else if offset < 4, !pullArmed {
             pullArmed = true
         }
     }

@@ -44,7 +44,7 @@ struct InviteSheet: View {
         .foregroundStyle(Color.onCanvas)
         .background(Color.psstCanvas.ignoresSafeArea())
         .presentationBackground(Color.psstCanvas)
-        .sheet(item: $psstShare) { ActivityView(items: $0.items) }
+        .sheet(item: $psstShare) { ShareSheet(items: $0.items) }
         .onAppear {
             if startEntering {
                 mode = .enter
@@ -362,7 +362,7 @@ struct PsstShare: Identifiable {
 }
 
 /// The system share sheet (Messages, WhatsApp, anything).
-struct ActivityView: UIViewControllerRepresentable {
+struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
 
     func makeUIViewController(context: Context) -> UIActivityViewController {

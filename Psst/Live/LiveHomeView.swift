@@ -623,7 +623,6 @@ struct LiveHomeView: View {
         .accessibilityAddTraits(.isButton)
     }
 
-    @ViewBuilder
     static let scrollSpace = "homeScroll"
     /// Pull this far past the top to refresh.
     static let pullToRefresh: CGFloat = 90
@@ -646,6 +645,7 @@ struct LiveHomeView: View {
         effect?.signal == .superPsst ? effect?.id : nil
     }
 
+    @ViewBuilder
     private func row(_ connection: ConnectionSummary, minHeight: CGFloat, colour: UInt32?) -> some View {
         if Self.isPaused(store.status(for: connection)) {
             // Re-read every second so the countdown moves and the band wakes up on time.

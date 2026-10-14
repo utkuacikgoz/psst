@@ -280,12 +280,10 @@ struct SettingsSheet: View {
 
 /// ED1: the top of Settings. Your band in your colour, and one way to change it.
 extension SettingsSheet {
-    /// "Psst 1.0.4 (23)": the App Store version and the build number.
+    /// "Psst 1.0.5": the App Store version only, no build number (owner, 14 Oct 2026).
     static var versionLine: String {
-        let info = Bundle.main.infoDictionary
-        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
-        let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "Psst \(version) (\(build))"
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        return "Psst \(version)"
     }
 }
 

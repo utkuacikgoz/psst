@@ -6,6 +6,8 @@ final class FakeAPI: PsstAPI {
     var isSignedIn = true
     var connections: [ConnectionSummary] = []
     var activityRows: [ActivitySummary] = []
+    var recapStatus: WeeklyRecapStatus?
+    var recapSettings: [Bool] = []
     var activityError: Error?
     var unseen: [UnseenSignal] = []
     var sentEventIDs: [UUID] = []
@@ -37,6 +39,12 @@ final class FakeAPI: PsstAPI {
     /// When set, sends wait until `releaseSend()` is called.
     var holdSends = false
     private var held: [CheckedContinuation<Void, Never>] = []
+
+    func weeklyRecapStatus() async throws -> WeeklyRecapStatus {
+        guard let recapStatus else { throw APIError.offline }
+        return recapStatus
+    }
+    func setWeeklyRecap(_ enabled: Bool) async throws { recapSettings.append(enabled) }
 
     func activity(monthStart: Date) async throws -> [ActivitySummary] {
         if let activityError { throw activityError }
@@ -270,6 +278,30 @@ final class LiveStoreTests: XCTestCase {
     func testTiedCountsShareARank() {
         XCTAssertEqual(ActivityView.ranks(for: [9, 5, 5, 2, 2, 2, 1]), [1, 2, 2, 4, 4, 4, 7])
         XCTAssertEqual(ActivityView.ranks(for: []), [])
+    }
+
+    func testWeeklyRecapIsOfferedOnceAfterABusyWeek() async {
+        api.connections = [connection(name: "Kim")]
+        api.recapStatus = WeeklyRecapStatus(enabled: false, weekTotal: 12)
+        await store.refresh()
+        XCTAssertTrue(store.recapOffer)
+        await store.setWeeklyRecap(true)
+        XCTAssertEqual(api.recapSettings, [true])
+        XCTAssertEqual(store.recapEnabled, true)
+        XCTAssertFalse(store.recapOffer, "turning it on ends the offer")
+
+        let quiet = LiveStore(api: api, defaults: defaults)
+        api.recapStatus = WeeklyRecapStatus(enabled: false, weekTotal: 12)
+        await quiet.refresh()
+        XCTAssertFalse(quiet.recapOffer, "never asked again")
+    }
+
+    func testRecapWeekLabel() {
+        func recap(_ start: String, _ end: String) -> WeeklyRecap {
+            WeeklyRecap(weekStart: start, weekEnd: end, total: 0, sent: 0, received: 0, top: nil, streak: nil)
+        }
+        XCTAssertEqual(recap("2026-10-05", "2026-10-11").rangeLabel, "Oct 5 – 11")
+        XCTAssertEqual(recap("2026-09-29", "2026-10-05").rangeLabel, "Sep 29 – Oct 5")
     }
 
     func testAGrowingStreakShowsItsMomentFromThreeDays() async {

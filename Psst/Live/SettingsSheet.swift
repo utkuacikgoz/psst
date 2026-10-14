@@ -81,6 +81,16 @@ struct SettingsSheet: View {
                     Text(notificationText)
                 }
 
+                // Weekly recap (owner pick 4A): off until you turn it on.
+                Section {
+                    Toggle("Weekly recap", isOn: Binding(
+                        get: { store.recapEnabled ?? false },
+                        set: { on in Task { await store.setWeeklyRecap(on) } }))
+                        .disabled(store.recapEnabled == nil)
+                } footer: {
+                    Text("Sundays at 6 PM: your Pssts, your #1 and your longest streak. Only you see it.")
+                }
+
                 Section {
                     if store.connections.isEmpty {
                         Text("No one yet.").foregroundStyle(.secondary)

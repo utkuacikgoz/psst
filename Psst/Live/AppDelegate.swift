@@ -64,6 +64,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         }
     }
 
+    /// The Sunday recap push (weekly-recap function).
+    nonisolated static func isRecap(_ userInfo: [AnyHashable: Any]) -> Bool {
+        (userInfo["psst"] as? [String: Any])?["recap"] as? Bool == true
+    }
+
     /// The push the inviter gets when someone accepts (accept-invite function).
     nonisolated static func isJoined(_ userInfo: [AnyHashable: Any]) -> Bool {
         (userInfo["psst"] as? [String: Any])?["joined"] as? Bool == true
@@ -82,6 +87,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             defer { completionHandler() }
             if Self.isJoined(userInfo) {
                 await self.store?.refresh()
+                return
+            }
+            if Self.isRecap(userInfo) {
+                self.store?.showingRecap = true
                 return
             }
             guard let store = self.store, let payload = SignalPayload(userInfo: userInfo) else { return }

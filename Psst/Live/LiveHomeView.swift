@@ -362,6 +362,9 @@ struct LiveHomeView: View {
         .sheet(isPresented: $showingInvite) { InviteSheet() }
         .sheet(isPresented: $enteringCode) { InviteSheet(startEntering: true) }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
+        .fullScreenCover(isPresented: Binding(get: { store.showingRecap }, set: { store.showingRecap = $0 })) {
+            WeeklyRecapView()
+        }
         .manageConnection(menuFor: $managing, confirming: $confirming,
                           onSuper: { superPerson = $0 },
                           onColour: { if purchases.isUnlocked { colouring = $0 } else { showingPlus = true } })
@@ -560,6 +563,11 @@ struct LiveHomeView: View {
             }
         }
         // Soft update (owner pick, 13 Oct 2026): once per new version.
+        if store.recapOffer {
+            NoticeView(symbol: "calendar", text: "Get a recap of your week on Sundays?", actionTitle: "Turn on",
+                       action: { Task { await store.setWeeklyRecap(true) } },
+                       onDismiss: { withAnimation { store.dismissRecapOffer() } })
+        }
         if store.updateAvailable != nil {
             NoticeView(symbol: "sparkles", text: "A new Psst is ready", actionTitle: "Update",
                        action: { openURL(LiveStore.appStoreURL) },

@@ -178,3 +178,45 @@ struct AppRequirements: Decodable, Equatable {
     let latestBuild: Int
     let latestVersion: String?
 }
+
+/// Your week, Monday to Sunday by your own calendar (weekly recap, owner pick 4A).
+struct WeeklyRecap: Decodable, Equatable {
+    struct Top: Decodable, Equatable {
+        let connectionId: UUID
+        let name: String
+        let count: Int
+        let still: Bool
+    }
+    struct Streak: Decodable, Equatable {
+        let connectionId: UUID
+        let name: String
+        let days: Int
+    }
+    /// "2026-10-05": plain dates, not timestamps.
+    let weekStart: String
+    let weekEnd: String
+    let total: Int
+    let sent: Int
+    let received: Int
+    let top: Top?
+    let streak: Streak?
+
+    /// "Oct 5 – 11", or "Sep 29 – Oct 5" across months.
+    var rangeLabel: String {
+        let parse = Date.ISO8601FormatStyle().year().month().day()
+        guard let start = try? Date(weekStart, strategy: parse), let end = try? Date(weekEnd, strategy: parse) else {
+            return ""
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let month = Date.FormatStyle(timeZone: calendar.timeZone).month(.abbreviated)
+        let day = Date.FormatStyle(timeZone: calendar.timeZone).day()
+        let sameMonth = calendar.component(.month, from: start) == calendar.component(.month, from: end)
+        return "\(start.formatted(month)) \(start.formatted(day)) – " + (sameMonth ? "" : "\(end.formatted(month)) ") + end.formatted(day)
+    }
+}
+
+struct WeeklyRecapStatus: Decodable, Equatable {
+    let enabled: Bool
+    let weekTotal: Int
+}

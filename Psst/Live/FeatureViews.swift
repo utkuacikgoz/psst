@@ -757,3 +757,128 @@ struct SuperPsstSheet: View {
         loading = false
     }
 }
+
+/// The Sunday recap (owner pick 4A, 14 Oct 2026), opened from its push: YOUR WEEK,
+/// then a band for the total, your #1 in their colour, your longest streak, and a
+/// white band to psst your #1. Only you see it.
+struct WeeklyRecapView: View {
+    @Environment(LiveStore.self) private var store
+    @Environment(Personalization.self) private var personalization
+    @Environment(\.dismiss) private var dismiss
+    @State private var recap: WeeklyRecap?
+    @State private var failed = false
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 40
+    @ScaledMetric(relativeTo: .largeTitle) private var bigSize: CGFloat = 52
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button("Close") { dismiss() }
+                    .font(.psst(.body, weight: .semibold))
+                    .frame(minWidth: Tokens.minTouch, minHeight: Tokens.minTouch)
+                    .padding(.horizontal, Tokens.Space.l)
+            }
+            ScrollView {
+                VStack(spacing: 0) {
+                    VStack(spacing: Tokens.Space.xs) {
+                        Text("YOUR WEEK")
+                            .bandTitle("Your week", size: titleSize, tracking: Tokens.Band.titleTracking)
+                            .accessibilityAddTraits(.isHeader)
+                        if let recap { Text(recap.rangeLabel).font(.psst(.subheadline, weight: .semibold)) }
+                    }
+                    .padding(.bottom, Tokens.Space.l)
+                    content
+                }
+                .multilineTextAlignment(.center)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            if let top = recap?.top, let connection = store.connections.first(where: { $0.id == top.connectionId }) {
+                Button {
+                    store.tap(connection)
+                    dismiss()
+                } label: {
+                    Text("PSST \(top.name.uppercased())")
+                        .font(.psst(.title3, weight: .black))
+                        .tracking(Tokens.Band.labelTracking)
+                        .foregroundStyle(Color.psstCanvas)
+                        .frame(maxWidth: .infinity, minHeight: 64)
+                        .background(Color.surface)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Psst \(top.name)")
+            }
+        }
+        .foregroundStyle(Color.onCanvas)
+        .background(Color.psstCanvas.ignoresSafeArea())
+        .task { await load() }
+    }
+
+    @ViewBuilder private var content: some View {
+        if let recap {
+            if recap.total == 0 {
+                Text("No Pssts this week yet.")
+                    .font(.psst(.body, weight: .semibold))
+                    .padding(Tokens.Space.xl)
+            } else {
+                band(color: .addBand) {
+                    Text("\(recap.total) PSSTS")
+                        .bandTitle("\(recap.total) Pssts", size: bigSize, tracking: Tokens.Band.titleTracking)
+                    Text("\(recap.sent) sent · \(recap.received) received")
+                        .font(.psst(.subheadline, weight: .semibold))
+                }
+                if let top = recap.top {
+                    band(color: colour(top.connectionId, top.name)) {
+                        Text(top.still ? "YOUR #1 · STILL" : "YOUR #1")
+                            .font(.psst(.footnote, weight: .bold))
+                            .tracking(Tokens.Band.labelTracking)
+                        Text(top.name.uppercased())
+                            .bandTitle(top.name, size: bigSize, tracking: Tokens.Band.titleTracking)
+                        Text("\(top.count) Pssts this week")
+                            .font(.psst(.subheadline, weight: .semibold))
+                    }
+                }
+                if let streak = recap.streak {
+                    band(color: colour(streak.connectionId, streak.name)) {
+                        Text("LONGEST STREAK")
+                            .font(.psst(.footnote, weight: .bold))
+                            .tracking(Tokens.Band.labelTracking)
+                        HStack(spacing: Tokens.Space.s) {
+                            Image(systemName: "flame.fill").font(.psst(size: bigSize * 0.6, weight: .black))
+                            Text("\(streak.days) DAYS")
+                                .bandTitle("\(streak.days) days", size: bigSize, tracking: Tokens.Band.titleTracking)
+                        }
+                        Text("with \(streak.name) · still going")
+                            .font(.psst(.subheadline, weight: .semibold))
+                    }
+                }
+            }
+        } else if failed {
+            Button("Couldn't load your week. Try again") { Task { await load() } }
+                .font(.psst(.body, weight: .bold))
+                .frame(minHeight: Tokens.minTouch)
+                .padding(Tokens.Space.xl)
+        } else {
+            ProgressView().tint(Color.onCanvas).padding(Tokens.Space.xl)
+        }
+    }
+
+    private func band<Content: View>(color: Color, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(spacing: Tokens.Space.xs) { content() }
+            .padding(.vertical, Tokens.Space.xl)
+            .padding(.horizontal, Tokens.Space.xl)
+            .frame(maxWidth: .infinity)
+            .background(color)
+            .accessibilityElement(children: .combine)
+    }
+
+    private func colour(_ id: UUID, _ name: String) -> Color {
+        Color(hex: personalization.colorHex(for: id, name: name))
+    }
+
+    private func load() async {
+        failed = false
+        do { recap = try await store.api.weeklyRecap() } catch { failed = true }
+    }
+}

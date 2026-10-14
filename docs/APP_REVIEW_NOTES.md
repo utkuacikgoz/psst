@@ -246,3 +246,61 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 The other 1.0.4 changes collect nothing new:
 - Invites joined per code are already covered by the existing account and contacts-free connection data.
 - Purchase verification failure reasons are stored on the server without any account or purchase identifiers.
+
+## 1.0.5 (build 29)
+
+Submit build 29. The backend for everything below (streaks, weekly recap, Psst links) is already deployed to production.
+
+**Before submitting:**
+1. Create two fresh review codes for the Psst Team profile:
+
+   ```sql
+   insert into public.invites (code, inviter_id, expires_at)
+   select v.code, p.id, now() + interval '30 days'
+   from public.profiles p, (values ('PSSTFIVE'), ('PSSTCATS')) as v(code)
+   where p.display_name = 'Psst Team';
+   ```
+
+2. Check `min_build` is not above 29: `select min_build, latest_build, latest_version from public.app_config;`
+3. In Vercel, set `PSST_SUPABASE_URL` and `PSST_SUPABASE_ANON_KEY`, so Psst links (psstapp.fun/p/CODE) and invite pages show the sender's first name instead of "Someone".
+4. The privacy policy should mention the time zone and the weekly recap before release (see App Privacy below).
+
+**What's New in This Version:**
+
+```
+• Psst someone who isn't on Psst yet: send a Psst link, and it's waiting for them when they join
+• Streaks: psst each other 3 days in a row and a little flame keeps count
+• Weekly recap (optional): your week on Sundays — your total, your #1 and your longest streak
+• Super Psst is now a nudge: it shakes their screen
+• Cats! Pull home down and one waves hello. There's one napping in Settings, too
+• A faster leaderboard, and small fixes
+```
+
+**Notes for the reviewer:**
+
+```
+Psst lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
+
+What's new in 1.0.5:
+- Psst someone new: + band → "Psst someone new" makes a one-person link (psstapp.fun/p/CODE, valid 7 days) and opens the share sheet. The web page shows only the sender's first name. If the recipient installs Psst and opens the link, they connect with the sender (both have agreed: one sent the link, the other accepted it) and that Psst arrives as their first. Nothing is sent to anyone who doesn't open the link.
+- Streaks: when two connected people have both pssted each other on 3 or more days in a row, a flame and the day count show in the corner of that person's band. Days follow each phone's own time zone, which the app saves on the account for this.
+- Weekly recap (off by default): Settings → Weekly recap, or a one-time offer on home after a busy week. When on, a push notification on Sundays at 6 PM opens a summary of the user's own week (their totals, their most-pssted person, their longest streak). It contains no promotional content and can be turned off in Settings.
+- Super Psst is now shown as a "nudge": its mark on the band is a cat between shake lines, and the screen shakes when one arrives (no shake with Reduce Motion).
+- Small illustrations: a cat appears when pulling home down, while loading, on connection errors, under the version in Settings, and when a Psst arrives.
+
+To try it with a real person (our team):
+1. Open the app, enter any name, and choose whether to allow notifications.
+2. On home, tap "I have a code" and enter:  PSSTFIVE
+   (backup code:  PSSTCATS)
+3. Tap Connect. A band for "Psst Team" appears on home.
+4. Tap the band to send a Psst; tap the cat mark in its corner for a Super Psst. We'll psst you back within a few minutes during review hours. If both of you psst within 10 seconds, both phones show SAME MOMENT.
+5. Long-press a notification to use "Psst back" without opening the app.
+
+Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. Settings → Delete account removes all server data immediately.
+
+Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "Psst+" next to Settings → Unlock, or from the Super Psst sheet once today's free one is used. It adds unlimited Super Psst, per-person band colours, alternate app icons, whisper sounds and Home Screen / Lock Screen widgets. "Restore purchase" is on both sheets. Pssting, replies and invites are free.
+
+Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
+```
+
+**App Privacy:** the device's time zone is now saved on the account (streak days and the recap's Sunday 6 PM). Apple has no time-zone category and it is far coarser than "Coarse Location", so the safe declaration is **Other Data → App Functionality, linked to the user, not used for tracking**. Weekly recap and Psst links collect nothing else new: the recap is computed from Pssts already stored, and a Psst link stores only the same invite row as an invite code.

@@ -9,6 +9,7 @@ import os
 import statistics
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -34,7 +35,11 @@ TOKEN = jwt.encode(
 def get(path: str, **query) -> dict:
     url = f"{API}{path}" + (f"?{urllib.parse.urlencode(query)}" if query else "")
     request = urllib.request.Request(url, headers={"Authorization": f"Bearer {TOKEN}"})
-    return json.load(urllib.request.urlopen(request, timeout=60))
+    try:
+        return json.load(urllib.request.urlopen(request, timeout=60))
+    except urllib.error.HTTPError as error:
+        detail = json.loads(error.read() or b"{}").get("errors", [{}])[0]
+        sys.exit(f"App Store Connect refused {path} ({error.code} {detail.get('code')}): {detail.get('detail')}")
 
 
 def mb(n: float) -> str:
@@ -45,8 +50,10 @@ app = get("/apps", **{"filter[bundleId]": os.environ["BUNDLE_ID"]})["data"]
 if not app:
     sys.exit("No app with that bundle ID in App Store Connect.")
 builds = get("/builds", **{"filter[app]": app[0]["id"], "sort": "-uploadedDate", "limit": LIMIT,
-                           "include": "preReleaseVersion"})
-versions = {v["id"]: v["attributes"]["version"] for v in builds.get("included", [])}
+                           "include": "preReleaseVersion,buildBundles"})
+included = builds.get("included", [])
+versions = {v["id"]: v["attributes"]["version"] for v in included if v["type"] == "preReleaseVersions"}
+bundles = {b["id"]: b["attributes"] for b in included if b["type"] == "buildBundles"}
 
 print(f"{'version':8} {'build':>5}  {'download (median)':>17}  {'install (median)':>16}  "
       f"{'install (largest)':>17}  devices  reference iPhone")
@@ -54,11 +61,11 @@ for build in builds["data"]:
     attrs = build["attributes"]
     version = versions.get(build["relationships"]["preReleaseVersion"]["data"]["id"], "?")
     sizes = []
-    for bundle in get(f"/builds/{build['id']}/buildBundles")["data"]:
-        if bundle["attributes"].get("bundleType") not in (None, "APP"):
+    for ref in build["relationships"].get("buildBundles", {}).get("data") or []:
+        if bundles.get(ref["id"], {}).get("bundleType") not in (None, "APP"):
             continue
         sizes += [s["attributes"] for s in
-                  get(f"/buildBundles/{bundle['id']}/buildBundleFileSizes", limit=200)["data"]]
+                  get(f"/buildBundles/{ref['id']}/buildBundleFileSizes", limit=200)["data"]]
     if not sizes:
         print(f"{version:8} {attrs['version']:>5}  (no sizes yet: {attrs.get('processingState')})")
         continue

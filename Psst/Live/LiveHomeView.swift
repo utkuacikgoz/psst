@@ -207,8 +207,10 @@ struct LiveHomeView: View {
                 ScrollView {
                     // Lazy: only the bands on screen are built, so hundreds of people scroll smoothly.
                     LazyVStack(alignment: .leading, spacing: 0) {
+                        if !Self.bisect.contains("noTop") {
                         Color.clear.frame(height: 0)
                             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.scrollSpace)).minY } action: { pulled($0) }
+                        }
                         // Pull down to search (owner pick, 13 Oct): sits just above the
                         // first band, out of view until you pull home down.
                         if showsSearch {
@@ -243,7 +245,7 @@ struct LiveHomeView: View {
                                     .frame(maxWidth: .infinity, minHeight: Tokens.personRowMinHeight)
                             }
                             addBand(minHeight: Tokens.Band.addBandMinHeight)
-                            if !dynamicTypeSize.isAccessibilitySize {
+                            if !dynamicTypeSize.isAccessibilitySize && !Self.bisect.contains("noBottom") {
                                 // 2A: push up past the end and a cat pops up in the + band's gold.
                                 Color.clear.frame(height: 0)
                                     .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.scrollSpace)).minY } action: { listEnd = $0 }
@@ -263,13 +265,13 @@ struct LiveHomeView: View {
                     }
                     .padding(.bottom, bottomPadding)
                 }
-                .coordinateSpace(.named(Self.scrollSpace))
+                .coordinateSpace(.named(Self.bisect.contains("noCoord") ? "unused" : Self.scrollSpace))
                 // Everyone fits: no scroll bar. Pulling down opens the gap in the first band's
                 // colour, where the cat waves "I'm here!" (2A) instead of a spinner; a far
                 // enough pull refreshes (see pulled(_:)).
                 .scrollIndicators(Self.fits(people: store.connections.count, space: space) ? .hidden : .automatic)
                 .background(alignment: .top) {
-                    pullGapColour.frame(height: max(0, space / 2))
+                    pullGapColour.frame(height: Self.bisect.contains("noBackground") ? 0 : max(0, space / 2))
                         .overlay(alignment: .top) {
                             if pull > 12 && !store.connections.isEmpty {
                                 PullCat(text: "I'm here!", eyes: showsSearch ? .psstCanvas : pullGapColour)
@@ -277,7 +279,7 @@ struct LiveHomeView: View {
                             }
                         }
                 }
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { scrollHeight = $0 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if !Self.bisect.contains("noMeasure") { scrollHeight = $0 } }
                 // Start with the search field tucked above the top edge.
                 .onAppear { hideSearch(reader) }
                 .onChange(of: showsSearch) { hideSearch(reader) }
@@ -632,6 +634,16 @@ struct LiveHomeView: View {
     }
 
     static let scrollSpace = "homeScroll"
+    /// Diagnostic only (Debug): switches off one 1.0.5 home piece at a time.
+    static let bisect: Set<String> = {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-PsstHomeBisect"), index + 1 < arguments.count {
+            return Set(arguments[index + 1].split(separator: ",").map(String.init))
+        }
+        #endif
+        return []
+    }()
     /// Pull this far past the top to refresh.
     static let pullToRefresh: CGFloat = 90
 

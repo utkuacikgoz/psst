@@ -24,3 +24,16 @@ document.getElementById("get").addEventListener("click", function (event) {
   var go = function () { location.href = store; };
   navigator.clipboard.writeText(code).then(go, go);
 });
+
+// 6A: "Lily wants to psst you." when the server knows the inviter's first name.
+if (code && window.fetch) {
+  fetch("/api/card?code=" + encodeURIComponent(code), { cache: "no-store" })
+    .then(function (response) { return response.ok ? response.json() : {}; })
+    .then(function (info) {
+      if (info && typeof info.first_name === "string" && info.first_name) {
+        document.querySelector("h1").textContent = info.first_name + " wants to psst you.";
+        document.title = info.first_name + " wants to psst you";
+      }
+    })
+    .catch(function () {});
+}

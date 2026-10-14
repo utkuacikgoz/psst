@@ -149,6 +149,11 @@ struct LiveHomeView: View {
     @State private var showingFeatureIntro = false
     /// The scroll area's real height, so 1–3 people fill it exactly (no stray scrolling).
     @State private var scrollHeight: CGFloat = 0
+    /// How far home is pulled down past its top (2A: the cat shows, and a far enough
+    /// pull refreshes), and where the list's end sits, for the cat under the + band.
+    @State private var pull: CGFloat = 0
+    @State private var listEnd: CGFloat = .infinity
+    @State private var pullArmed = true
     @State private var superPerson: ConnectionSummary?
     @AppStorage("psst.hapticsEnabled") private var hapticsEnabled = true
     @State private var showingInvite = false
@@ -190,9 +195,10 @@ struct LiveHomeView: View {
     var body: some View {
         GeometryReader { proxy in
             let inset = Tokens.sideInset(forWidth: proxy.size.width)
-            // Room for the bands: the measured scroll area less its bottom padding
-            // (an estimate only for the very first frame, before it's measured).
-            let space = scrollHeight > 0 ? scrollHeight - Tokens.Space.l : proxy.size.height - 150
+            // Room for the bands: the measured scroll area (an estimate only for the very
+            // first frame). The gap above Settings is in the footer, so the list ends flush.
+            let bottomPadding = dynamicTypeSize.isAccessibilitySize ? Tokens.Space.l : 0
+            let space = scrollHeight > 0 ? scrollHeight - bottomPadding : proxy.size.height - 150
 
             VStack(spacing: 0) {
                 header.padding(.horizontal, inset)
@@ -201,6 +207,8 @@ struct LiveHomeView: View {
                 ScrollView {
                     // Lazy: only the bands on screen are built, so hundreds of people scroll smoothly.
                     LazyVStack(alignment: .leading, spacing: 0) {
+                        Color.clear.frame(height: 0)
+                            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.scrollSpace)).minY } action: { pulled($0) }
                         // Pull down to search (owner pick, 13 Oct): sits just above the
                         // first band, out of view until you pull home down.
                         if showsSearch {
@@ -235,21 +243,45 @@ struct LiveHomeView: View {
                                     .frame(maxWidth: .infinity, minHeight: Tokens.personRowMinHeight)
                             }
                             addBand(minHeight: Tokens.Band.addBandMinHeight)
+                            if !dynamicTypeSize.isAccessibilitySize {
+                                // 2A: push up past the end and a cat pops up in the + band's gold.
+                                Color.clear.frame(height: 0)
+                                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.scrollSpace)).minY } action: { listEnd = $0 }
+                                    .overlay(alignment: .top) {
+                                        Color.addBand.frame(height: proxy.size.height)
+                                            .overlay(alignment: .top) {
+                                                if listEnd < scrollHeight - 12 {
+                                                    PullCat(text: "Psst!", eyes: .addBand).padding(.top, Tokens.Space.m)
+                                                }
+                                            }
+                                            .allowsHitTesting(false)
+                                    }
+                                    .accessibilityHidden(true)
+                            }
                         }
                         if dynamicTypeSize.isAccessibilitySize { settingsButton }
                     }
-                    .padding(.bottom, Tokens.Space.l)
+                    .padding(.bottom, bottomPadding)
                 }
-                // Everyone fits: no scroll bar. Pulling down to refresh shows the first
-                // band's own colour in the gap (behind the spinner), not the purple canvas.
+                .coordinateSpace(.named(Self.scrollSpace))
+                // Everyone fits: no scroll bar. Pulling down opens the gap in the first band's
+                // colour, where the cat waves "I'm here!" (2A) instead of a spinner; a far
+                // enough pull refreshes (see pulled(_:)).
                 .scrollIndicators(Self.fits(people: store.connections.count, space: space) ? .hidden : .automatic)
-                .background(alignment: .top) { pullGapColour.frame(height: max(0, space / 2)) }
+                .background(alignment: .top) {
+                    pullGapColour.frame(height: max(0, space / 2))
+                        .overlay(alignment: .top) {
+                            if pull > 12 && !store.connections.isEmpty {
+                                PullCat(text: "I'm here!", eyes: showsSearch ? .psstCanvas : pullGapColour)
+                                    .padding(.top, Tokens.Space.m)
+                            }
+                        }
+                }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { scrollHeight = $0 }
-                .refreshable { await store.refresh() }
                 // Start with the search field tucked above the top edge.
                 .onAppear { hideSearch(reader) }
                 .onChange(of: showsSearch) { hideSearch(reader) }
-                .pinnedFooter(!dynamicTypeSize.isAccessibilitySize, inset: inset) { settingsButton }
+                .pinnedFooter(!dynamicTypeSize.isAccessibilitySize, inset: inset) { settingsButton.padding(.top, Tokens.Space.l) }
                 }
             }
         }
@@ -592,6 +624,23 @@ struct LiveHomeView: View {
     }
 
     @ViewBuilder
+    static let scrollSpace = "homeScroll"
+    /// Pull this far past the top to refresh.
+    static let pullToRefresh: CGFloat = 90
+
+    /// Home's own pull to refresh (2A): the cat replaces the system spinner, which
+    /// can't be hidden on one screen only. One refresh per pull; it re-arms once the
+    /// list is back at rest.
+    private func pulled(_ offset: CGFloat) {
+        pull = offset
+        if offset > Self.pullToRefresh, pullArmed {
+            pullArmed = false
+            Task { await store.refresh() }
+        } else if offset < 4 {
+            pullArmed = true
+        }
+    }
+
     /// The effect's id when it's a Super Psst, so only those play the nudge.
     static func superEffectID(_ effect: EffectTrigger?) -> UUID? {
         effect?.signal == .superPsst ? effect?.id : nil

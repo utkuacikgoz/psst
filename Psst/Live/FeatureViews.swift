@@ -4,6 +4,8 @@ import SwiftUI
 struct MischiefCat: View {
     /// The eyes and mouth; the band's colour makes them read as cut-outs.
     var eyes: Color = .psstCanvas
+    /// Happy closed eyes and a smile instead of the mischief look.
+    var happy = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -21,17 +23,65 @@ struct MischiefCat: View {
                     p.closeSubpath()
                 }.fill(.white)
                 Path { p in
-                    p.move(to: CGPoint(x: w * 0.27, y: h * 0.48))
-                    p.addLine(to: CGPoint(x: w * 0.4, y: h * 0.53))
-                    p.move(to: CGPoint(x: w * 0.61, y: h * 0.52))
-                    p.addQuadCurve(to: CGPoint(x: w * 0.75, y: h * 0.47), control: CGPoint(x: w * 0.7, y: h * 0.44))
-                    p.move(to: CGPoint(x: w * 0.47, y: h * 0.66))
-                    p.addLine(to: CGPoint(x: w * 0.52, y: h * 0.71))
-                    p.addLine(to: CGPoint(x: w * 0.57, y: h * 0.66))
+                    if happy {
+                        p.move(to: CGPoint(x: w * 0.26, y: h * 0.53))
+                        p.addQuadCurve(to: CGPoint(x: w * 0.4, y: h * 0.53), control: CGPoint(x: w * 0.33, y: h * 0.43))
+                        p.move(to: CGPoint(x: w * 0.61, y: h * 0.53))
+                        p.addQuadCurve(to: CGPoint(x: w * 0.75, y: h * 0.53), control: CGPoint(x: w * 0.68, y: h * 0.43))
+                        p.move(to: CGPoint(x: w * 0.44, y: h * 0.65))
+                        p.addQuadCurve(to: CGPoint(x: w * 0.6, y: h * 0.65), control: CGPoint(x: w * 0.52, y: h * 0.75))
+                    } else {
+                        p.move(to: CGPoint(x: w * 0.27, y: h * 0.48))
+                        p.addLine(to: CGPoint(x: w * 0.4, y: h * 0.53))
+                        p.move(to: CGPoint(x: w * 0.61, y: h * 0.52))
+                        p.addQuadCurve(to: CGPoint(x: w * 0.75, y: h * 0.47), control: CGPoint(x: w * 0.7, y: h * 0.44))
+                        p.move(to: CGPoint(x: w * 0.47, y: h * 0.66))
+                        p.addLine(to: CGPoint(x: w * 0.52, y: h * 0.71))
+                        p.addLine(to: CGPoint(x: w * 0.57, y: h * 0.66))
+                    }
                 }.stroke(eyes, style: StrokeStyle(lineWidth: max(2, w * 0.04), lineCap: .round, lineJoin: .round))
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// The cat in home's pull gaps (owner pick 2A, 14 Oct 2026): happy, waving a paw,
+/// with a word under it. "I'm here!" above the bands, "Psst!" under the + band.
+struct PullCat: View {
+    let text: String
+    /// The colour behind it, for the cat's eyes.
+    var eyes: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var waving = false
+
+    var body: some View {
+        VStack(spacing: Tokens.Space.xs) {
+            ZStack(alignment: .topTrailing) {
+                MischiefCat(eyes: eyes, happy: true).frame(width: 52, height: 44)
+                paw
+                    .rotationEffect(.degrees(waving ? -22 : 12), anchor: .bottom)
+                    .offset(x: 12, y: -4)
+            }
+            Text(text).font(.psst(.footnote, weight: .bold))
+        }
+        .foregroundStyle(Color.onCanvas)
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 0.28).repeatForever(autoreverses: true)) { waving = true }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var paw: some View {
+        ZStack {
+            Ellipse().fill(.white).frame(width: 15, height: 18)
+            HStack(spacing: 2) {
+                ForEach(0..<3, id: \.self) { _ in Circle().fill(Color(hex: 0xE9B4C6)).frame(width: 3, height: 3) }
+            }
+            .offset(y: -4)
+            Ellipse().fill(Color(hex: 0xE9B4C6)).frame(width: 6, height: 5).offset(y: 2)
+        }
     }
 }
 

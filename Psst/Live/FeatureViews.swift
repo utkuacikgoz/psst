@@ -85,6 +85,173 @@ struct PullCat: View {
     }
 }
 
+/// The same white cat in other moods (owner picks 1A 2A 3A 4B, 14 Oct 2026, from
+/// Fevzi's ideas): sleepy under the version, peeking while home loads, sad when
+/// Psst can't connect, startled when a Psst arrives. Drawn on a 100 × 90 grid,
+/// like MischiefCat; the ears of `.startled` reach a little above the frame.
+struct MoodCat: View {
+    enum Mood { case sleepy, awake, peeking, sad, startled }
+    let mood: Mood
+    /// The colour behind the cat, for its eyes and mouth.
+    var eyes: Color = .psstCanvas
+    /// Moves the eyes sideways, -1…1 (the peeking cat looks around).
+    var look: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { geometry in
+            let w = geometry.size.width, h = geometry.size.height
+            let pt = { (x: CGFloat, y: CGFloat) in CGPoint(x: w * x / 100, y: h * y / 100) }
+            let line = StrokeStyle(lineWidth: max(1.5, w * 0.05), lineCap: .round, lineJoin: .round)
+            ZStack {
+                head(pt).fill(.white)
+                face(pt).stroke(eyes, style: line)
+                if mood == .awake {
+                    Circle().fill(eyes).frame(width: w * 0.1, height: w * 0.1).position(pt(68, 51))
+                }
+                if mood == .sad {
+                    Ellipse().fill(Color(hex: 0x9FD3FF)).frame(width: w * 0.08, height: h * 0.13).position(pt(30, 62))
+                }
+                if mood == .startled {
+                    ForEach([CGFloat(33), CGFloat(68)], id: \.self) { x in
+                        Circle().fill(eyes).frame(width: w * 0.16, height: w * 0.16).position(pt(x, 50))
+                        Circle().fill(.white).frame(width: w * 0.05, height: w * 0.05).position(pt(x + 2.5, 47))
+                    }
+                    Ellipse().fill(eyes).frame(width: w * 0.08, height: h * 0.11).position(pt(52, 70))
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    /// The stroked eyes and mouth (the startled cat's are filled shapes instead).
+    private func face(_ pt: (CGFloat, CGFloat) -> CGPoint) -> Path {
+        let dx: CGFloat = look * 3
+        var p = Path()
+        switch mood {
+        case .sleepy, .awake:
+            p.move(to: pt(26, 52)); p.addLine(to: pt(40, 52))
+            if mood == .sleepy { p.move(to: pt(61, 52)); p.addLine(to: pt(75, 52)) }
+            p.move(to: pt(48, 66)); p.addLine(to: pt(52, 69)); p.addLine(to: pt(56, 66))
+        case .peeking:
+            p.move(to: pt(27 + dx, 48)); p.addLine(to: pt(40 + dx, 53))
+            p.move(to: pt(61 + dx, 52)); p.addQuadCurve(to: pt(75 + dx, 47), control: pt(70 + dx, 44))
+            p.move(to: pt(47, 66)); p.addLine(to: pt(52, 71)); p.addLine(to: pt(57, 66))
+        case .sad:
+            p.move(to: pt(26, 50)); p.addQuadCurve(to: pt(40, 48), control: pt(33, 52))
+            p.move(to: pt(61, 48)); p.addQuadCurve(to: pt(75, 50), control: pt(68, 52))
+            p.move(to: pt(44, 72)); p.addQuadCurve(to: pt(60, 72), control: pt(52, 64))
+        case .startled:
+            break
+        }
+        return p
+    }
+
+    /// The head: ears up for a startled cat, down for a sad one.
+    private func head(_ pt: (CGFloat, CGFloat) -> CGPoint) -> Path {
+        let (leftEar, rightEar): (CGPoint, CGPoint) = switch mood {
+        case .startled: (pt(9, -4), pt(93, -5))
+        case .sad: (pt(2, 16), pt(99, 15))
+        default: (pt(13, 5), pt(88, 4))
+        }
+        return Path { p in
+            p.move(to: pt(12, 86))
+            p.addQuadCurve(to: pt(15, 30), control: pt(1, 55))
+            p.addLine(to: leftEar)
+            p.addLine(to: pt(38, 24))
+            p.addQuadCurve(to: pt(65, 24), control: pt(52, 17))
+            p.addLine(to: rightEar)
+            p.addLine(to: pt(86, 33))
+            p.addQuadCurve(to: pt(88, 86), control: pt(99, 55))
+            p.closeSubpath()
+        }
+    }
+}
+
+/// A white paw with pink beans, as on the pull-gap cat.
+struct CatPaw: View {
+    var body: some View {
+        ZStack {
+            Ellipse().fill(.white).frame(width: 18, height: 15)
+            HStack(spacing: 2) {
+                ForEach(0..<3, id: \.self) { _ in Circle().fill(Color(hex: 0xE9B4C6)).frame(width: 3, height: 3) }
+            }
+            .offset(y: -3)
+            Ellipse().fill(Color(hex: 0xE9B4C6)).frame(width: 6, height: 5).offset(y: 2)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// 2A: home's loading cat. It peeks over a line with its paws on it and looks
+/// left and right while your people load; with Reduce Motion it sits still.
+struct LoadingCat: View {
+    var eyes: Color = .psstCanvas
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var look: CGFloat = 0
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            MoodCat(mood: .peeking, eyes: eyes, look: look)
+                .frame(width: 72, height: 65)
+                .offset(y: 16)
+            HStack(spacing: 36) { CatPaw(); CatPaw() }
+                .offset(y: 4)
+        }
+        .frame(width: 120, height: 80)
+        .clipped()
+        .overlay(alignment: .bottom) { Rectangle().fill(Color.onCanvas.opacity(0.5)).frame(height: 3) }
+        .task {
+            guard !reduceMotion else { return }
+            for side in [CGFloat(-1), 1, 0].cycled() {
+                withAnimation(.easeInOut(duration: 0.35)) { look = side }
+                try? await Task.sleep(for: .milliseconds(side == 0 ? 1100 : 700))
+                if Task.isCancelled { return }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private extension Array {
+    /// The elements over and over, for a looping animation.
+    func cycled() -> AnySequence<Element> {
+        AnySequence { () -> AnyIterator<Element> in
+            var index = 0
+            return AnyIterator {
+                guard !self.isEmpty else { return nil }
+                defer { index = (index + 1) % self.count }
+                return self[index]
+            }
+        }
+    }
+}
+
+/// 3A: the sad cat (ears down, one tear) shown where Psst can't connect.
+struct SadCat: View {
+    var eyes: Color = .psstCanvas
+    var body: some View {
+        MoodCat(mood: .sad, eyes: eyes).frame(width: 72, height: 65)
+    }
+}
+
+/// 4B: when a Psst arrives, a startled cat peeks in from the screen's edge, as if
+/// someone just said psst behind it. With Reduce Motion it is simply there.
+struct StartledPeekCat: View {
+    /// The band's colour, for its eyes.
+    var eyes: Color
+    var shown: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        MoodCat(mood: .startled, eyes: eyes)
+            .frame(width: 74, height: 67)
+            .rotationEffect(.degrees(-24))
+            .offset(x: shown || reduceMotion ? 14 : 110)
+            .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.6).delay(0.15), value: shown)
+            .accessibilityHidden(true)
+    }
+}
+
 /// The Super Psst mark (owner pick 1A, 14 Oct 2026): the cat between two pairs of
 /// "shake" arcs, Psst's own nudge. About twice as wide as it is tall.
 struct NudgeMark: View {
@@ -265,8 +432,12 @@ struct ActivityView: View {
                 if store.activity.isEmpty && (loading || !attempted) {
                     ProgressView("Loading activity").frame(maxWidth: .infinity).padding(Tokens.Space.xl)
                 } else if store.activity.isEmpty && failed {
-                    Button("Couldn't load activity. Try again") { Task { await load() } }
-                        .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
+                    VStack(spacing: Tokens.Space.s) {
+                        SadCat(eyes: Color(.systemGroupedBackground))
+                        Button("Couldn't load activity. Try again") { Task { await load() } }
+                            .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
+                    }
+                    .padding(.top, Tokens.Space.l)
                 } else if entries.isEmpty {
                     Text("No Pssts yet. Your leaderboard starts with your first one.")
                         .foregroundStyle(.secondary)
@@ -855,10 +1026,13 @@ struct WeeklyRecapView: View {
                 }
             }
         } else if failed {
-            Button("Couldn't load your week. Try again") { Task { await load() } }
-                .font(.psst(.body, weight: .bold))
-                .frame(minHeight: Tokens.minTouch)
-                .padding(Tokens.Space.xl)
+            VStack(spacing: Tokens.Space.s) {
+                SadCat()
+                Button("Couldn't load your week. Try again") { Task { await load() } }
+                    .font(.psst(.body, weight: .bold))
+                    .frame(minHeight: Tokens.minTouch)
+            }
+            .padding(Tokens.Space.xl)
         } else {
             ProgressView().tint(Color.onCanvas).padding(Tokens.Space.xl)
         }

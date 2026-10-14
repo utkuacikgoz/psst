@@ -196,10 +196,13 @@ struct SettingsSheet: View {
                     VStack(spacing: Tokens.Space.l) {
                         if let deleteError { Text(deleteError) }
                         // The version, like Apple's own apps; long-press to copy it for support.
-                        Text(Self.versionLine)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, Tokens.Space.xl)
+                        VStack(spacing: Tokens.Space.s) {
+                            Text(Self.versionLine)
+                                .textSelection(.enabled)
+                            VersionCat()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, Tokens.Space.xl)
                     }
                 }
             }
@@ -284,6 +287,25 @@ extension SettingsSheet {
     static var versionLine: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         return "Psst \(version)"
+    }
+}
+
+/// 1A (owner pick, 14 Oct 2026): a small sleeping cat under the version. Tap it
+/// and it opens one eye for a moment.
+private struct VersionCat: View {
+    @State private var awake = false
+
+    var body: some View {
+        MoodCat(mood: awake ? .awake : .sleepy, eyes: Color(.systemGroupedBackground))
+            .frame(width: 30, height: 27)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                awake = true
+                Task {
+                    try? await Task.sleep(for: .seconds(1.5))
+                    awake = false
+                }
+            }
     }
 }
 

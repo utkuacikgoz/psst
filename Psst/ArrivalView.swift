@@ -216,6 +216,13 @@ struct ArrivalView: View {
                 .background(Color.bandShade.ignoresSafeArea(edges: .bottom))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 4B (owner pick, 14 Oct 2026): a startled cat peeks in from the edge.
+        .overlay(alignment: .topTrailing) {
+            if arrival.kind == .signal {
+                StartledPeekCat(eyes: color ?? .personBand(name), shown: settled)
+                    .padding(.top, 150)
+            }
+        }
         .background((color ?? .personBand(name)).ignoresSafeArea())
     }
 

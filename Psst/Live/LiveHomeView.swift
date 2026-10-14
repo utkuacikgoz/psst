@@ -172,11 +172,12 @@ struct LiveHomeView: View {
     private func loadingPeople(minHeight: CGFloat) -> some View {
         VStack(spacing: Tokens.Space.m) {
             if store.connectionsLoadFailed {
+                SadCat()
                 Text("Couldn't load your people.")
                 Button("Try again") { Task { await store.refresh() } }
                     .frame(minHeight: Tokens.minTouch)
             } else {
-                ProgressView().tint(Color.onCanvas).controlSize(.large)
+                LoadingCat()
                 Text(store.isOffline ? "Waiting for a connection…" : "Loading your people…")
                 .font(.psst(.subheadline, weight: .semibold))
             }

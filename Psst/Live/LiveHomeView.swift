@@ -147,6 +147,8 @@ struct LiveHomeView: View {
     @Environment(\.requestReview) private var requestReview
 
     @State private var showingFeatureIntro = false
+    /// The scroll area's real height, so 1–3 people fill it exactly (no stray scrolling).
+    @State private var scrollHeight: CGFloat = 0
     @State private var superPerson: ConnectionSummary?
     @AppStorage("psst.hapticsEnabled") private var hapticsEnabled = true
     @State private var showingInvite = false
@@ -188,6 +190,9 @@ struct LiveHomeView: View {
     var body: some View {
         GeometryReader { proxy in
             let inset = Tokens.sideInset(forWidth: proxy.size.width)
+            // Room for the bands: the measured scroll area less its bottom padding
+            // (an estimate only for the very first frame, before it's measured).
+            let space = scrollHeight > 0 ? scrollHeight - Tokens.Space.l : proxy.size.height - 150
 
             VStack(spacing: 0) {
                 header.padding(.horizontal, inset)
@@ -202,20 +207,21 @@ struct LiveHomeView: View {
                             searchField(inset: inset)
                         }
                         Color.clear.frame(height: 0).id(Self.peopleAnchor)
-                        notices
+                        // On the canvas as always, whatever colour sits behind the list.
+                        notices.background(Color.psstCanvas)
                         if store.connections.isEmpty {
                             if store.hasLoadedConnections {
-                                firstInviteBand(minHeight: max(Tokens.personRowMinHeight, Self.bandHeight(available: proxy.size.height, people: 0) - Tokens.Band.addBandMinHeight))
+                                firstInviteBand(minHeight: max(Tokens.personRowMinHeight, Self.bandHeight(space: space, people: 0) - Tokens.Band.addBandMinHeight))
                                 haveCodeBand
                             } else {
                                 // First launch on this phone: nothing remembered yet.
-                                loadingPeople(minHeight: Self.bandHeight(available: proxy.size.height, people: 0))
+                                loadingPeople(minHeight: Self.bandHeight(space: space, people: 0))
                             }
                         } else {
                             // Yo classic (H2): people share the screen above a short + band;
                             // with many people each keeps a minimum and scrolls.
                             let visible = visibleConnections
-                            let bandHeight = Self.bandHeight(available: proxy.size.height, people: max(visible.count, 1))
+                            let bandHeight = Self.bandHeight(space: space, people: max(visible.count, 1))
                             // O2: most recent first; drag a band to place it yourself.
                             // Worked out once per render, not once per band.
                             let colours = bandColors
@@ -234,6 +240,11 @@ struct LiveHomeView: View {
                     }
                     .padding(.bottom, Tokens.Space.l)
                 }
+                // Everyone fits: no scroll bar. Pulling down to refresh shows the first
+                // band's own colour in the gap (behind the spinner), not the purple canvas.
+                .scrollIndicators(Self.fits(people: store.connections.count, space: space) ? .hidden : .automatic)
+                .background(alignment: .top) { pullGapColour.frame(height: max(0, space / 2)) }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { scrollHeight = $0 }
                 .refreshable { await store.refresh() }
                 // Start with the search field tucked above the top edge.
                 .onAppear { hideSearch(reader) }
@@ -462,13 +473,22 @@ struct LiveHomeView: View {
             .accessibilityAddTraits(.isHeader)
     }
 
-    /// Splits the space below the header and above Settings between the people
-    /// and the + band, but never below the band minimum.
-    static func bandHeight(available: CGFloat, people: Int) -> CGFloat {
-        let chrome: CGFloat = 150 // header and Settings footer, approximately
+    /// Splits the scroll area between the people and the + band, but never below
+    /// the band minimum. Rounded down so the stack never overflows by a fraction.
+    static func bandHeight(space: CGFloat, people: Int) -> CGFloat {
         // People get the room; the + band (or "I have a code") keeps a fixed, shorter height.
-        let share = (available - chrome - (people > 0 ? Tokens.Band.addBandMinHeight : 0)) / CGFloat(max(people, 1))
-        return max(Tokens.personRowMinHeight, share)
+        let share = (space - (people > 0 ? Tokens.Band.addBandMinHeight : 0)) / CGFloat(max(people, 1))
+        return max(Tokens.personRowMinHeight, share.rounded(.down))
+    }
+
+    /// True when every band fits at its share without scrolling.
+    static func fits(people: Int, space: CGFloat) -> Bool {
+        CGFloat(people) * Tokens.personRowMinHeight + Tokens.Band.addBandMinHeight <= space
+    }
+
+    private var pullGapColour: Color {
+        guard !showsSearch, let first = store.orderedConnections.first else { return .clear }
+        return Color(hex: bandColors[first.id] ?? personalization.colorHex(for: first.id, name: first.otherName))
     }
 
     /// The gold + band that ends the list, as in Yo. Opens the invite sheet.

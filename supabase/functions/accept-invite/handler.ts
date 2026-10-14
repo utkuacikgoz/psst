@@ -9,6 +9,8 @@ export interface AcceptResult {
 export interface JoinedTargets {
   connection_id: string;
   joiner_name: string;
+  /** They joined through your Psst (5A): the push says so. */
+  held_psst?: boolean;
   sound?: string;
   tokens: { token: string; environment: ApnsEnvironment }[];
 }
@@ -37,7 +39,12 @@ export const JOINED_PUSH_LIFETIME_SECONDS = 24 * 60 * 60;
 export function buildJoinedPayload(targets: JoinedTargets) {
   return {
     aps: {
-      alert: { title: `${targets.joiner_name} is in`, body: "Tap to send your first Psst" },
+      alert: {
+        title: `${targets.joiner_name} is in`,
+        body: targets.held_psst
+          ? `${targets.joiner_name} got your Psst and joined. Tap to psst them.`
+          : "Tap to send your first Psst",
+      },
       sound: targets.sound ?? "psst.wav",
       "thread-id": targets.connection_id,
     },

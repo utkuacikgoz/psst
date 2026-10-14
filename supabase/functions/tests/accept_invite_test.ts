@@ -76,3 +76,8 @@ Deno.test("the joined push names the person and carries no content", () => {
   assertEquals(payload.aps.alert, { title: "Kim is in", body: "Tap to send your first Psst" });
   assertEquals(payload.psst, { connection_id: CONNECTION, joined: true });
 });
+
+Deno.test("joining through your Psst says so", () => {
+  const payload = buildJoinedPayload({ connection_id: CONNECTION, joiner_name: "Kim", held_psst: true, tokens: [] });
+  assertEquals(payload.aps.alert, { title: "Kim is in", body: "Kim got your Psst and joined. Tap to psst them." });
+});

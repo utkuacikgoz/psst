@@ -77,7 +77,7 @@ try:
     check("Ada creates an invite", status == 200 and code, body)
 
     status, body = emre.rpc("preview_invite", p_code=code)
-    check("Emre sees Ada's pending invite", body == {"status": "pending", "inviter_name": "Smoke Ada"}, body)
+    check("Emre sees Ada's pending invite", isinstance(body, dict) and body.get("status") == "pending" and body.get("inviter_name") == "Smoke Ada", body)
 
     status, body = emre.rpc("accept_invite", p_code=code)
     connection = body.get("connection_id") if isinstance(body, dict) else None

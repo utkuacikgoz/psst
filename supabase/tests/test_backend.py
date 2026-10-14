@@ -136,7 +136,7 @@ class BackendTests(unittest.TestCase):
         code = ada.rpc("create_invite")["code"]
         self.assertEqual(len(code), 8)
         preview = emre.rpc("preview_invite", code.lower()[:4] + "-" + code.lower()[4:])
-        self.assertEqual(preview, {"status": "pending", "inviter_name": "Ada"})
+        self.assertEqual(preview, {"status": "pending", "kind": "code", "inviter_name": "Ada"})
         result = emre.rpc("accept_invite", code)
         self.assertEqual(result["status"], "accepted")
         self.assertEqual(len(ada.rows("select * from public.connections")), 1)
@@ -156,7 +156,7 @@ class BackendTests(unittest.TestCase):
         emre.rpc("accept_invite", used)
         admin("update public.invites set max_uses = 1 where code = %s", used)  # a full code
         # Someone else (wrong account) opening an already-used link.
-        self.assertEqual(sam.rpc("preview_invite", used), {"status": "used", "inviter_name": None})
+        self.assertEqual(sam.rpc("preview_invite", used), {"status": "used", "kind": "code", "inviter_name": None})
         with self.fails("invite_used", 409):
             sam.rpc("accept_invite", used)
         # The person who accepted it sees they're already connected.
@@ -231,6 +231,36 @@ class BackendTests(unittest.TestCase):
             ada.rpc("create_invite")
         open_codes = {r[0] for r in ada.rows("select code from public.list_open_invites()")}
         self.assertIn(group, open_codes)
+
+    def test_psst_invite_delivers_the_held_psst_and_works_once(self):
+        ada, kim, sam = new_user("Ada Lovelace"), new_user("Kim"), new_user("Sam")
+        invite = ada.rpc("create_psst_invite")
+        self.assertEqual((invite["kind"], invite["max_uses"]), ("psst", 1))
+        code = invite["code"]
+
+        anon = Api("anon")
+        card = anon.rpc("public_invite_card", code)
+        self.assertEqual((card["status"], card["kind"], card["first_name"]), ("pending", "psst", "Ada"), "first name only")
+        self.assertEqual(kim.rpc("preview_invite", code)["kind"], "psst")
+        self.assertEqual(ada.rows("select kind from public.list_open_invites()"), [("psst",)])
+
+        result = kim.rpc("accept_invite", code)
+        self.assertEqual((result["status"], result["held_psst"]), ("accepted", True))
+        unseen = kim.rows("select sender_name, effect_id from public.list_unseen()")
+        self.assertEqual(unseen, [("Ada Lovelace", "psst")], "Ada's Psst is Kim's first")
+        self.assertEqual(Api("service_role").rpc("joined_push_targets", result["connection_id"])["held_psst"], True)
+
+        self.assertEqual(anon.rpc("public_invite_card", code), {"status": "unavailable"}, "nothing shown once used")
+        with self.fails("invite_used", 409):
+            sam.rpc("accept_invite", code)
+        self.assertEqual(ada.rows("select code from public.list_open_invites()"), [])
+
+    def test_making_codes_never_retires_a_waiting_psst(self):
+        ada = new_user("Ada")
+        waiting = ada.rpc("create_psst_invite")["code"]
+        for _ in range(6):
+            ada.rpc("create_invite")
+        self.assertIn(waiting, {r[0] for r in ada.rows("select code from public.list_open_invites()")})
 
     def test_only_inviter_can_revoke(self):
         ada, sam = new_user("Ada"), new_user("Sam")
@@ -556,7 +586,7 @@ class BackendTests(unittest.TestCase):
             ada.rpc("send_signal", uuid.uuid4(), conn, "psst")
         # Ada's new invite looks invalid to Emre and vice versa.
         code = ada.rpc("create_invite")["code"]
-        self.assertEqual(emre.rpc("preview_invite", code), {"status": "invalid", "inviter_name": None})
+        self.assertEqual(emre.rpc("preview_invite", code), {"status": "invalid", "kind": "code", "inviter_name": None})
         with self.fails("invite_invalid", 404):
             emre.rpc("accept_invite", code)
         code = emre.rpc("create_invite")["code"]

@@ -1,0 +1,26 @@
+name: App sizes
+
+# Manual, Linux only. Prints App Store Connect's measured download and install
+# size for recent builds, so size changes are compared on Apple's numbers.
+on:
+  workflow_dispatch:
+    inputs:
+      builds:
+        description: How many recent builds
+        default: "12"
+
+jobs:
+  sizes:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+      BUILDS: ${{ inputs.builds }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: pip install -q pyjwt cryptography
+      - run: python3 scripts/app_sizes.py

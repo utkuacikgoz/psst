@@ -10,6 +10,8 @@ Read `PROJECT.md` and `DESIGN.md` first. These rules come from the owner.
    `scripts/check_design_approval.py` fails CI for any design file changed
    without one. Never write that trailer without the owner's explicit approval
    of that specific change.
+   Previews always use the owner's format in docs/DESIGN_PREVIEWS.md: one
+   artifact page, numbered topics, A/B/C options with pick buttons on the page.
 1. **Never remove or replace an owner-approved feature or design** (anything in
    DESIGN.md marked "owner pick", "owner go", "owner-approved" or
    "Owner-selected") without the owner's explicit approval in the conversation.

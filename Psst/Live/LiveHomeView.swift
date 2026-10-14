@@ -592,6 +592,11 @@ struct LiveHomeView: View {
     }
 
     @ViewBuilder
+    /// The effect's id when it's a Super Psst, so only those play the nudge.
+    static func superEffectID(_ effect: EffectTrigger?) -> UUID? {
+        effect?.signal == .superPsst ? effect?.id : nil
+    }
+
     private func row(_ connection: ConnectionSummary, minHeight: CGFloat, colour: UInt32?) -> some View {
         if Self.isPaused(store.status(for: connection)) {
             // Re-read every second so the countdown moves and the band wakes up on time.
@@ -654,10 +659,19 @@ struct LiveHomeView: View {
                     store.dismissSuperHint()
                     superPerson = connection
                 } label: {
-                    Image(systemName: "sparkle")
-                        .font(.psst(.title3, weight: .bold))
-                        .foregroundStyle(Color.onBandSoft)
-                        .frame(width: Tokens.minTouch, height: Tokens.minTouch)
+                    // The nudge mark (owner pick 1A, 14 Oct), replacing the ✦. It gives a
+                    // little jump when a Super Psst goes out from this band.
+                    NudgeMark(eyes: Color(hex: colour ?? personalization.colorHex(for: connection.id, name: connection.otherName)))
+                        .frame(width: 48, height: 24)
+                        .keyframeAnimator(initialValue: 1.0, trigger: Self.superEffectID(store.effects[connection.id])) { content, scale in
+                            content.scaleEffect(reduceMotion ? 1 : CGFloat(scale))
+                        } keyframes: { _ in
+                            KeyframeTrack {
+                                CubicKeyframe(1.25, duration: 0.12)
+                                CubicKeyframe(1.0, duration: 0.3)
+                            }
+                        }
+                        .frame(minWidth: Tokens.minTouch + 12, minHeight: Tokens.minTouch)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

@@ -135,6 +135,26 @@ struct ArrivalView: View {
     /// FROM, their name, then "psst" in the wordmark's own lettering, with the
     /// reply as a band along the bottom, the same shape as everything you tap.
     private var single: some View {
+        singleContent
+            // A Super Psst arrives as a nudge: the screen shakes like the old MSN nudge
+            // (owner pick 1A, 14 Oct). With Reduce Motion, the cat's soft pulse only.
+            .keyframeAnimator(initialValue: 0.0, trigger: arrival.kind == .superPsst ? trigger : nil) { content, x in
+                content.offset(x: reduceMotion ? 0 : CGFloat(x))
+            } keyframes: { _ in
+                KeyframeTrack {
+                    LinearKeyframe(-16, duration: 0.05)
+                    LinearKeyframe(16, duration: 0.08)
+                    LinearKeyframe(-14, duration: 0.08)
+                    LinearKeyframe(14, duration: 0.08)
+                    LinearKeyframe(-10, duration: 0.08)
+                    LinearKeyframe(10, duration: 0.08)
+                    LinearKeyframe(-4, duration: 0.07)
+                    LinearKeyframe(0, duration: 0.07)
+                }
+            }
+    }
+
+    private var singleContent: some View {
         VStack(spacing: 0) {
             Spacer(minLength: Tokens.Space.xxl)
             VStack(spacing: Tokens.Space.m) {

@@ -2,6 +2,9 @@ import SwiftUI
 
 /// One vector mark, shared by the invite, introduction and Super Psst arrival.
 struct MischiefCat: View {
+    /// The eyes and mouth; the band's colour makes them read as cut-outs.
+    var eyes: Color = .psstCanvas
+
     var body: some View {
         GeometryReader { geometry in
             let w = geometry.size.width, h = geometry.size.height
@@ -25,10 +28,48 @@ struct MischiefCat: View {
                     p.move(to: CGPoint(x: w * 0.47, y: h * 0.66))
                     p.addLine(to: CGPoint(x: w * 0.52, y: h * 0.71))
                     p.addLine(to: CGPoint(x: w * 0.57, y: h * 0.66))
-                }.stroke(Color.psstCanvas, style: StrokeStyle(lineWidth: max(2, w * 0.04), lineCap: .round, lineJoin: .round))
+                }.stroke(eyes, style: StrokeStyle(lineWidth: max(2, w * 0.04), lineCap: .round, lineJoin: .round))
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// The Super Psst mark (owner pick 1A, 14 Oct 2026): the cat between two pairs of
+/// "shake" arcs, Psst's own nudge. About twice as wide as it is tall.
+struct NudgeMark: View {
+    /// The band's colour, for the cat's eyes.
+    var eyes: Color
+
+    var body: some View {
+        GeometryReader { geometry in
+            let h = geometry.size.height
+            let arcs = StrokeStyle(lineWidth: max(1.5, h * 0.07), lineCap: .round)
+            HStack(spacing: h * 0.08) {
+                ShakeArcs(mirrored: false).stroke(Color.white, style: arcs).frame(width: h * 0.36)
+                MischiefCat(eyes: eyes).frame(width: h * 1.1, height: h)
+                ShakeArcs(mirrored: true).stroke(Color.white, style: arcs).frame(width: h * 0.36)
+            }
+            .frame(width: geometry.size.width, height: h)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// Two "shake" arcs beside the cat: the inner one short, the outer one taller.
+struct ShakeArcs: Shape {
+    /// The right-hand pair, opening the other way.
+    var mirrored: Bool
+
+    func path(in rect: CGRect) -> Path {
+        func x(_ fraction: CGFloat) -> CGFloat { rect.minX + rect.width * (mirrored ? 1 - fraction : fraction) }
+        func y(_ fraction: CGFloat) -> CGFloat { rect.minY + rect.height * fraction }
+        var p = Path()
+        p.move(to: CGPoint(x: x(0.85), y: y(0.24)))
+        p.addQuadCurve(to: CGPoint(x: x(0.85), y: y(0.74)), control: CGPoint(x: x(0.45), y: y(0.49)))
+        p.move(to: CGPoint(x: x(0.35), y: y(0.15)))
+        p.addQuadCurve(to: CGPoint(x: x(0.35), y: y(0.83)), control: CGPoint(x: x(-0.05), y: y(0.49)))
+        return p
     }
 }
 

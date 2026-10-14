@@ -73,6 +73,19 @@ struct PersonRow: View {
             .padding(.horizontal, Tokens.Space.xl)
             .padding(.vertical, Tokens.Band.verticalPadding)
             .frame(maxWidth: .infinity, minHeight: minHeight)
+            // A Super Psst nudges: the name shakes side to side (owner pick 1A, 14 Oct).
+            .keyframeAnimator(initialValue: 0.0, trigger: effect?.signal == .superPsst ? effect?.id : nil) { content, x in
+                content.offset(x: reduceMotion ? 0 : CGFloat(x))
+            } keyframes: { _ in
+                KeyframeTrack {
+                    LinearKeyframe(-10, duration: 0.05)
+                    LinearKeyframe(10, duration: 0.08)
+                    LinearKeyframe(-8, duration: 0.08)
+                    LinearKeyframe(8, duration: 0.08)
+                    LinearKeyframe(-4, duration: 0.07)
+                    LinearKeyframe(0, duration: 0.07)
+                }
+            }
             .background { PsstRipple(trigger: effect?.id) }
             .clipped()
             .overlay(alignment: .bottomTrailing) {

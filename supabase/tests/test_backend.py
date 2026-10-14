@@ -488,6 +488,45 @@ class BackendTests(unittest.TestCase):
         with self.assertRaises(errors.InsufficientPrivilege):
             emre.rows("select time_zone from public.profiles")
 
+    def test_weekly_recap_counts_the_week_and_knows_a_new_number_one(self):
+        import datetime
+        ada, emre, sam = new_user("Ada"), new_user("Emre"), new_user("Sam")
+        with_emre, with_sam = connect(ada, emre), connect(ada, sam)
+        today = datetime.date.today()
+        sunday = today + datetime.timedelta(days=(6 - today.weekday()))  # this week's Sunday (UTC)
+        saturday = datetime.datetime.combine(sunday - datetime.timedelta(days=1), datetime.time(12), datetime.timezone.utc)
+
+        def psst(conn, sender, recipient, n, at=saturday):
+            for _ in range(n):
+                admin("insert into public.signal_events (id, connection_id, sender_id, recipient_id, effect_id, created_at) "
+                      "values (gen_random_uuid(), %s, %s, %s, 'psst', %s)", conn, sender.user_id, recipient.user_id, at)
+
+        psst(with_emre, ada, emre, 3); psst(with_emre, emre, ada, 2); psst(with_sam, ada, sam, 1)
+        psst(with_sam, sam, ada, 9, at=saturday - datetime.timedelta(days=7))  # last week: not counted
+
+        recap = admin("select private.recap_for(%s, %s)", ada.user_id, sunday)[0][0]
+        self.assertEqual((recap["total"], recap["sent"], recap["received"]), (6, 4, 2))
+        self.assertEqual((recap["top"]["name"], recap["top"]["count"], recap["top"]["still"]), ("Emre", 5, False))
+
+        # Last week's recap named Sam: Emre is the new #1; had it named Emre, "still".
+        admin("insert into private.recap_state (user_id, last_week, last_top) values (%s, %s, %s)",
+              ada.user_id, sunday - datetime.timedelta(days=7), with_sam)
+        self.assertFalse(admin("select private.recap_for(%s, %s)", ada.user_id, sunday)[0][0]["top"]["still"])
+        admin("update private.recap_state set last_top = %s where user_id = %s", with_emre, ada.user_id)
+        self.assertTrue(admin("select private.recap_for(%s, %s)", ada.user_id, sunday)[0][0]["top"]["still"])
+
+        self.assertEqual(ada.rpc("weekly_recap_status")["enabled"], False, "off until turned on")
+        ada.rpc("set_weekly_recap", True)
+        self.assertEqual(ada.rpc("weekly_recap_status")["enabled"], True)
+
+        service = Api("service_role")
+        self.assertFalse(service.rpc("recap_cron_ok", "guess"), "no vault here: never true")
+        with self.fails("scheduler_unavailable", 503):
+            service.rpc("schedule_weekly_recap", "https://example.invalid/functions/v1/weekly-recap")
+        for fn, args in (("recap_push_targets", ()), ("recap_cron_ok", ("x",))):
+            with self.assertRaises(errors.InsufficientPrivilege):
+                ada.rpc(fn, *args)
+
     def test_inviter_hears_who_joined_server_only(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         token = "cd" * 32

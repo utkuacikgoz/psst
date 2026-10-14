@@ -129,6 +129,28 @@ jobs:
           supabase functions deploy delete-account --project-ref "$SUPABASE_PROJECT_REF"
           supabase functions deploy verify-plus --project-ref "$SUPABASE_PROJECT_REF"
           supabase functions deploy accept-invite --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy weekly-recap --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+
+      - name: Schedule the weekly recap (hourly; sends at 6 PM each Sunday, local time)
+        run: |
+          KEY=$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_REF" -o json | python3 -c "
+          import json, sys
+          keys = json.load(sys.stdin)
+          pick = next((k for k in keys if k.get('name') == 'service_role'), None) \
+              or next((k for k in keys if k.get('type') == 'secret'), None)
+          print(pick['api_key'] if pick else '')
+          ")
+          if [ -z "$KEY" ]; then echo "::error::Couldn't read the project's service key"; exit 1; fi
+          echo "::add-mask::$KEY"
+          AUTH=(-H "apikey: $KEY")
+          case "$KEY" in eyJ*) AUTH+=(-H "Authorization: Bearer $KEY");; esac
+          BASE="https://$SUPABASE_PROJECT_REF.supabase.co"
+          code=$(curl -sS -o "$RUNNER_TEMP/schedule.txt" -w '%{http_code}' -X POST "$BASE/rest/v1/rpc/schedule_weekly_recap" \
+            "${AUTH[@]}" -H 'Content-Type: application/json' -d "{\"p_url\": \"$BASE/functions/v1/weekly-recap\"}")
+          if [ "$code" != "204" ] && [ "$code" != "200" ]; then
+            echo "::error::Scheduling the weekly recap failed (HTTP $code): $(cat "$RUNNER_TEMP/schedule.txt")"; exit 1
+          fi
+          echo "Weekly recap job scheduled."
 
       - name: Smoke test the deployed backend
         run: |

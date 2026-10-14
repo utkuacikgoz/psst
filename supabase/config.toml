@@ -29,3 +29,7 @@ verify_jwt = true
 
 [functions.accept-invite]
 verify_jwt = true
+
+# Called hourly by pg_cron with a secret from the vault, not a user's token.
+[functions.weekly-recap]
+verify_jwt = false

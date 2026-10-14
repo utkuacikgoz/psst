@@ -120,10 +120,11 @@ struct ActivityView: View {
     @Environment(LiveStore.self) private var store
     @Environment(Personalization.self) private var personalization
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var rows: [ActivitySummary] = []
     @State private var direction: Direction = .sent
-    @State private var loading = true
+    @State private var loading = false
     @State private var failed = false
+    /// False until the first refresh finishes, so an empty cache shows Loading, not "No Pssts yet".
+    @State private var attempted = false
     @ScaledMetric(relativeTo: .largeTitle) private var podiumName: CGFloat = 30
     @ScaledMetric(relativeTo: .largeTitle) private var podiumCount: CGFloat = 30
 
@@ -136,16 +137,28 @@ struct ActivityView: View {
     }
 
     private var ranked: [ActivitySummary] {
-        rows.filter { count($0) > 0 }.sorted {
+        store.activity.filter { count($0) > 0 }.sorted {
             count($0) == count($1)
                 ? $0.otherName.localizedStandardCompare($1.otherName) == .orderedAscending
                 : count($0) > count($1)
         }
     }
 
+    /// Equal counts share a rank (1, 2, 2, 4), so a tie never looks like a loss.
+    static func ranks(for counts: [Int]) -> [Int] {
+        var result: [Int] = []
+        for (index, value) in counts.enumerated() {
+            result.append(index > 0 && value == counts[index - 1] ? result[index - 1] : index + 1)
+        }
+        return result
+    }
+
     var body: some View {
+        let entries = ranked
+        let ranks = Self.ranks(for: entries.map { count($0) })
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+            // Lazy: only the rows on screen are built, however many people there are.
+            LazyVStack(alignment: .leading, spacing: 0) {
                 controls
                     .padding(.horizontal, Tokens.Space.l)
                     .padding(.vertical, Tokens.Space.m)
@@ -157,21 +170,22 @@ struct ActivityView: View {
                     .padding(.horizontal, Tokens.Space.l)
                     .padding(.bottom, Tokens.Space.s)
                     .accessibilityAddTraits(.isHeader)
-                if loading {
+                // The last leaderboard shows straight away; these only appear with nothing to show.
+                if store.activity.isEmpty && (loading || !attempted) {
                     ProgressView("Loading activity").frame(maxWidth: .infinity).padding(Tokens.Space.xl)
-                } else if failed {
+                } else if store.activity.isEmpty && failed {
                     Button("Couldn't load activity. Try again") { Task { await load() } }
                         .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
-                } else if ranked.isEmpty {
+                } else if entries.isEmpty {
                     Text("No Pssts yet. Your leaderboard starts with your first one.")
                         .foregroundStyle(.secondary)
                         .padding(Tokens.Space.l)
                 } else {
-                    ForEach(Array(ranked.prefix(3).enumerated()), id: \.element.id) { index, row in
-                        podiumBand(rank: index + 1, row: row)
+                    ForEach(Array(entries.prefix(3).enumerated()), id: \.element.id) { index, row in
+                        podiumBand(rank: ranks[index], position: index + 1, row: row)
                     }
-                    ForEach(Array(ranked.dropFirst(3).enumerated()), id: \.element.id) { index, row in
-                        listRow(rank: index + 4, row: row)
+                    ForEach(Array(entries.enumerated().dropFirst(3)), id: \.element.id) { index, row in
+                        listRow(rank: ranks[index], row: row)
                         Divider().padding(.leading, Tokens.Space.l)
                     }
                 }
@@ -200,8 +214,9 @@ struct ActivityView: View {
     }
 
     /// First, second and third: their band, their colour, the count.
-    private func podiumBand(rank: Int, row: ActivitySummary) -> some View {
-        let scale: CGFloat = rank == 1 ? 1 : rank == 2 ? 0.85 : 0.75
+    private func podiumBand(rank: Int, position: Int, row: ActivitySummary) -> some View {
+        // Size follows the place on the podium; the number shows the shared rank.
+        let scale: CGFloat = position == 1 ? 1 : position == 2 ? 0.85 : 0.75
         return HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.m) {
             Text("\(rank)")
                 .font(.psst(.title3, weight: .black))
@@ -237,9 +252,9 @@ struct ActivityView: View {
 
     private func load() async {
         loading = true; failed = false
-        let monthStart = Calendar.current.dateInterval(of: .month, for: .now)?.start ?? .now
-        do { rows = try await store.api.activity(monthStart: monthStart) } catch { failed = true }
+        do { try await store.refreshActivity() } catch { failed = true }
         loading = false
+        attempted = true
     }
 }
 

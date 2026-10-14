@@ -5,6 +5,8 @@ import XCTest
 final class FakeAPI: PsstAPI {
     var isSignedIn = true
     var connections: [ConnectionSummary] = []
+    var activityRows: [ActivitySummary] = []
+    var activityError: Error?
     var unseen: [UnseenSignal] = []
     var sentEventIDs: [UUID] = []
     var sentSignals: [Signal] = []
@@ -35,6 +37,11 @@ final class FakeAPI: PsstAPI {
     /// When set, sends wait until `releaseSend()` is called.
     var holdSends = false
     private var held: [CheckedContinuation<Void, Never>] = []
+
+    func activity(monthStart: Date) async throws -> [ActivitySummary] {
+        if let activityError { throw activityError }
+        return activityRows
+    }
 
     var pendingSendCount: Int { held.count }
     func releaseSend() { held.removeFirst().resume() }
@@ -244,6 +251,25 @@ final class LiveStoreTests: XCTestCase {
 
         try await store.deleteAccount()
         XCTAssertTrue(LiveStore(api: api, defaults: defaults).connections.isEmpty)
+    }
+
+    func testLeaderboardOpensFromTheLastResultAndKeepsItWhenRefreshFails() async throws {
+        let row = ActivitySummary(connectionId: UUID(), otherName: "Mia", sentAll: 4, receivedAll: 2, sentMonth: 0, receivedMonth: 0)
+        api.activityRows = [row]
+        try await store.refreshActivity()
+        XCTAssertEqual(LiveStore(api: api, defaults: defaults).activity, [row], "A relaunch shows it before any request")
+
+        api.activityError = APIError.offline
+        do { try await store.refreshActivity(); XCTFail("Should report the failure") } catch {}
+        XCTAssertEqual(store.activity, [row], "A failed refresh keeps the last leaderboard")
+
+        try await store.deleteAccount()
+        XCTAssertTrue(LiveStore(api: api, defaults: defaults).activity.isEmpty, "Forgotten with the account")
+    }
+
+    func testTiedCountsShareARank() {
+        XCTAssertEqual(ActivityView.ranks(for: [9, 5, 5, 2, 2, 2, 1]), [1, 2, 2, 4, 4, 4, 7])
+        XCTAssertEqual(ActivityView.ranks(for: []), [])
     }
 
     func testOverlappingRefreshesShareOneRequest() async {

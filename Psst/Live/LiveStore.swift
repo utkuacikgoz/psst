@@ -55,6 +55,8 @@ final class LiveStore {
     static let myNameKey = "psst.live.myName"
     /// The last list of people from the server, shown at launch while it refreshes.
     static let connectionsCacheKey = "psst.live.connectionsCache"
+    /// The last leaderboard, so it opens instantly and survives a failed refresh.
+    static let activityCacheKey = "psst.live.activityCache"
 
     private(set) var phase: Phase = .loading
     /// Your own name as last saved on this phone (ED1). Nil on installs from
@@ -86,6 +88,8 @@ final class LiveStore {
     private(set) var networkAvailable = true
     @ObservationIgnored private var failedInARow = 0
     private(set) var hasLoadedConnections = false
+    /// The private leaderboard, last known first; refreshActivity() replaces it.
+    private(set) var activity: [ActivitySummary] = []
     private(set) var connectionsLoadFailed = false
     /// A short, factual message for the home screen (e.g. a connection that ended).
     var notice: String?
@@ -150,6 +154,19 @@ final class LiveStore {
             reorderByRecency()
         }
         reorder()
+        if let data = defaults.data(forKey: Self.activityCacheKey),
+           let cached = try? JSONDecoder().decode([ActivitySummary].self, from: data) {
+            activity = cached
+        }
+    }
+
+    /// Fetches the leaderboard and keeps it for next time. On failure the last
+    /// known one stays, and the error tells the screen to offer Try again.
+    func refreshActivity() async throws {
+        let monthStart = Calendar.current.dateInterval(of: .month, for: now())?.start ?? now()
+        let rows = try await api.activity(monthStart: monthStart)
+        activity = rows
+        if let data = try? JSONEncoder().encode(rows) { defaults.set(data, forKey: Self.activityCacheKey) }
     }
 
     // MARK: Onboarding
@@ -760,6 +777,8 @@ final class LiveStore {
         defaults.removeObject(forKey: Self.pinnedOrderKey)
         defaults.removeObject(forKey: Self.myNameKey)
         defaults.removeObject(forKey: Self.connectionsCacheKey)
+        defaults.removeObject(forKey: Self.activityCacheKey)
+        activity = []
         myName = nil
         pinnedOrder = []
         recencyOrder = []

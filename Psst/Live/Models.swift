@@ -148,7 +148,8 @@ struct SignalPayload: Equatable {
               let signal = (psst["effect_id"] as? String).flatMap(Signal.init(rawValue:))
         else { return nil }
         self.init(eventID: event, connectionID: connection,
-                  signal: psst["super_psst"] as? Bool == true ? .superPsst : signal,
+                  signal: psst["super_psst"] as? Bool == true ? .superPsst
+                      : psst["doodle"] as? Bool == true ? .doodle : signal,
                   sameMoment: psst["same_moment"] as? Bool ?? false)
     }
 }

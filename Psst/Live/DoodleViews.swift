@@ -67,6 +67,8 @@ struct DoodleSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var strokes: DoodleStrokes = []
     @State private var current: [[Double]] = []
+    @State private var refused = 0
+    @State private var atLimit = false
 
     private var pointCount: Int { strokes.reduce(0) { $0 + $1.count } + current.count }
 
@@ -77,7 +79,7 @@ struct DoodleSheet: View {
                 Spacer()
                 Text("To \(connection.otherName)").font(.psst(.body, weight: .bold))
                 Spacer()
-                Button("Undo") { if !strokes.isEmpty { strokes.removeLast() } }
+                Button("Undo") { if !strokes.isEmpty { strokes.removeLast(); atLimit = false } }
                     .disabled(strokes.isEmpty)
             }
             .font(.psst(.body, weight: .semibold))
@@ -106,11 +108,13 @@ struct DoodleSheet: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityLabel("Drawing area")
                 .accessibilityHint("Draw with one finger.")
+                // VoiceOver passes touches straight through, so the pad can be drawn on.
+                .accessibilityAddTraits(.allowsDirectInteraction)
             }
 
             Button {
-                store.sendDoodle(connection, strokes: strokes)
-                dismiss()
+                // Nothing sent (a send to them is still going): keep the drawing open.
+                if store.sendDoodle(connection, strokes: strokes) != nil { dismiss() } else { refused += 1 }
             } label: {
                 Text("SEND DOODLE")
                     .font(.psst(.title3, weight: .black))
@@ -122,6 +126,8 @@ struct DoodleSheet: View {
             .buttonStyle(.plain)
             .disabled(strokes.isEmpty)
             .opacity(strokes.isEmpty ? 0.5 : 1)
+            .sensoryFeedback(.error, trigger: refused)
+            .sensoryFeedback(.warning, trigger: atLimit) { _, new in new }
         }
         .padding(Tokens.Space.l)
         .foregroundStyle(Color.onCanvas)
@@ -131,7 +137,12 @@ struct DoodleSheet: View {
 
     /// Keeps points at least ~1% apart, within the limits, rounded to 3 decimals.
     private func add(_ location: CGPoint, side: CGFloat) {
-        guard side > 0, pointCount < Doodle.maxPoints, strokes.count < Doodle.maxStrokes else { return }
+        guard side > 0 else { return }
+        guard pointCount < Doodle.maxPoints, strokes.count < Doodle.maxStrokes else {
+            // The pen stops at the limit: one tap of feedback says so.
+            atLimit = true
+            return
+        }
         let x = Double(min(max(location.x / side, 0), 1)), y = Double(min(max(location.y / side, 0), 1))
         let point: [Double] = [(x * 1000).rounded() / 1000, (y * 1000).rounded() / 1000]
         if let last = current.last, abs(last[0] - point[0]) + abs(last[1] - point[1]) < 0.01 { return }

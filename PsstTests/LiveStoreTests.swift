@@ -511,6 +511,25 @@ final class LiveStoreTests: XCTestCase {
             "event_id": event.uuidString, "connection_id": connection.uuidString, "effect_id": "psst"]])?.sameMoment, false)
     }
 
+    func testDoodleReplacesAFailedSendButNotOneStillGoing() async {
+        let mia = connection(name: "Mia")
+        api.connections = [mia]
+        await store.refresh()
+        let strokes: DoodleStrokes = [[[0.1, 0.1], [0.5, 0.5]]]
+        await store.sendDoodle(mia, strokes: strokes)?.value // the fake server refuses doodles
+        guard case .failed(_, .doodle, _)? = store.sendStates[mia.id] else { return XCTFail("expected a failed doodle") }
+        XCTAssertNotNil(store.sendDoodle(mia, strokes: strokes), "a new doodle may replace a failed send")
+        XCTAssertNil(store.sendDoodle(mia, strokes: strokes), "not one still sending: the pad stays open")
+    }
+
+    func testDoodlePayloadFlag() {
+        let event = UUID(), connection = UUID()
+        let payload = SignalPayload(userInfo: ["psst": [
+            "event_id": event.uuidString, "connection_id": connection.uuidString,
+            "effect_id": "psst", "doodle": true, "super_psst": false]])
+        XCTAssertEqual(payload?.signal, .doodle)
+    }
+
     // MARK: Order (O2 + drag)
 
     private func at(_ seconds: TimeInterval, _ name: String) -> ConnectionSummary {

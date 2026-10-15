@@ -62,7 +62,11 @@ export async function handleSendSignal(req: Request, deps: SendSignalDeps): Prom
 
   if (deps.background) {
     // The signal is stored and visible in the recipient's in-app inbox either way.
-    deps.background(deps.deliver(data.id).catch(() => "failed"));
+    deps.background(deps.deliver(data.id).catch((err) => {
+      // Nobody awaits this, so say what went wrong in the function logs (no names or tokens).
+      console.error("background push failed", data.id, err instanceof Error ? err.message : String(err));
+      return "failed" as const;
+    }));
     return json(data, 200);
   }
 

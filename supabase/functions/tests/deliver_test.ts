@@ -124,4 +124,7 @@ Deno.test("a busy or failing APNs gets one retry with the same push", async () =
 Deno.test("a doodle's notification says they drew something", () => {
   const payload = buildPayload(targets({ effect_id: "doodle" })) as { aps: { alert: { title: string; body: string } } };
   assertEquals(payload.aps.alert.body, "drew you something ✎");
+  // Routed as a Psst so 1.0.4 can still psst back from it; the flag says it's a doodle.
+  const routing = (payload as unknown as { psst: { effect_id: string; doodle: boolean; super_psst: boolean } }).psst;
+  assertEquals([routing.effect_id, routing.doodle, routing.super_psst], ["psst", true, false]);
 });

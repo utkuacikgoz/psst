@@ -60,9 +60,11 @@ export function buildPayload(targets: PushTargets) {
     psst: {
       event_id: targets.event_id,
       connection_id: targets.connection_id,
-      // Keep the original routing ID so older app versions can still psst back.
-      effect_id: targets.effect_id === "super_psst" ? "psst" : targets.effect_id,
+      // Keep a routing ID every app version knows, so older ones can still psst
+      // back; the flags say what it really was.
+      effect_id: targets.effect_id === "super_psst" || targets.effect_id === "doodle" ? "psst" : targets.effect_id,
       super_psst: targets.effect_id === "super_psst",
+      doodle: targets.effect_id === "doodle",
       same_moment: targets.same_moment ?? false,
     },
   };

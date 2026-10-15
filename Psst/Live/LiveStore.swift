@@ -660,12 +660,18 @@ final class LiveStore {
     }
 
     /// A doodle (1A): sent like a Super Psst, with its strokes kept for a retry.
+    /// nil when nothing was sent (a send to them is still going, or they're paused):
+    /// the pad stays open so the drawing isn't lost. It may replace a failed send.
     @discardableResult
     func sendDoodle(_ connection: ConnectionSummary, strokes: DoodleStrokes) -> Task<Void, Never>? {
         guard !strokes.isEmpty, sendStates[connection.id] == nil || {
-            if case .sent = sendStates[connection.id] { return true }; return false
+            switch sendStates[connection.id] {
+            case .sent, .failed: return true
+            default: return false
+            }
         }() else { return nil }
         if let until = pausedUntil[connection.id], until > now() { return nil }
+        if case .failed(let failedID, .doodle, _) = sendStates[connection.id] { doodleStrokes[failedID] = nil }
         let eventID = UUID()
         doodleStrokes[eventID] = strokes
         sendStates[connection.id] = .sending(eventID: eventID, signal: .doodle)
@@ -721,11 +727,16 @@ final class LiveStore {
             noteReachable()
             sendStates[connectionID] = nil
             notice = "Today's Super Psst is used. Hold a person to see when it resets."
+        } catch APIError.server(_, "invalid_doodle") {
+            // The same strokes would fail again; never offer a retry that can't work.
+            doodleStrokes[eventID] = nil
+            sendStates[connectionID] = nil
         } catch APIError.server(429, _) {
             noteReachable()
             pausedUntil[connectionID] = now().addingTimeInterval(Self.pauseDuration)
             sendStates[connectionID] = .failed(eventID: eventID, signal: signal, reason: .rateLimited)
         } catch APIError.signedOut {
+            doodleStrokes[eventID] = nil
             sendStates[connectionID] = nil
             resetLocalAccount()
         } catch {
@@ -740,12 +751,14 @@ final class LiveStore {
         try await api.removeConnection(connection.id)
         connections.removeAll { $0.id == connection.id }
         sendStates[connection.id] = nil
+        if WidgetBridge.showsDoodle(from: connection.id) { await publishDoodle() }
     }
 
     func block(_ connection: ConnectionSummary) async throws {
         try await api.blockUser(connection.otherId)
         connections.removeAll { $0.id == connection.id }
         sendStates[connection.id] = nil
+        if WidgetBridge.showsDoodle(from: connection.id) { await publishDoodle() }
     }
 
     /// Reporting also blocks, on the server.
@@ -753,6 +766,7 @@ final class LiveStore {
         try await api.reportUser(connection.otherId)
         connections.removeAll { $0.id == connection.id }
         sendStates[connection.id] = nil
+        if WidgetBridge.showsDoodle(from: connection.id) { await publishDoodle() }
     }
 
     func acceptInvite(code: String) async throws -> UUID? {
@@ -867,6 +881,7 @@ final class LiveStore {
         for attempt in 0..<2 {
             do {
                 _ = try await api.sendSignal(eventID: reply, connectionID: payload.connectionID, signal: .psst)
+                if WidgetBridge.showsDoodle(from: payload.connectionID) { await publishDoodle() }
                 return true
             } catch APIError.offline where attempt == 0 {
                 // One more try shortly: the reply ID is fixed, so it can't send twice.
@@ -926,6 +941,7 @@ final class LiveStore {
         connectionsLoadFailed = false
         phase = .needsName
         // No names left behind on the Home Screen or Lock Screen.
-        WidgetBridge.publish([], unlocked: false)
+        WidgetBridge.publish([], unlocked: false, everyone: [])
+        WidgetBridge.publishDoodle(nil)
     }
 }

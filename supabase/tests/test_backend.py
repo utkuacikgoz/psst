@@ -181,6 +181,10 @@ class BackendTests(unittest.TestCase):
         self.assertIsNone(sam.rpc("latest_doodle"))
         emre.rpc("send_signal", uuid.uuid4(), conn, "psst")
         self.assertIsNone(emre.rpc("latest_doodle"), "gone once they psst back")
+        # The biggest drawing the app allows: 60 strokes, 2,000 points, 3 decimals each.
+        biggest = [[[round(0.123 + (i % 7) / 1000, 3), round(0.456 + (i % 5) / 1000, 3)] for i in range(n)] for n in [34] * 20 + [33] * 40]
+        self.assertEqual(sum(map(len, biggest)), 2000)
+        ada.rpc("send_signal", uuid.uuid4(), conn, "doodle", json.dumps(biggest))
         # Plain sends still work with three arguments, and only doodles may carry a drawing.
         ada.rpc("send_signal", uuid.uuid4(), conn, "psst")
         for bad in (None, "[]", json.dumps([[[1.5, 0.2]]]), json.dumps([[["a", 0.2]]]), json.dumps([[[0.1, 0.1]]] * 61),

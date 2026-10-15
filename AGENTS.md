@@ -26,7 +26,9 @@ Read `PROJECT.md` and `DESIGN.md` first. These rules come from the owner.
 4. **Don't push code you haven't checked.** If you can't build iOS locally,
    re-read the whole diff for compile errors before pushing; never use CI as
    the compiler. Don't start macOS CI runs (UI tests, screenshots) unless the
-   owner asks: they cost the owner money.
+   owner asks: they cost the owner money. Exception (owner, 15 Oct 2026): deploy
+   the backend and send TestFlight builds without asking, once CI is green on
+   what you ship.
 5. **Tests: find the cause before changing them.** Get evidence (failure
    annotation or screenshot) first; never "fix" a test by guessing.
 6. **Commits are the owner's.** Use `Utku

@@ -247,9 +247,9 @@ The other 1.0.4 changes collect nothing new:
 - Invites joined per code are already covered by the existing account and contacts-free connection data.
 - Purchase verification failure reasons are stored on the server without any account or purchase identifiers.
 
-## 1.0.5 (build 29)
+## 1.0.5 (build 32 or later)
 
-Submit build 29. The backend for everything below (streaks, weekly recap, Psst links) is already deployed to production.
+Submit the newest 1.0.5 build: 32 or later (31 and earlier have the doodle size bug fixed in 12b5a36). The backend for everything below (streaks, weekly recap, Psst links, doodles and the 40 KB doodle limit) is deployed to production.
 
 **Before submitting:**
 1. Create two fresh review codes for the Psst Team profile:
@@ -261,18 +261,21 @@ Submit build 29. The backend for everything below (streaks, weekly recap, Psst l
    where p.display_name = 'Psst Team';
    ```
 
-2. Check `min_build` is not above 29: `select min_build, latest_build, latest_version from public.app_config;`
+2. Check `min_build` is not above the build you submit: `select min_build, latest_build, latest_version from public.app_config;`
 3. In Vercel, set `PSST_SUPABASE_URL` and `PSST_SUPABASE_ANON_KEY`, so Psst links (psstapp.fun/p/CODE) and invite pages show the sender's first name instead of "Someone".
 4. The privacy policy should mention the time zone and the weekly recap before release (see App Privacy below).
 
 **What's New in This Version:**
 
 ```
+• Doodles! Hold someone's band, draw them something, and it lands on their Home Screen widget
+• A Control Center button that sends a Psst without opening the app (iOS 18)
 • Psst someone who isn't on Psst yet: send a Psst link, and it's waiting for them when they join
 • Streaks: psst each other 3 days in a row and a little flame keeps count
 • Weekly recap (optional): your week on Sundays — your total, your #1 and your longest streak
 • Super Psst is now a nudge: it shakes their screen
 • Cats! Pull home down and one waves hello. There's one napping in Settings, too
+• Group invite codes show who's joined
 • A faster leaderboard, and small fixes
 ```
 
@@ -286,6 +289,9 @@ What's new in 1.0.5:
 - Streaks: when two connected people have both pssted each other on 3 or more days in a row, a flame and the day count show in the corner of that person's band. Days follow each phone's own time zone, which the app saves on the account for this.
 - Weekly recap (off by default): Settings → Weekly recap, or a one-time offer on home after a busy week. When on, a push notification on Sundays at 6 PM opens a summary of the user's own week (their totals, their most-pssted person, their longest streak). It contains no promotional content and can be turned off in Settings.
 - Super Psst is now shown as a "nudge": its mark on the band is a cat between shake lines, and the screen shakes when one arrives (no shake with Reduce Motion).
+- Doodles (free): hold a band → "Doodle for <name>", draw with one finger, then SEND DOODLE. The other person gets a notification ("<name> drew you something") and sees the drawing full screen when they open it; it also shows on their Home Screen widget until they psst back. Doodles only go between two people who have both agreed to connect, are limited to 60 strokes, and are deleted after 30 days like every Psst. Holding the sender's band offers Report and Block, which also takes their doodle off the widget.
+- Control Center (iOS 18): Control Center → + → Add a Control → Psst → "Psst someone", then pick a person. Tapping it sends a Psst without opening the app. Also available as a Shortcuts action, "Send a Psst".
+- Group codes: the invite sheet shows how many people joined a code ("3 of 10 joined · 6 days left") and who.
 - Small illustrations: a cat appears when pulling home down, while loading, on connection errors, under the version in Settings, and when a Psst arrives.
 
 To try it with a real person (our team):
@@ -295,6 +301,7 @@ To try it with a real person (our team):
 3. Tap Connect. A band for "Psst Team" appears on home.
 4. Tap the band to send a Psst; tap the cat mark in its corner for a Super Psst. We'll psst you back within a few minutes during review hours. If both of you psst within 10 seconds, both phones show SAME MOMENT.
 5. Long-press a notification to use "Psst back" without opening the app.
+6. Hold the Psst Team band → "Doodle for Psst Team" to send us a drawing. We'll send you one back too.
 
 Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. Settings → Delete account removes all server data immediately.
 
@@ -303,4 +310,4 @@ Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "
 Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
 ```
 
-**App Privacy:** the device's time zone is now saved on the account (streak days and the recap's Sunday 6 PM). Apple has no time-zone category and it is far coarser than "Coarse Location", so the safe declaration is **Other Data → App Functionality, linked to the user, not used for tracking**. Weekly recap and Psst links collect nothing else new: the recap is computed from Pssts already stored, and a Psst link stores only the same invite row as an invite code.
+**App Privacy:** doodles are covered by the existing **User Content → Other User Content** (linked, not tracking, App Functionality); the privacy manifest now lists it too. The device's time zone is now saved on the account (streak days and the recap's Sunday 6 PM). Apple has no time-zone category and it is far coarser than "Coarse Location", so the safe declaration is **Other Data → App Functionality, linked to the user, not used for tracking**. Weekly recap and Psst links collect nothing else new: the recap is computed from Pssts already stored, and a Psst link stores only the same invite row as an invite code.

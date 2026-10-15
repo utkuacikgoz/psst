@@ -33,6 +33,15 @@ jobs:
           version: latest
       - name: Recent verify-plus failures
         run: python3 scripts/diagnose_purchases.py
-      - name: How long sends take (last 24 h)
+      - name: How long a Psst send takes (two temporary accounts)
         if: always()
-        run: python3 scripts/send_latency.py
+        run: |
+          SUPABASE_ANON_KEY=$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_REF" -o json | python3 -c "
+          import json, sys
+          keys = json.load(sys.stdin)
+          pick = next((k for k in keys if k.get('name') == 'anon'), None) \
+              or next((k for k in keys if k.get('type') == 'publishable'), None)
+          print(pick['api_key'] if pick else '')
+          ")
+          echo "::add-mask::$SUPABASE_ANON_KEY"
+          SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" python3 scripts/send_timing.py

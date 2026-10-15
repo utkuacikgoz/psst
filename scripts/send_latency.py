@@ -5,6 +5,7 @@ import datetime
 import json
 import os
 import statistics
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -24,7 +25,10 @@ limit 1000
 query = urllib.parse.urlencode({"sql": sql, "iso_timestamp_start": start.isoformat(), "iso_timestamp_end": end.isoformat()})
 request = urllib.request.Request(f"https://api.supabase.com/v1/projects/{ref}/analytics/endpoints/logs.all?{query}",
                                  headers={"Authorization": f"Bearer {token}"})
-body = json.load(urllib.request.urlopen(request, timeout=60))
+try:
+    body = json.load(urllib.request.urlopen(request, timeout=60))
+except urllib.error.HTTPError as error:
+    raise SystemExit(f"Logs API refused ({error.code}): {error.read()[:500].decode(errors='replace')}")
 if body.get("error"):
     raise SystemExit(f"Logs query failed: {body['error']}")
 rows = body.get("result") or []

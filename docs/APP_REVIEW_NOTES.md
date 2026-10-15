@@ -271,6 +271,7 @@ Submit the newest 1.0.6 build: 34 or later. 1.0.5 build 29 (commit 486c752) is t
 • Doodles! Hold someone's band, draw them something, and it lands on their Home Screen widget
 • A Control Center button that sends a Psst without opening the app (iOS 18)
 • Group invite codes show who's joined
+• Super Psst opens a small card instead of a whole page
 • Settings, tidied: everything one tap away
 • The weekly recap is now on for everyone (turn it off in Settings)
 • A smaller download, faster sending, and fixes
@@ -285,6 +286,7 @@ What's new in 1.0.6:
 - Doodles (free): hold a band → "Doodle for <name>", draw with one finger, then SEND DOODLE. The other person gets a notification ("<name> drew you something") and sees the drawing full screen when they open it; it also shows on their Home Screen widget until they psst back. Doodles only go between two people who have both agreed to connect, are limited to 60 strokes, and are deleted after 30 days like every Psst. On the doodle itself, ••• (top left) offers Hide doodle, Block and Report; holding the sender's band offers Report and Block too.
 - Control Center (iOS 18): Control Center → + → Add a Control → Psst → "Psst someone", then pick a person. Tapping it sends a Psst without opening the app. Also available as a Shortcuts action, "Send a Psst".
 - Group codes: the invite sheet shows how many people joined a code ("3 of 10 joined · 6 days left") and who.
+- Super Psst (tap the nudge mark in a band's corner, or hold → Super Psst) now opens a short card over home instead of a full page; it has the same states as before, including the Psst+ offer and Restore purchase once today's free one is used.
 - Settings is now a short front page; People, Notifications, Psst+ and Privacy and help each open their own page. Psst+ (with Restore purchase) is reachable from Settings too.
 - Weekly recap is on by default (it was opt-in in 1.0.5): a push notification on Sundays at 6 PM opens a summary of the user's own week. It is only about the user's own Pssts, contains no promotional content, is skipped in weeks with no Pssts, and can be turned off in Settings → Weekly recap.
 
@@ -299,7 +301,7 @@ To try it with a real person (our team):
 
 Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. Settings → Delete account removes all server data immediately.
 
-Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "Psst+" next to Settings → Unlock, or from the Super Psst sheet once today's free one is used. It adds unlimited Super Psst, per-person band colours, alternate app icons, whisper sounds and Home Screen / Lock Screen widgets. "Restore purchase" is on both sheets. Pssting, replies and invites are free.
+Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "Psst+" next to Settings (or Settings → Psst+) → Unlock, or from the Super Psst card once today's free one is used. It adds unlimited Super Psst, per-person band colours, alternate app icons, whisper sounds and Home Screen / Lock Screen widgets. "Restore purchase" is on both sheets. Pssting, replies and invites are free.
 
 Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
 ```

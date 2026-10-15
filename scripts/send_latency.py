@@ -22,7 +22,7 @@ cross join unnest(m.request) as request
 order by timestamp desc
 limit 1000
 """
-query = urllib.parse.urlencode({"sql": sql, "iso_timestamp_start": start.isoformat(), "iso_timestamp_end": end.isoformat()})
+query = urllib.parse.urlencode({"sql": sql, "iso_timestamp_start": start.strftime("%Y-%m-%dT%H:%M:%SZ"), "iso_timestamp_end": end.strftime("%Y-%m-%dT%H:%M:%SZ")})
 request = urllib.request.Request(f"https://api.supabase.com/v1/projects/{ref}/analytics/endpoints/logs?{query}",
                                  headers={"Authorization": f"Bearer {token}"})
 try:

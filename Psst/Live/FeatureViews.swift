@@ -554,6 +554,10 @@ struct SuperPsstSheet: View {
     @State private var sending = false
     /// Set once the server accepts: plays the Ps-st pulse, then the sheet closes.
     @State private var sentID: UUID?
+    /// The card is as tall as what it shows (1B): measured, not a full page.
+    @State private var contentHeight: CGFloat = 300
+    @State private var footerHeight: CGFloat = 80
+    @State private var bottomInset: CGFloat = 0
     @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 40
     @ScaledMetric(relativeTo: .largeTitle) private var compactTitleSize: CGFloat = 34
     @ScaledMetric(relativeTo: .largeTitle) private var plusTitleSize: CGFloat = 28
@@ -581,37 +585,40 @@ struct SuperPsstSheet: View {
         return allowance.remaining > 0 || date >= allowance.resetsAt ? .available : .used(resetsAt: allowance.resetsAt)
     }
 
-    /// Their band, full screen: the cat, SUPER PSST for NAME, one status line and
-    /// one white band. Each state changes only the status line and what the band does;
-    /// when today's free one is used, a calm Psst+ block appears in the middle.
+    /// A short card in their colour over home (owner pick 1B, 16 Oct 2026; was a full
+    /// page): the cat, SUPER PSST for NAME, one status line and one white band. Each
+    /// state changes only the status line and what the band does; when today's free
+    /// one is used, a calm Psst+ block appears and the card grows to fit it.
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let mode = mode(at: context.date)
             VStack(spacing: 0) {
-                HStack {
-                    Spacer()
-                    Button("Close") { dismiss() }
-                        .font(.psst(.body, weight: .semibold))
-                        .frame(minWidth: Tokens.minTouch, minHeight: Tokens.minTouch)
-                        .padding(.horizontal, Tokens.Space.l)
-                        .opacity(mode == .sending || mode == .sent ? 0.5 : 1)
-                }
                 ScrollView {
                     content(mode, now: context.date)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, Tokens.sheetInset)
-                        .padding(.vertical, Tokens.Space.l)
+                        .padding(.top, Tokens.Space.xl)
+                        .padding(.bottom, Tokens.Space.l)
                         .frame(maxWidth: .infinity)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
                 }
                 .scrollBounceBehavior(.basedOnSize)
                 footer(mode, now: context.date)
+                    .padding(.horizontal, Tokens.Space.l)
+                    .padding(.bottom, Tokens.Space.m)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
             }
+            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
             .foregroundStyle(Color.onCanvas)
             .background { PsstRipple(trigger: sentID) }
             .clipped()
         }
         .background(Color(hex: bandHex).ignoresSafeArea())
         .presentationBackground(Color(hex: bandHex))
+        // Taller than the screen allows (huge text): iOS caps it and the middle scrolls.
+        .presentationDetents([.height(contentHeight + footerHeight + bottomInset)])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
         .task(id: scenePhase) { if scenePhase == .active { await load() } }
         .onChange(of: store.status(for: connection)) { _, status in statusChanged(status) }
         .onChange(of: purchases.isUnlocked) { _, unlocked in if unlocked { Task { await load() } } }
@@ -883,8 +890,8 @@ struct SuperPsstSheet: View {
                 .foregroundStyle(Color(hex: bandHex))
                 .modifier(SendingShimmer(active: sweeping))
                 .padding(.horizontal, Tokens.Space.l)
-                .frame(maxWidth: .infinity, minHeight: 64)
-                .background(Color.surface.opacity(enabled || sweeping ? 1 : 0.4))
+                .frame(maxWidth: .infinity, minHeight: 58)
+                .background(Color.surface.opacity(enabled || sweeping ? 1 : 0.4), in: RoundedRectangle(cornerRadius: 16))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

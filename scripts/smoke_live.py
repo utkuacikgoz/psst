@@ -89,8 +89,10 @@ try:
     event = str(uuid.uuid4())
     status, body = ada.send(event, connection, "psst")
     check("Ada's signal is accepted by the server", status == 200 and body.get("duplicate") is False, body)
-    check("No device registered is reported, not delivery",
-          isinstance(body, dict) and body.get("push_status") == "no_devices", body)
+    # The push hand-off runs after the answer, so the status is still "pending" here
+    # (or "no_devices" if it already finished); never a claim of delivery.
+    check("Push status is a hand-off state, not delivery",
+          isinstance(body, dict) and body.get("push_status") in ("pending", "no_devices"), body)
 
     status, body = ada.send(event, connection, "psst")
     check("Retrying the same event ID is a duplicate, not a new signal",

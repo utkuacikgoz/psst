@@ -15,12 +15,19 @@ export interface SendSignalDeps {
     args: { p_event_id: string; p_connection_id: string; p_effect_id: string },
   ): Promise<{ data: SendSignalResult | null; error: { message: string } | null; status: number }>;
   deliver(eventId: string): Promise<PushStatus>;
+  /**
+   * Keeps work running after the response is sent (EdgeRuntime.waitUntil). With it,
+   * the sender gets their answer as soon as the signal is stored and the push hand-off
+   * to Apple happens afterwards, so "sending" doesn't wait on APNs.
+   */
+  background?(work: Promise<unknown>): void;
 }
 
 /**
  * POST { event_id, connection_id, effect_id } with the user's bearer token.
  * 200 means the server accepted and stored the signal. push_status reports the
- * APNs hand-off only and must never be shown as delivery.
+ * APNs hand-off only and must never be shown as delivery; when the hand-off runs
+ * in the background it is the stored status at answer time (usually "pending").
  */
 export async function handleSendSignal(req: Request, deps: SendSignalDeps): Promise<Response> {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -48,6 +55,12 @@ export async function handleSendSignal(req: Request, deps: SendSignalDeps): Prom
   });
   if (error || !data) {
     return json({ error: error?.message ?? "send_failed" }, status >= 400 ? status : 500);
+  }
+
+  if (deps.background) {
+    // The signal is stored and visible in the recipient's in-app inbox either way.
+    deps.background(deps.deliver(data.id).catch(() => "failed"));
+    return json(data, 200);
   }
 
   let pushStatus: PushStatus = data.push_status;

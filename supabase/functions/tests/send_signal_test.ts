@@ -80,3 +80,34 @@ Deno.test("a push failure still returns the stored signal", async () => {
   assertEquals(res.status, 200);
   assertEquals((await res.json()).push_status, "failed");
 });
+
+Deno.test("with background work, answers once stored and hands the push off afterwards", async () => {
+  let release!: (status: "accepted") => void;
+  const pushed = new Promise<"accepted">((resolve) => (release = resolve));
+  const queued: Promise<unknown>[] = [];
+  const { d } = deps({ deliver: () => pushed, background: (work) => queued.push(work) });
+  const res = await handleSendSignal(request(BODY), d);
+  assertEquals(res.status, 200);
+  assertEquals((await res.json()).push_status, "pending");
+  assertEquals(queued.length, 1);
+  release("accepted");
+  assertEquals(await queued[0], "accepted");
+});
+
+Deno.test("a background push failure is contained", async () => {
+  const queued: Promise<unknown>[] = [];
+  const { d } = deps({ deliver: () => Promise.reject(new Error("apns down")), background: (work) => queued.push(work) });
+  const res = await handleSendSignal(request(BODY), d);
+  assertEquals(res.status, 200);
+  assertEquals(await queued[0], "failed");
+});
+
+Deno.test("a database refusal queues no background push", async () => {
+  const queued: Promise<unknown>[] = [];
+  const { d } = deps({
+    sendSignal: () => Promise.resolve({ data: null, error: { message: "not_connected" }, status: 403 }),
+    background: (work) => queued.push(work),
+  });
+  assertEquals((await handleSendSignal(request(BODY), d)).status, 403);
+  assertEquals(queued.length, 0);
+});

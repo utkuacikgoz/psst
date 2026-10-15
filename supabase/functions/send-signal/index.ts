@@ -7,6 +7,9 @@ const url = Deno.env.get("SUPABASE_URL")!;
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Supabase's edge runtime: keeps a promise running after the response is sent.
+declare const EdgeRuntime: { waitUntil(work: Promise<unknown>): void } | undefined;
+
 const service = createClient(url, serviceKey, { auth: { persistSession: false } });
 
 const apns = new ApnsClient({
@@ -26,6 +29,7 @@ Deno.serve((req) =>
       const { data, error, status } = await caller.rpc("send_signal", args);
       return { data, error, status };
     },
+    background: typeof EdgeRuntime !== "undefined" ? (work) => EdgeRuntime!.waitUntil(work) : undefined,
     deliver: (eventId) =>
       deliver(eventId, {
         async pushTargets(id) {

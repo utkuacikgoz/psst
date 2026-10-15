@@ -307,7 +307,10 @@ struct LiveHomeView: View {
                             onDone: { withAnimation { store.nextArrival() } },
                             color: arrival.connectionID.map {
                                 Color(hex: bandColors[$0] ?? personalization.colorHex(for: $0, name: arrival.senderName))
-                            })
+                            },
+                            onHideDoodle: { withAnimation { store.hideDoodle(arrival) } },
+                            onBlock: sender(of: arrival).map { person -> () -> Void in { confirm(.block, person) } },
+                            onReport: sender(of: arrival).map { person -> () -> Void in { confirm(.report, person) } })
             }
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: store.arrival)
@@ -394,6 +397,17 @@ struct LiveHomeView: View {
                           onDoodle: { doodlePerson = $0 })
         .sheet(isPresented: $showingPlus) { PsstPlusSheet() }
         .sheet(item: $colouring) { ColourSheet(connection: $0) }
+    }
+
+    private func sender(of arrival: Arrival) -> ConnectionSummary? {
+        store.connections.first { $0.id == arrival.connectionID }
+    }
+
+    /// Block or Report from a doodle's ••• menu (1B): the moment closes and the
+    /// same confirm as holding the band asks first.
+    private func confirm(_ kind: ConnectionAction.Kind, _ person: ConnectionSummary) {
+        withAnimation { store.nextArrival() }
+        confirming = ConnectionAction(kind: kind, connection: person)
     }
 
     private func closePresentations() {

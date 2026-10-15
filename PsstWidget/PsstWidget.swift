@@ -146,7 +146,9 @@ struct Provider: TimelineProvider {
             .flatMap { try? JSONDecoder().decode([WidgetPerson].self, from: $0) } ?? people
         // What the app saved, unless the widget just asked the server itself.
         let stored = defaults?.data(forKey: "psst.widget.doodle").flatMap { try? JSONDecoder().decode(StoredDoodle.self, from: $0) }
+        let hidden = defaults?.string(forKey: "psst.widget.doodle.hidden").flatMap(UUID.init(uuidString:))
         let source: (UUID, String, [[[Double]]])? = switch fetched {
+        case .some(.some(let doodle)) where doodle.eventId != nil && doodle.eventId == hidden: nil
         case .some(.some(let doodle)): (doodle.connectionId, doodle.senderName, doodle.doodle)
         case .some(.none): nil
         case .none: stored.map { ($0.connectionId, $0.senderName, $0.doodle) }

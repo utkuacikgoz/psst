@@ -65,6 +65,7 @@ struct DoodleSheet: View {
 
     @Environment(LiveStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var strokes: DoodleStrokes = []
     @State private var current: [[Double]] = []
     @State private var refused = 0
@@ -126,6 +127,19 @@ struct DoodleSheet: View {
             .buttonStyle(.plain)
             .disabled(strokes.isEmpty)
             .opacity(strokes.isEmpty ? 0.5 : 1)
+            // 2B (owner pick, 16 Oct 2026): nothing sent yet, so SEND gives a little
+            // shake and an error buzz, and the drawing stays. No shake with Reduce Motion.
+            .keyframeAnimator(initialValue: 0.0, trigger: refused) { content, x in
+                content.offset(x: reduceMotion ? 0 : CGFloat(x))
+            } keyframes: { _ in
+                KeyframeTrack {
+                    LinearKeyframe(-9, duration: 0.05)
+                    LinearKeyframe(8, duration: 0.07)
+                    LinearKeyframe(-6, duration: 0.07)
+                    LinearKeyframe(4, duration: 0.06)
+                    LinearKeyframe(0, duration: 0.05)
+                }
+            }
             .sensoryFeedback(.error, trigger: refused)
             .sensoryFeedback(.warning, trigger: atLimit) { _, new in new }
         }

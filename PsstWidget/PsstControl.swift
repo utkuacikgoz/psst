@@ -129,12 +129,13 @@ enum PsstSender {
     /// The newest unanswered doodle from the server (latest_doodle), so the widget can
     /// show one while the app is closed. nil = none; throws when it can't ask.
     struct FetchedDoodle: Decodable {
+        let eventId: UUID?
         let connectionId: UUID
         let senderName: String
         let doodle: [[[Double]]]
 
         enum CodingKeys: String, CodingKey {
-            case connectionId = "connection_id", senderName = "sender_name", doodle
+            case eventId = "event_id", connectionId = "connection_id", senderName = "sender_name", doodle
         }
     }
 

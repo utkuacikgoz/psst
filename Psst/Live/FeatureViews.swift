@@ -96,6 +96,8 @@ struct MoodCat: View {
     var eyes: Color = .psstCanvas
     /// Moves the eyes sideways, -1…1 (the peeking cat looks around).
     var look: CGFloat = 0
+    /// A thin edge so the white cat shows on a light page (3B, owner pick 16 Oct 2026).
+    var outline: Color? = nil
 
     var body: some View {
         GeometryReader { geometry in
@@ -104,6 +106,7 @@ struct MoodCat: View {
             let line = StrokeStyle(lineWidth: max(1.5, w * 0.05), lineCap: .round, lineJoin: .round)
             ZStack {
                 head(pt).fill(.white)
+                if let outline { head(pt).stroke(outline, style: StrokeStyle(lineWidth: max(1, w * 0.035), lineJoin: .round)) }
                 face(pt).stroke(eyes, style: line)
                 if mood == .awake {
                     Circle().fill(eyes).frame(width: w * 0.1, height: w * 0.1).position(pt(68, 51))
@@ -229,8 +232,21 @@ private extension Array {
 /// 3A: the sad cat (ears down, one tear) shown where Psst can't connect.
 struct SadCat: View {
     var eyes: Color = .psstCanvas
+    var outline: Color? = nil
     var body: some View {
-        MoodCat(mood: .sad, eyes: eyes).frame(width: 72, height: 65)
+        MoodCat(mood: .sad, eyes: eyes, outline: outline).frame(width: 72, height: 65)
+    }
+}
+
+/// The white cat on a light page (Settings, the leaderboard): grey face and a thin
+/// grey edge, so it doesn't vanish into the background (3B). Dark pages unchanged.
+struct LightPageCatColors {
+    let eyes: Color
+    let outline: Color?
+
+    init(_ scheme: ColorScheme) {
+        eyes = scheme == .light ? Color(.systemGray) : Color(.systemGroupedBackground)
+        outline = scheme == .light ? Color(.systemGray3) : nil
     }
 }
 
@@ -363,6 +379,7 @@ struct FeatureIntroSheet: View {
 /// in their own colours, everyone else in a list. All time or this month; sent,
 /// received or both. Only you see it.
 struct ActivityView: View {
+    @Environment(\.colorScheme) private var colorScheme
     enum Direction: String, CaseIterable, Identifiable {
         case sent = "Sent to", received = "Received from", both = "Both"
         var id: String { rawValue }
@@ -433,7 +450,7 @@ struct ActivityView: View {
                     ProgressView("Loading activity").frame(maxWidth: .infinity).padding(Tokens.Space.xl)
                 } else if store.activity.isEmpty && failed {
                     VStack(spacing: Tokens.Space.s) {
-                        SadCat(eyes: Color(.systemGroupedBackground))
+                        SadCat(eyes: LightPageCatColors(colorScheme).eyes, outline: LightPageCatColors(colorScheme).outline)
                         Button("Couldn't load activity. Try again") { Task { await load() } }
                             .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
                     }
@@ -994,8 +1011,9 @@ struct WeeklyRecapView: View {
                     .padding(Tokens.Space.xl)
             } else {
                 band(color: .addBand) {
-                    Text("\(recap.total) PSSTS")
-                        .bandTitle("\(recap.total) Pssts", size: bigSize, tracking: Tokens.Band.titleTracking)
+                    // 4A (owner pick, 16 Oct 2026): one Psst is "1 PSST".
+                    Text(recap.total == 1 ? LocalizedStringKey("1 PSST") : "\(recap.total) PSSTS")
+                        .bandTitle(recap.total == 1 ? "1 Psst" : "\(recap.total) Pssts", size: bigSize, tracking: Tokens.Band.titleTracking)
                     Text("\(recap.sent) sent · \(recap.received) received")
                         .font(.psst(.subheadline, weight: .semibold))
                 }
@@ -1006,7 +1024,7 @@ struct WeeklyRecapView: View {
                             .tracking(Tokens.Band.labelTracking)
                         Text(top.name.uppercased())
                             .bandTitle(top.name, size: bigSize, tracking: Tokens.Band.titleTracking)
-                        Text("\(top.count) Pssts this week")
+                        Text(top.count == 1 ? LocalizedStringKey("1 Psst this week") : "\(top.count) Pssts this week")
                             .font(.psst(.subheadline, weight: .semibold))
                     }
                 }

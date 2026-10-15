@@ -28,6 +28,14 @@ struct ArrivalView: View {
     let onDone: () -> Void
     /// The sender's band colour, if you chose one with Psst+.
     var color: Color? = nil
+    /// A doodle's ••• menu (owner pick 1B, 16 Oct 2026): take it off your widget
+    /// without pssting back, or block or report the sender, where you see it.
+    var onHideDoodle: (() -> Void)? = nil
+    var onBlock: (() -> Void)? = nil
+    var onReport: (() -> Void)? = nil
+
+    @State private var showingOptions = false
+    private var hasOptions: Bool { arrival.kind == .doodle && onBlock != nil && onReport != nil }
 
     static let displayTime: Duration = .milliseconds(1800)
     /// Rare, so it lingers a little longer.
@@ -105,6 +113,14 @@ struct ArrivalView: View {
         .accessibilityHint(hint)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: "Close", onDone)
+        .accessibilityActions {
+            if hasOptions {
+                if let onHideDoodle { Button("Hide doodle", action: onHideDoodle) }
+                if let onBlock { Button("Block \(name)", action: onBlock) }
+                if let onReport { Button("Report \(name)", action: onReport) }
+            }
+        }
+        .overlay(alignment: .topLeading) { if hasOptions { doodleOptions } }
         // Closing without sending anything back, outside the tap-to-reply area.
         .overlay(alignment: .topTrailing) {
             Button("Close", systemImage: "xmark", action: onDone)
@@ -127,11 +143,80 @@ struct ArrivalView: View {
             if hapticsEnabled, arrival.kind == .signal || arrival.kind == .superPsst || arrival.kind == .doodle {
                 PsstHaptics.play(arrival.kind == .superPsst && superEffectsEnabled ? .superPsst : .psst)
             }
-            guard !staysOpen else { return }
-            try? await Task.sleep(for: holdTime)
+        }
+        // Closes on its own, but never while the doodle's ••• menu is open; the
+        // wait starts again when it closes.
+        .task(id: AutoClose(arrival: arrival.id, paused: showingOptions)) {
+            guard !staysOpen, !showingOptions else { return }
+            try? await Task.sleep(for: holdTime + .milliseconds(reduceMotion ? 0 : 150))
             guard !Task.isCancelled else { return }
             onDone()
         }
+    }
+
+    private struct AutoClose: Hashable {
+        let arrival: UUID
+        let paused: Bool
+    }
+
+    /// ••• top left (1B): Hide doodle, Block, Report, in a small dark menu. A tap
+    /// anywhere else closes the menu instead of pssting back.
+    private var doodleOptions: some View {
+        ZStack(alignment: .topLeading) {
+            if showingOptions {
+                Color.black.opacity(0.001)
+                    .ignoresSafeArea()
+                    .onTapGesture { showingOptions = false }
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: Tokens.Space.xs) {
+                Button {
+                    showingOptions.toggle()
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.body.weight(.black))
+                        .foregroundStyle(Color.onCanvas)
+                        .frame(minWidth: Tokens.minTouch, minHeight: Tokens.minTouch)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("More")
+                if showingOptions {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if let onHideDoodle {
+                            optionRow("Hide doodle", destructive: false, action: onHideDoodle)
+                            optionDivider
+                        }
+                        if let onBlock { optionRow("Block \(name)", destructive: true, action: onBlock) }
+                        optionDivider
+                        if let onReport { optionRow("Report \(name)", destructive: true, action: onReport) }
+                    }
+                    .frame(width: 220, alignment: .leading)
+                    .background(Color(white: 0.16).opacity(0.97), in: RoundedRectangle(cornerRadius: 14))
+                    .transition(.opacity)
+                }
+            }
+            .padding(Tokens.Space.s)
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: showingOptions)
+    }
+
+    private var optionDivider: some View {
+        Rectangle().fill(Color(white: 0.28)).frame(height: 0.5)
+    }
+
+    private func optionRow(_ title: String, destructive: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            showingOptions = false
+            action()
+        } label: {
+            Text(title)
+                .font(.psst(.body, weight: .medium))
+                .foregroundStyle(destructive ? Color(red: 1, green: 0.41, blue: 0.38) : .white)
+                .frame(maxWidth: .infinity, minHeight: Tokens.minTouch, alignment: .leading)
+                .padding(.horizontal, Tokens.Space.m)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var isPsst: Bool { arrival.kind == .signal || arrival.kind == .superPsst || arrival.kind == .doodle }

@@ -294,9 +294,11 @@ extension SettingsSheet {
 /// and it opens one eye for a moment.
 private struct VersionCat: View {
     @State private var awake = false
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        MoodCat(mood: awake ? .awake : .sleepy, eyes: Color(.systemGroupedBackground))
+        MoodCat(mood: awake ? .awake : .sleepy, eyes: LightPageCatColors(colorScheme).eyes,
+                outline: LightPageCatColors(colorScheme).outline)
             .frame(width: 30, height: 27)
             .contentShape(Rectangle())
             .onTapGesture {

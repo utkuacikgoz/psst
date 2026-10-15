@@ -44,9 +44,20 @@ enum WidgetBridge {
     /// Psst+), or nil to take it off. The widget finds the sender's colour by id.
     static let doodleKey = "psst.widget.doodle"
 
+    /// The doodle you hid from its ••• menu (1B): it stays off the widget even
+    /// though it's still unanswered, until a newer one comes.
+    static let hiddenDoodleKey = "psst.widget.doodle.hidden"
+
+    static func hideDoodle(eventID: UUID, in store: UserDefaults? = nil) {
+        guard let defaults = store ?? Self.defaults else { return }
+        defaults.set(eventID.uuidString, forKey: hiddenDoodleKey)
+        publishDoodle(nil, to: defaults)
+    }
+
     static func publishDoodle(_ doodle: LatestDoodle?, to store: UserDefaults? = nil) {
         guard let defaults = store ?? Self.defaults else { return }
-        let data = doodle.flatMap { try? JSONEncoder().encode($0) }
+        let shown = doodle?.eventId.uuidString == defaults.string(forKey: hiddenDoodleKey) ? nil : doodle
+        let data = shown.flatMap { try? JSONEncoder().encode($0) }
         guard data != defaults.data(forKey: doodleKey) else { return }
         defaults.set(data, forKey: doodleKey)
         WidgetCenter.shared.reloadAllTimelines()

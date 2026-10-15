@@ -965,4 +965,21 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(stored, shown)
         XCTAssertTrue(defaults.bool(forKey: WidgetBridge.unlockedKey))
     }
+
+    func testHiddenDoodleStaysOffTheWidgetUntilANewerOne() throws {
+        let suite = "WidgetTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let mia = UUID()
+        let first = LatestDoodle(eventId: UUID(), connectionId: mia, senderName: "Mia", createdAt: Date(), doodle: [[[0.1, 0.1]]])
+        WidgetBridge.publishDoodle(first, to: defaults)
+        XCTAssertTrue(WidgetBridge.showsDoodle(from: mia, in: defaults))
+        WidgetBridge.hideDoodle(eventID: first.eventId, in: defaults)
+        XCTAssertFalse(WidgetBridge.showsDoodle(from: mia, in: defaults))
+        WidgetBridge.publishDoodle(first, to: defaults) // the app's next load still finds it unanswered
+        XCTAssertFalse(WidgetBridge.showsDoodle(from: mia, in: defaults))
+        let newer = LatestDoodle(eventId: UUID(), connectionId: mia, senderName: "Mia", createdAt: Date(), doodle: [[[0.2, 0.2]]])
+        WidgetBridge.publishDoodle(newer, to: defaults)
+        XCTAssertTrue(WidgetBridge.showsDoodle(from: mia, in: defaults))
+    }
 }

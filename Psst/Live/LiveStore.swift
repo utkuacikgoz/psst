@@ -320,6 +320,12 @@ final class LiveStore {
 
     /// Puts the newest unanswered doodle on the widget (free, Psst+ or not), and
     /// takes it off once you've pssted that person back.
+    /// "Hide doodle" (1B): off your widget without pssting back.
+    func hideDoodle(_ arrival: Arrival) {
+        WidgetBridge.hideDoodle(eventID: arrival.id)
+        nextArrival()
+    }
+
     func publishDoodle() async {
         do { WidgetBridge.publishDoodle(try await api.latestDoodle()) } catch {}
     }

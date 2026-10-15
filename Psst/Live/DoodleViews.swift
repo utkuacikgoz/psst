@@ -132,8 +132,8 @@ struct DoodleSheet: View {
     /// Keeps points at least ~1% apart, within the limits, rounded to 3 decimals.
     private func add(_ location: CGPoint, side: CGFloat) {
         guard side > 0, pointCount < Doodle.maxPoints, strokes.count < Doodle.maxStrokes else { return }
-        let x = min(max(location.x / side, 0), 1), y = min(max(location.y / side, 0), 1)
-        let point = [(x * 1000).rounded() / 1000, (y * 1000).rounded() / 1000]
+        let x = Double(min(max(location.x / side, 0), 1)), y = Double(min(max(location.y / side, 0), 1))
+        let point: [Double] = [(x * 1000).rounded() / 1000, (y * 1000).rounded() / 1000]
         if let last = current.last, abs(last[0] - point[0]) + abs(last[1] - point[1]) < 0.01 { return }
         current.append(point)
     }

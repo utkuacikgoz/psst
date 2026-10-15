@@ -608,9 +608,9 @@ class BackendTests(unittest.TestCase):
         admin("update private.recap_state set last_top = %s where user_id = %s", with_emre, ada.user_id)
         self.assertTrue(admin("select private.recap_for(%s, %s)", ada.user_id, sunday)[0][0]["top"]["still"])
 
-        self.assertEqual(ada.rpc("weekly_recap_status")["enabled"], False, "off until turned on")
-        ada.rpc("set_weekly_recap", True)
-        self.assertEqual(ada.rpc("weekly_recap_status")["enabled"], True)
+        self.assertEqual(ada.rpc("weekly_recap_status")["enabled"], True, "on from the start")
+        ada.rpc("set_weekly_recap", False)
+        self.assertEqual(ada.rpc("weekly_recap_status")["enabled"], False)
 
         service = Api("service_role")
         self.assertFalse(service.rpc("recap_cron_ok", "guess"), "no vault here: never true")

@@ -280,20 +280,14 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(ActivityView.ranks(for: []), [])
     }
 
-    func testWeeklyRecapIsOfferedOnceAfterABusyWeek() async {
+    func testWeeklyRecapFollowsTheServerAndTurnsOff() async {
         api.connections = [connection(name: "Kim")]
-        api.recapStatus = WeeklyRecapStatus(enabled: false, weekTotal: 12)
+        api.recapStatus = WeeklyRecapStatus(enabled: true, weekTotal: 12)
         await store.refresh()
-        XCTAssertTrue(store.recapOffer)
-        await store.setWeeklyRecap(true)
-        XCTAssertEqual(api.recapSettings, [true])
-        XCTAssertEqual(store.recapEnabled, true)
-        XCTAssertFalse(store.recapOffer, "turning it on ends the offer")
-
-        let quiet = LiveStore(api: api, defaults: defaults)
-        api.recapStatus = WeeklyRecapStatus(enabled: false, weekTotal: 12)
-        await quiet.refresh()
-        XCTAssertFalse(quiet.recapOffer, "never asked again")
+        XCTAssertEqual(store.recapEnabled, true, "on from the start (owner pick 2A)")
+        await store.setWeeklyRecap(false)
+        XCTAssertEqual(api.recapSettings, [false])
+        XCTAssertEqual(store.recapEnabled, false)
     }
 
     func testRecapWeekLabel() {

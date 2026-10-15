@@ -350,25 +350,18 @@ final class LiveStore {
         }
     }
 
-    // MARK: Weekly recap (4A)
+    // MARK: Weekly recap (4A; on from the start since owner pick 2A, 16 Oct 2026)
 
-    /// On or off on the server; nil until known.
+    /// On or off on the server; nil until known. On unless you turned it off.
     private(set) var recapEnabled: Bool?
-    /// The one-time "Get a recap of your week on Sundays?" strip, after a busy week.
-    private(set) var recapOffer = false
     /// The recap sheet, opened from the Sunday push.
     var showingRecap = false
-    static let recapOfferDismissedKey = "psst.recapOfferDismissed"
-    /// Pssts in a week before the recap is offered.
-    static let recapOfferMinimum = 10
     @ObservationIgnored private var loadedRecapStatus = false
 
     private func loadRecapStatus() async {
         guard !loadedRecapStatus, let status = try? await api.weeklyRecapStatus() else { return }
         loadedRecapStatus = true
         recapEnabled = status.enabled
-        recapOffer = !status.enabled && status.weekTotal >= Self.recapOfferMinimum
-            && !defaults.bool(forKey: Self.recapOfferDismissedKey)
     }
 
     /// Turns the recap on or off. Returns false if the server didn't take it.
@@ -377,17 +370,10 @@ final class LiveStore {
         do {
             try await api.setWeeklyRecap(enabled)
             recapEnabled = enabled
-            if enabled { dismissRecapOffer() }
             return true
         } catch {
             return false
         }
-    }
-
-    /// ✕ on the strip, or turned on: never asked again.
-    func dismissRecapOffer() {
-        defaults.set(true, forKey: Self.recapOfferDismissedKey)
-        recapOffer = false
     }
 
     /// A day is the person's own day, so the server keeps the phone's time zone. Once per
@@ -920,10 +906,8 @@ final class LiveStore {
         streakMoments = [:]
         reportedTimeZone = nil
         recapEnabled = nil
-        recapOffer = false
         showingRecap = false
         loadedRecapStatus = false
-        defaults.removeObject(forKey: Self.recapOfferDismissedKey)
         myName = nil
         pinnedOrder = []
         recencyOrder = []

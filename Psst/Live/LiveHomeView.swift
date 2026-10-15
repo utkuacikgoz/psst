@@ -614,11 +614,6 @@ struct LiveHomeView: View {
             }
         }
         // Soft update (owner pick, 13 Oct 2026): once per new version.
-        if store.recapOffer {
-            NoticeView(symbol: "calendar", text: "Get a recap of your week on Sundays?", actionTitle: "Turn on",
-                       action: { Task { await store.setWeeklyRecap(true) } },
-                       onDismiss: { withAnimation { store.dismissRecapOffer() } })
-        }
         if store.updateAvailable != nil {
             NoticeView(symbol: "sparkles", text: "A new Psst is ready", actionTitle: "Update",
                        action: { openURL(LiveStore.appStoreURL) },

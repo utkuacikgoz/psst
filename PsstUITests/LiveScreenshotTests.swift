@@ -107,7 +107,10 @@ final class LiveScreenshotTests: XCTestCase {
         wait(0.6)
         shot("live-13-settings")
 
-        // At the largest text sizes the people are below the fold.
+        // People are one tap in (1B); at the largest text sizes they're below the fold.
+        let peopleRow = app.buttons["People"]
+        for _ in 0..<4 where !peopleRow.isHittable { app.swipeUp() }
+        peopleRow.tap()
         let manageMia = app.buttons["Manage Ada"]
         for _ in 0..<4 where !manageMia.isHittable { app.swipeUp() }
         manageMia.tap()

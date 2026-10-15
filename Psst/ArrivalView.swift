@@ -124,7 +124,7 @@ struct ArrivalView: View {
             AccessibilityNotification.Announcement(announcement).post()
             try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 150))
             trigger = arrival.id
-            if hapticsEnabled, arrival.kind == .signal || arrival.kind == .superPsst {
+            if hapticsEnabled, arrival.kind == .signal || arrival.kind == .superPsst || arrival.kind == .doodle {
                 PsstHaptics.play(arrival.kind == .superPsst && superEffectsEnabled ? .superPsst : .psst)
             }
             guard !staysOpen else { return }

@@ -138,10 +138,15 @@ enum PsstSender {
         }
     }
 
+    /// Never refreshes the session: a widget can be stopped at any moment, and a
+    /// refresh cut off between the server's reply and saving it would leave the app
+    /// holding a used token, signed out for good. With an expired token it just
+    /// keeps what the app saved; the app refreshes the next time it's opened.
     static func latestDoodle() async throws -> FetchedDoodle? {
-        guard let baseURL, var session = load() else { throw PsstSendError.signedOut }
-        if session.expiresAt.timeIntervalSinceNow < 60 { session = try await refresh(session, baseURL: baseURL) }
+        guard let baseURL, let session = load() else { throw PsstSendError.signedOut }
+        guard session.expiresAt.timeIntervalSinceNow > 60 else { throw PsstSendError.failed }
         var request = URLRequest(url: baseURL.appendingPathComponent("rest/v1/rpc/latest_doodle"))
+        request.timeoutInterval = 10
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -165,6 +170,7 @@ enum PsstSender {
 
     private static func post(_ session: Session, baseURL: URL, connection: UUID) async throws -> Int {
         var request = URLRequest(url: baseURL.appendingPathComponent("functions/v1/send-signal"))
+        request.timeoutInterval = 15
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -185,6 +191,7 @@ enum PsstSender {
         components?.queryItems = [URLQueryItem(name: "grant_type", value: "refresh_token")]
         guard let url = components?.url else { throw PsstSendError.failed }
         var request = URLRequest(url: url)
+        request.timeoutInterval = 15
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(anonKey, forHTTPHeaderField: "apikey")

@@ -33,7 +33,7 @@ struct PsstWidgetBundle: WidgetBundle {
 /// Lock Screen: one tap on your first person (the top of home).
 struct FavouriteWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "PsstFavourite", provider: Provider()) { entry in
+        StaticConfiguration(kind: "PsstFavourite", provider: Provider(fetchesDoodle: false)) { entry in
             FavouriteView(entry: entry)
                 .containerBackground(for: .widget) { AccessoryWidgetBackground() }
         }
@@ -126,6 +126,9 @@ struct WidgetDoodle: Hashable {
 }
 
 struct Provider: TimelineProvider {
+    /// The Lock Screen widget never shows a doodle, so it never asks the server.
+    var fetchesDoodle = true
+
     private var defaults: UserDefaults? {
         (Bundle.main.object(forInfoDictionaryKey: "PSSTAppGroup") as? String).flatMap(UserDefaults.init(suiteName:))
     }
@@ -165,6 +168,7 @@ struct Provider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
         // The app reloads the widget whenever the people or the doodle change. While
         // the app is closed, the widget also checks for a new doodle now and then.
+        guard fetchesDoodle else { return completion(Timeline(entries: [read()], policy: .never)) }
         Task {
             // nil: couldn't ask (keep what the app saved); .some(nil): no doodle now.
             let fetched: PsstSender.FetchedDoodle??

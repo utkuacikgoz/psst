@@ -377,12 +377,36 @@ struct LiveHomeView: View {
         .fullScreenCover(isPresented: Binding(get: { store.showingRecap }, set: { store.showingRecap = $0 })) {
             WeeklyRecapView()
         }
+        // The Sunday push can open the recap while something else is up; SwiftUI shows
+        // one thing at a time, so close that first and then show the recap.
+        .onChange(of: store.showingRecap) { _, show in
+            guard show, anySheet else { return }
+            store.showingRecap = false
+            closePresentations()
+            Task {
+                try? await Task.sleep(for: .milliseconds(600))
+                store.showingRecap = true
+            }
+        }
         .manageConnection(menuFor: $managing, confirming: $confirming,
                           onSuper: { superPerson = $0 },
                           onColour: { if purchases.isUnlocked { colouring = $0 } else { showingPlus = true } },
                           onDoodle: { doodlePerson = $0 })
         .sheet(isPresented: $showingPlus) { PsstPlusSheet() }
         .sheet(item: $colouring) { ColourSheet(connection: $0) }
+    }
+
+    private func closePresentations() {
+        showingFeatureIntro = false
+        superPerson = nil
+        doodlePerson = nil
+        showingInvite = false
+        enteringCode = false
+        showingSettings = false
+        managing = nil
+        confirming = nil
+        showingPlus = false
+        colouring = nil
     }
 
     private func showDesignPreviewIfRequested() {
@@ -727,6 +751,8 @@ struct LiveHomeView: View {
             }
             .accessibilityAction(named: "Super Psst") { superPerson = connection }
             .accessibilityAction(named: "Doodle") { doodlePerson = connection }
+            // Pull to refresh has no VoiceOver gesture since the cat replaced .refreshable.
+            .accessibilityAction(named: "Refresh") { Task { await store.refresh() } }
             .accessibilityAction(named: "Manage \(connection.otherName)") { managing = connection }
             .accessibilityAction(named: "Move up") { withAnimation { store.move(connection.id, by: -1) } }
             .accessibilityAction(named: "Move down") { withAnimation { store.move(connection.id, by: 1) } }

@@ -23,7 +23,7 @@ order by timestamp desc
 limit 1000
 """
 query = urllib.parse.urlencode({"sql": sql, "iso_timestamp_start": start.isoformat(), "iso_timestamp_end": end.isoformat()})
-request = urllib.request.Request(f"https://api.supabase.com/v1/projects/{ref}/analytics/endpoints/logs.all?{query}",
+request = urllib.request.Request(f"https://api.supabase.com/v1/projects/{ref}/analytics/endpoints/logs?{query}",
                                  headers={"Authorization": f"Bearer {token}"})
 try:
     body = json.load(urllib.request.urlopen(request, timeout=60))

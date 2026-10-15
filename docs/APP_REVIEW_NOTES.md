@@ -247,9 +247,9 @@ The other 1.0.4 changes collect nothing new:
 - Invites joined per code are already covered by the existing account and contacts-free connection data.
 - Purchase verification failure reasons are stored on the server without any account or purchase identifiers.
 
-## 1.0.5 (build 33 or later)
+## 1.0.6 (build 34 or later)
 
-Submit the newest 1.0.5 build: 33 or later (33 has the launch fixes and the new Settings; 31 and earlier have the doodle size bug). The backend for everything below (streaks, weekly recap, Psst links, doodles and the 40 KB doodle limit) is deployed to production.
+Submit the newest 1.0.6 build: 34 or later (same content as 1.0.5 build 33, with the version bumped to 1.0.6). The backend for everything below (streaks, weekly recap, Psst links, doodles and the 40 KB doodle limit) is deployed to production.
 
 **Before submitting:**
 1. Create two fresh review codes for the Psst Team profile:
@@ -284,7 +284,7 @@ Submit the newest 1.0.5 build: 33 or later (33 has the launch fixes and the new 
 ```
 Psst lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
 
-What's new in 1.0.5:
+What's new in 1.0.6:
 - Psst someone new: + band → "Psst someone new" makes a one-person link (psstapp.fun/p/CODE, valid 7 days) and opens the share sheet. The web page shows only the sender's first name. If the recipient installs Psst and opens the link, they connect with the sender (both have agreed: one sent the link, the other accepted it) and that Psst arrives as their first. Nothing is sent to anyone who doesn't open the link.
 - Streaks: when two connected people have both pssted each other on 3 or more days in a row, a flame and the day count show in the corner of that person's band. Days follow each phone's own time zone, which the app saves on the account for this.
 - Weekly recap (on by default; Settings → Weekly recap turns it off): a push notification on Sundays at 6 PM opens a summary of the user's own week (their totals, their most-pssted person, their longest streak). It is only about the user's own Pssts, contains no promotional content, is skipped in weeks with no Pssts, and can be turned off in Settings → Weekly recap.

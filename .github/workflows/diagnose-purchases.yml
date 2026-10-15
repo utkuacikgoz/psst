@@ -33,3 +33,6 @@ jobs:
           version: latest
       - name: Recent verify-plus failures
         run: python3 scripts/diagnose_purchases.py
+      - name: How long sends take (last 24 h)
+        if: always()
+        run: python3 scripts/send_latency.py

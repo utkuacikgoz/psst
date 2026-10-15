@@ -131,6 +131,26 @@ class BackendTests(unittest.TestCase):
         ada.rpc("revoke_invite", open_code)
         self.assertEqual(ada.rows("select code from public.list_open_invites()"), [])
 
+    def test_invite_progress_shows_the_open_group_code_filling_up(self):
+        ada, emre, sam, kim, zed = new_user("Ada"), new_user("Emre"), new_user("Sam"), new_user("Kim"), new_user("Zed")
+        self.assertIsNone(ada.rpc("invite_progress"), "nothing until someone joins")
+        code = ada.rpc("create_invite")["code"]
+        self.assertIsNone(ada.rpc("invite_progress"))
+        for person in (emre, sam, kim):
+            person.rpc("accept_invite", code)
+        progress = ada.rpc("invite_progress")
+        self.assertEqual((progress["code"], progress["uses"], progress["max_uses"]), (code, 3, 10))
+        self.assertEqual(progress["joined"], ["Emre", "Sam", "Kim"])
+        ada.rpc("block_user", str(kim.user_id))
+        self.assertEqual(ada.rpc("invite_progress")["joined"], ["Emre", "Sam"], "blocked people aren't named")
+        self.assertEqual(ada.rpc("invite_progress")["uses"], 3, "but still count")
+        self.assertIsNone(zed.rpc("invite_progress"), "only the inviter's own codes")
+        self.assertIsNone(emre.rpc("invite_progress"))
+        admin("update public.invites set expires_at = now() - interval '1 minute' where code = %s", code)
+        self.assertIsNone(ada.rpc("invite_progress"), "gone once expired")
+        with self.assertRaises(psycopg.Error):
+            Api("anon").rpc("invite_progress")
+
     def test_invite_accept_creates_mutual_connection(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         code = ada.rpc("create_invite")["code"]

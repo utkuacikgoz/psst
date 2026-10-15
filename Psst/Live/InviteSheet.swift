@@ -15,6 +15,8 @@ struct InviteSheet: View {
 
     // Share
     @State private var invite: CreatedInvite?
+    /// Your open group code, once someone has joined with it (1C).
+    @State private var progress: InviteProgress?
     @State private var isCreating = false
     @State private var createError: String?
 
@@ -45,6 +47,7 @@ struct InviteSheet: View {
         .background(Color.psstCanvas.ignoresSafeArea())
         .presentationBackground(Color.psstCanvas)
         .sheet(item: $psstShare) { ShareSheet(items: $0.items) }
+        .task { progress = try? await store.api.inviteProgress() }
         .onAppear {
             if startEntering {
                 mode = .enter
@@ -93,8 +96,10 @@ struct InviteSheet: View {
             chooserBand(title: "Psst someone new",
                         subtitle: psstError ?? (creatingPsst ? "Getting your Psst ready…" : "Not on Psst yet? Your Psst is the invite."),
                         color: Color(hex: 0xAC3E68), tag: "NEW") { createPsst() }
-            chooserBand(title: "Share my invite", subtitle: "Send a link to your friends", color: .inviteGold) {
+            chooserBand(title: "Share my invite", subtitle: progress?.summary() ?? "Send a link to your friends", color: .inviteGold) {
                 withAnimation { mode = .share }
+                // Keep sharing the code that's already filling up, rather than starting a new one.
+                if invite == nil, let progress { invite = progress.invite }
                 if invite == nil { create() }
             }
             chooserBand(title: "I have a code", subtitle: "Someone invited you", color: Color(hex: 0x5F61AE)) {
@@ -150,8 +155,18 @@ struct InviteSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                         .accessibilityLabel("Invite code \(invite.code.map(String.init).joined(separator: " "))")
-                    Text("\(invite.usesLine) · expires \(invite.expiresAt.formatted(date: .abbreviated, time: .omitted))")
-                        .font(.psst(.subheadline, weight: .medium))
+                    if let progress, progress.code == invite.code {
+                        joinedDots(progress)
+                        Text(progress.summary())
+                            .font(.psst(.subheadline, weight: .bold))
+                        if !progress.joined.isEmpty {
+                            Text(progress.joined.joined(separator: ", "))
+                                .font(.psst(.subheadline, weight: .medium))
+                        }
+                    } else {
+                        Text("\(invite.usesLine) · expires \(invite.expiresAt.formatted(date: .abbreviated, time: .omitted))")
+                            .font(.psst(.subheadline, weight: .medium))
+                    }
                 } else if let createError {
                     Label(createError, systemImage: "exclamationmark.circle")
                         .font(.psst(.subheadline, weight: .semibold))
@@ -172,7 +187,7 @@ struct InviteSheet: View {
                     item: invite.link,
                     message: Text("I want to be able to psst you. Tap to join me (code \(invite.code)).")
                 ) {
-                    Label("Share invite", systemImage: "square.and.arrow.up")
+                    Label(progress?.code == invite.code ? "Share again" : "Share invite", systemImage: "square.and.arrow.up")
                         .font(.psst(.body, weight: .semibold))
                         .foregroundStyle(Color.ink)
                         .frame(maxWidth: .infinity, minHeight: Tokens.Band.barMinHeight)
@@ -180,6 +195,18 @@ struct InviteSheet: View {
                 }
             }
         }
+    }
+
+    /// One dot per place on the code, filled for each person who joined (1C).
+    private func joinedDots(_ progress: InviteProgress) -> some View {
+        HStack(spacing: 4) {
+            ForEach(0..<progress.maxUses, id: \.self) { index in
+                Circle()
+                    .fill(index < progress.uses ? Color.onCanvas : Color.onCanvas.opacity(0.3))
+                    .frame(width: 9, height: 9)
+            }
+        }
+        .accessibilityHidden(true)
     }
 
     /// Makes a one-person link holding your Psst, then opens the share sheet (5A).

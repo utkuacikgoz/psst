@@ -37,6 +37,7 @@ protocol PsstAPI: AnyObject {
     func reportUser(_ id: UUID) async throws
     func listBlocked() async throws -> [BlockedPerson]
     func listOpenInvites() async throws -> [OpenInvite]
+    func inviteProgress() async throws -> InviteProgress?
     func revokeInvite(code: String) async throws
     func setNotificationSound(_ file: String) async throws
     func setNotificationStatus(_ enabled: Bool) async throws
@@ -61,6 +62,7 @@ extension PsstAPI {
     func reportAppVersion(_ version: String, build: Int) async throws {}
     func setTimeZone(_ identifier: String) async throws {}
     func createPsstInvite() async throws -> CreatedInvite { throw APIError.server(status: 503, code: "feature_unavailable") }
+    func inviteProgress() async throws -> InviteProgress? { nil }
     func weeklyRecap() async throws -> WeeklyRecap { throw APIError.server(status: 503, code: "feature_unavailable") }
     func weeklyRecapStatus() async throws -> WeeklyRecapStatus { throw APIError.server(status: 503, code: "feature_unavailable") }
     func setWeeklyRecap(_ enabled: Bool) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
@@ -235,6 +237,10 @@ final class APIClient: PsstAPI {
 
     func listOpenInvites() async throws -> [OpenInvite] {
         try await rpc("list_open_invites", [String: String]())
+    }
+
+    func inviteProgress() async throws -> InviteProgress? {
+        try await rpc("invite_progress", [String: String]())
     }
 
     func revokeInvite(code: String) async throws {

@@ -62,6 +62,24 @@ struct CreatedInvite: Decodable, Equatable {
     var displayCode: String { code.count == 8 ? "\(code.prefix(4)) \(code.suffix(4))" : code }
 }
 
+/// Your open group code filling up (owner pick 1C, 15 Oct 2026): "3 of 10 joined",
+/// who joined (only people still connected to you), and how long it has left.
+struct InviteProgress: Decodable, Equatable {
+    let code: String
+    let expiresAt: Date
+    let uses: Int
+    let maxUses: Int
+    let joined: [String]
+
+    var invite: CreatedInvite { CreatedInvite(code: code, expiresAt: expiresAt, maxUses: maxUses) }
+
+    /// "3 of 10 joined · 6 days left".
+    func summary(now: Date = Date()) -> String {
+        let days = max(1, Int((expiresAt.timeIntervalSince(now) / 86_400).rounded(.up)))
+        return "\(uses) of \(maxUses) joined · \(days) \(days == 1 ? "day" : "days") left"
+    }
+}
+
 /// One of your own invites nobody has used yet (Settings → Open invites).
 struct OpenInvite: Decodable, Identifiable, Equatable {
     let code: String

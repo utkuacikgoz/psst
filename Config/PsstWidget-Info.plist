@@ -9,9 +9,5 @@
 	</dict>
 	<key>PSSTAppGroup</key>
 	<string>$(PSST_APP_GROUP)</string>
-	<key>UIAppFonts</key>
-	<array>
-		<string>InterTight-Black.ttf</string>
-	</array>
 </dict>
 </plist>

@@ -1,3 +1,4 @@
+import CoreText
 import SwiftUI
 import WidgetKit
 
@@ -7,6 +8,19 @@ import WidgetKit
 /// App Group (see WidgetBridge).
 @main
 struct PsstWidgetBundle: WidgetBundle {
+    init() {
+        // Uses the app's own copy of the font (5A, 14 Oct 2026): the widget sits
+        // inside Psst.app/PlugIns, so the app bundle is two folders up.
+        let app = Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent()
+        for path in ["InterTight-Black.ttf", "Fonts/InterTight-Black.ttf"] {
+            let url = app.appendingPathComponent(path)
+            if FileManager.default.fileExists(atPath: url.path) {
+                CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+                break
+            }
+        }
+    }
+
     var body: some Widget {
         PeopleWidget()
         FavouriteWidget()

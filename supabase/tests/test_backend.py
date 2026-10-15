@@ -166,6 +166,30 @@ class BackendTests(unittest.TestCase):
             with self.assertRaises(psycopg.Error):
                 caller.rpc("metrics_report")
 
+    def test_doodles_carry_strokes_and_stay_until_answered(self):
+        ada, emre, sam = new_user("Ada"), new_user("Emre"), new_user("Sam")
+        conn = connect(ada, emre)
+        heart = json.dumps([[[0.2, 0.3], [0.5, 0.8], [0.8, 0.3]], [[0.1, 0.1]]])
+        self.assertIsNone(emre.rpc("latest_doodle"))
+        ada.rpc("send_signal", uuid.uuid4(), conn, "doodle", heart)
+        unseen = emre.rows("select effect_id, doodle from public.list_unseen()")
+        self.assertEqual(unseen[0][0], "doodle")
+        self.assertEqual(unseen[0][1], json.loads(heart))
+        latest = emre.rpc("latest_doodle")
+        self.assertEqual((latest["sender_name"], latest["doodle"]), ("Ada", json.loads(heart)))
+        self.assertIsNone(ada.rpc("latest_doodle"), "only the recipient sees it")
+        self.assertIsNone(sam.rpc("latest_doodle"))
+        emre.rpc("send_signal", uuid.uuid4(), conn, "psst")
+        self.assertIsNone(emre.rpc("latest_doodle"), "gone once they psst back")
+        # Plain sends still work with three arguments, and only doodles may carry a drawing.
+        ada.rpc("send_signal", uuid.uuid4(), conn, "psst")
+        for bad in (None, "[]", json.dumps([[[1.5, 0.2]]]), json.dumps([[["a", 0.2]]]), json.dumps([[[0.1, 0.1]]] * 61),
+                    json.dumps([[[0.5, 0.5]] * 2001])):
+            with self.fails("invalid_doodle", 422):
+                ada.rpc("send_signal", uuid.uuid4(), conn, "doodle", bad)
+        with self.fails("invalid_doodle", 422):
+            ada.rpc("send_signal", uuid.uuid4(), conn, "psst", heart)
+
     def test_invite_accept_creates_mutual_connection(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         code = ada.rpc("create_invite")["code"]

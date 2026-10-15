@@ -156,6 +156,7 @@ struct LiveHomeView: View {
     @State private var endCatShowing = false
     @State private var pullArmed = true
     @State private var superPerson: ConnectionSummary?
+    @State private var doodlePerson: ConnectionSummary?
     @AppStorage("psst.hapticsEnabled") private var hapticsEnabled = true
     @State private var showingInvite = false
     @State private var enteringCode = false
@@ -191,7 +192,7 @@ struct LiveHomeView: View {
     private var showsCoach: Bool { store.showsCoach && store.hasLoadedConnections && !anySheet && store.arrival == nil }
 
     private var anySheet: Bool {
-        showingFeatureIntro || superPerson != nil || showingInvite || enteringCode || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
+        showingFeatureIntro || superPerson != nil || doodlePerson != nil || showingInvite || enteringCode || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
     }
 
     var body: some View {
@@ -366,6 +367,10 @@ struct LiveHomeView: View {
         }
         .sheet(isPresented: $showingFeatureIntro, onDismiss: { store.dismissFeatureIntro() }) { FeatureIntroSheet() }
         .sheet(item: $superPerson) { SuperPsstSheet(connection: $0) }
+        .fullScreenCover(item: $doodlePerson) { person in
+            DoodleSheet(connection: person,
+                        color: Color(hex: bandColors[person.id] ?? personalization.colorHex(for: person.id, name: person.otherName)))
+        }
         .sheet(isPresented: $showingInvite) { InviteSheet() }
         .sheet(isPresented: $enteringCode) { InviteSheet(startEntering: true) }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
@@ -374,7 +379,8 @@ struct LiveHomeView: View {
         }
         .manageConnection(menuFor: $managing, confirming: $confirming,
                           onSuper: { superPerson = $0 },
-                          onColour: { if purchases.isUnlocked { colouring = $0 } else { showingPlus = true } })
+                          onColour: { if purchases.isUnlocked { colouring = $0 } else { showingPlus = true } },
+                          onDoodle: { doodlePerson = $0 })
         .sheet(isPresented: $showingPlus) { PsstPlusSheet() }
         .sheet(item: $colouring) { ColourSheet(connection: $0) }
     }

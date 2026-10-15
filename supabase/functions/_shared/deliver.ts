@@ -37,6 +37,7 @@ export function isTransient(result: ApnsResult): boolean {
 const EFFECT_TITLES: Record<string, string> = {
   psst: "Psst",
   super_psst: "Super Psst",
+  doodle: "drew you something ✎",
 };
 
 /** A signal is a moment, not a message: undelivered pushes are dropped after an hour. */

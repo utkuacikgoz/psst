@@ -316,6 +316,14 @@ final class LiveStore {
 
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
 
+    // MARK: Doodles on the widget (2A, 4A, 5A)
+
+    /// Puts the newest unanswered doodle on the widget (free, Psst+ or not), and
+    /// takes it off once you've pssted that person back.
+    func publishDoodle() async {
+        do { WidgetBridge.publishDoodle(try await api.latestDoodle()) } catch {}
+    }
+
     // MARK: Streaks (3A)
 
     /// "7 days in a row" shows on a band for a moment when its streak grows (3+).
@@ -403,6 +411,7 @@ final class LiveStore {
             await reportTimeZone()
             await loadRecapStatus()
             await showUnseenIfVisible()
+            await publishDoodle()
         } catch APIError.offline {
             connectionsLoadFailed = true
             noteUnreachable()
@@ -467,7 +476,8 @@ final class LiveStore {
         let many = senders.count > 1
         let moments = senders.enumerated().map { index, s in
             Arrival(id: s.id, connectionID: s.connectionId, senderName: s.senderName,
-                    kind: s.signal == .superPsst ? .superPsst : (s.sameMoment == true ? .sameMoment : .signal),
+                    kind: s.signal == .superPsst ? .superPsst : s.signal == .doodle ? .doodle : (s.sameMoment == true ? .sameMoment : .signal),
+                    doodle: s.doodle,
                     position: many ? index + 1 : nil, total: many ? senders.count : nil,
                     note: heldPsstConnections.remove(s.connectionId) == nil ? nil
                         : "Sent \(PersonRow.lowercasedStart(ExchangeTime.label(s.createdAt, now: now()))), before you had Psst")
@@ -649,10 +659,32 @@ final class LiveStore {
         return Task { await send(connectionID: connection.id, eventID: eventID, signal: .superPsst) }
     }
 
+    /// A doodle (1A): sent like a Super Psst, with its strokes kept for a retry.
+    @discardableResult
+    func sendDoodle(_ connection: ConnectionSummary, strokes: DoodleStrokes) -> Task<Void, Never>? {
+        guard !strokes.isEmpty, sendStates[connection.id] == nil || {
+            if case .sent = sendStates[connection.id] { return true }; return false
+        }() else { return nil }
+        if let until = pausedUntil[connection.id], until > now() { return nil }
+        let eventID = UUID()
+        doodleStrokes[eventID] = strokes
+        sendStates[connection.id] = .sending(eventID: eventID, signal: .doodle)
+        return Task { await send(connectionID: connection.id, eventID: eventID, signal: .doodle) }
+    }
+
+    /// Strokes of doodles not yet accepted, so a retry sends the same drawing.
+    @ObservationIgnored private var doodleStrokes: [UUID: DoodleStrokes] = [:]
+
     func send(connectionID: UUID, eventID: UUID, signal: Signal) async {
         sendStates[connectionID] = .sending(eventID: eventID, signal: signal)
         do {
-            let result = try await api.sendSignal(eventID: eventID, connectionID: connectionID, signal: signal)
+            let result: SendResult
+            if signal == .doodle, let strokes = doodleStrokes[eventID] {
+                result = try await api.sendDoodle(eventID: eventID, connectionID: connectionID, strokes: strokes)
+                doodleStrokes[eventID] = nil
+            } else {
+                result = try await api.sendSignal(eventID: eventID, connectionID: connectionID, signal: signal == .doodle ? .psst : signal)
+            }
             noteReachable()
             // Acceptance includes the authoritative timestamp, even if the
             // subsequent list refresh fails. Never synthesize a sent time.
@@ -674,6 +706,8 @@ final class LiveStore {
             }
             play(EffectTrigger(id: eventID, signal: signal), on: connectionID)
             if let updated = try? await api.listConnections() { connections = updated }
+            // Pssting someone back takes their doodle off your widget (5A).
+            if WidgetBridge.showsDoodle(from: connectionID) { await publishDoodle() }
             try? await Task.sleep(for: sentDisplayDuration)
             if sendStates[connectionID] == .sent(eventID: eventID, signal: signal) {
                 sendStates[connectionID] = nil
@@ -784,8 +818,13 @@ final class LiveStore {
         play(EffectTrigger(id: payload.eventID, signal: signal), on: payload.connectionID)
         await refresh()
         if let sender = connections.first(where: { $0.id == payload.connectionID }) {
+            var drawing: DoodleStrokes?
+            if signal == .doodle, let latest = try? await api.latestDoodle(), latest.eventId == payload.eventID {
+                drawing = latest.doodle
+            }
             let opened = Arrival(id: payload.eventID, connectionID: sender.id, senderName: sender.otherName,
-                                 kind: signal == .superPsst ? .superPsst : (payload.sameMoment ? .sameMoment : .signal))
+                                 kind: signal == .superPsst ? .superPsst : signal == .doodle ? .doodle : (payload.sameMoment ? .sameMoment : .signal),
+                                 doodle: drawing)
             // Never cut off a moment that's on screen: the opened one plays next.
             if arrival == nil {
                 arrival = opened

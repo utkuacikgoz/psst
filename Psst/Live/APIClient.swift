@@ -27,6 +27,8 @@ protocol PsstAPI: AnyObject {
     func listUnseen() async throws -> [UnseenSignal]
     func ackSignals(_ ids: [UUID]) async throws
     func sendSignal(eventID: UUID, connectionID: UUID, signal: Signal) async throws -> SendResult
+    func sendDoodle(eventID: UUID, connectionID: UUID, strokes: DoodleStrokes) async throws -> SendResult
+    func latestDoodle() async throws -> LatestDoodle?
     func createInvite() async throws -> CreatedInvite
     func createPsstInvite() async throws -> CreatedInvite
     func previewInvite(code: String) async throws -> InvitePreview
@@ -63,6 +65,10 @@ extension PsstAPI {
     func setTimeZone(_ identifier: String) async throws {}
     func createPsstInvite() async throws -> CreatedInvite { throw APIError.server(status: 503, code: "feature_unavailable") }
     func inviteProgress() async throws -> InviteProgress? { nil }
+    func sendDoodle(eventID: UUID, connectionID: UUID, strokes: DoodleStrokes) async throws -> SendResult {
+        throw APIError.server(status: 503, code: "feature_unavailable")
+    }
+    func latestDoodle() async throws -> LatestDoodle? { nil }
     func weeklyRecap() async throws -> WeeklyRecap { throw APIError.server(status: 503, code: "feature_unavailable") }
     func weeklyRecapStatus() async throws -> WeeklyRecapStatus { throw APIError.server(status: 503, code: "feature_unavailable") }
     func setWeeklyRecap(_ enabled: Bool) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
@@ -217,6 +223,22 @@ final class APIClient: PsstAPI {
             "connection_id": connectionID.uuidString.lowercased(),
             "effect_id": signal.rawValue,
         ])
+    }
+
+    private struct DoodleBody: Encodable {
+        let event_id: String
+        let connection_id: String
+        let effect_id = "doodle"
+        let doodle: DoodleStrokes
+    }
+
+    func sendDoodle(eventID: UUID, connectionID: UUID, strokes: DoodleStrokes) async throws -> SendResult {
+        try await authorizedRequest(path: "functions/v1/send-signal", body: DoodleBody(
+            event_id: eventID.uuidString.lowercased(), connection_id: connectionID.uuidString.lowercased(), doodle: strokes))
+    }
+
+    func latestDoodle() async throws -> LatestDoodle? {
+        try await rpc("latest_doodle", [String: String]())
     }
 
     func createInvite() async throws -> CreatedInvite {

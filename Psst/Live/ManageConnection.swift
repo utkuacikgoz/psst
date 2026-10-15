@@ -60,6 +60,7 @@ private struct ManageConnectionModifier: ViewModifier {
     /// Visible routes to what is otherwise a touch-and-hold (HIG: gestures are never the only way).
     var onSuper: ((ConnectionSummary) -> Void)?
     var onColour: ((ConnectionSummary) -> Void)?
+    var onDoodle: ((ConnectionSummary) -> Void)?
 
     @Environment(LiveStore.self) private var store
     @State private var failedName: String?
@@ -72,6 +73,7 @@ private struct ManageConnectionModifier: ViewModifier {
                 titleVisibility: .visible,
                 presenting: menuFor
             ) { connection in
+                if let onDoodle { Button("Doodle for \(connection.otherName)") { afterDialog { onDoodle(connection) } } }
                 if let onSuper { Button("Super Psst…") { afterDialog { onSuper(connection) } } }
                 if let onColour { Button("Colour…") { afterDialog { onColour(connection) } } }
                 ForEach([ConnectionAction.Kind.remove, .block, .report], id: \.self) { kind in
@@ -135,8 +137,9 @@ extension View {
                           confirming: Binding<ConnectionAction?>,
                           onDone: @escaping () -> Void = {},
                           onSuper: ((ConnectionSummary) -> Void)? = nil,
-                          onColour: ((ConnectionSummary) -> Void)? = nil) -> some View {
+                          onColour: ((ConnectionSummary) -> Void)? = nil,
+                          onDoodle: ((ConnectionSummary) -> Void)? = nil) -> some View {
         modifier(ManageConnectionModifier(menuFor: menuFor, confirming: confirming, onDone: onDone,
-                                          onSuper: onSuper, onColour: onColour))
+                                          onSuper: onSuper, onColour: onColour, onDoodle: onDoodle))
     }
 }

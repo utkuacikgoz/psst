@@ -6,9 +6,17 @@ import SwiftUI
 enum Signal: String, CaseIterable, Identifiable, Codable {
     case psst
     case superPsst = "super_psst"
+    /// A doodle drawn for their widget (owner pick, 15 Oct 2026).
+    case doodle
 
     var id: String { rawValue }
-    var title: String { self == .superPsst ? "Super Psst" : "Psst" }
+    var title: String {
+        switch self {
+        case .psst: "Psst"
+        case .superPsst: "Super Psst"
+        case .doodle: "Doodle"
+        }
+    }
     var meaning: String { "Thinking of you" }
     /// Stand-in artwork until the production effect is designed.
     var symbolName: String { "ellipsis.message" }

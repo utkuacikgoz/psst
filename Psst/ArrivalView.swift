@@ -3,13 +3,15 @@ import SwiftUI
 /// A full-screen moment: a Psst that just arrived (R2), someone new (J2), or
 /// both of you pssting within 10 seconds by the server's clock (X2).
 struct Arrival: Identifiable, Equatable {
-    enum Kind { case signal, joined, sameMoment, superPsst }
+    enum Kind { case signal, joined, sameMoment, superPsst, doodle }
 
     /// The signal event (or, for a welcome, the connection), so it never shows twice.
     let id: UUID
     let connectionID: UUID?
     let senderName: String
     var kind: Kind = .signal
+    /// A doodle's strokes (kind .doodle); shown as a polaroid.
+    var doodle: DoodleStrokes? = nil
     /// MA2: when several people pssted, each gets a moment; "2 of 3".
     var position: Int? = nil
     var total: Int? = nil
@@ -39,7 +41,8 @@ struct ArrivalView: View {
         // App Store screenshot runs hold each moment so it can be captured.
         if ProcessInfo.processInfo.arguments.contains("-PsstUITestHoldMoments") { return .seconds(8) }
         #endif
-        if arrival.kind == .sameMoment { return Self.sameMomentTime }
+        // Rare ones linger: a same moment, or a doodle someone drew for you.
+        if arrival.kind == .sameMoment || arrival.kind == .doodle { return Self.sameMomentTime }
         return arrival.total == nil ? Self.displayTime : Self.queuedTime
     }
 
@@ -70,6 +73,7 @@ struct ArrivalView: View {
         switch arrival.kind {
         case .signal: "\(countPrefix)Psst from \(name)"
         case .superPsst: "\(countPrefix)Super Psst from \(name)"
+        case .doodle: "\(countPrefix)\(name) drew you a doodle"
         case .joined: "\(name) is in. You're connected."
         case .sameMoment: "Same moment. You and \(name) pssted each other at the same time."
         }
@@ -77,7 +81,7 @@ struct ArrivalView: View {
 
     private var hint: String {
         switch arrival.kind {
-        case .signal, .superPsst: "Sends a Psst back."
+        case .signal, .superPsst, .doodle: "Sends a Psst back."
         case .joined: "Sends your first Psst."
         case .sameMoment: "Closes."
         }
@@ -130,7 +134,7 @@ struct ArrivalView: View {
         }
     }
 
-    private var isPsst: Bool { arrival.kind == .signal || arrival.kind == .superPsst }
+    private var isPsst: Bool { arrival.kind == .signal || arrival.kind == .superPsst || arrival.kind == .doodle }
     /// Motion starts when `trigger` is set (just after the moment appears).
     private var settled: Bool { trigger != nil }
 
@@ -173,7 +177,16 @@ struct ArrivalView: View {
                     .opacity(settled || !reduceMotion ? 1 : 0)
                     .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.25), value: settled)
                 Group {
-                    if arrival.kind == .superPsst {
+                    if arrival.kind == .doodle {
+                        // 3B: the doodle as a little polaroid.
+                        if let doodle = arrival.doodle {
+                            DoodlePolaroid(strokes: doodle, name: name, color: (color ?? .personBand(name)).opacity(0.85),
+                                           width: 220)
+                        } else {
+                            Text("drew you something ✎")
+                                .font(.psst(.title2, weight: .heavy))
+                        }
+                    } else if arrival.kind == .superPsst {
                         VStack(spacing: Tokens.Space.s) {
                             MischiefCat().frame(width: 84, height: 68)
                                 .scaleEffect(!settled || reduceMotion ? 1 : 1.08)

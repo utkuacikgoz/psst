@@ -26,8 +26,19 @@ struct UnseenSignal: Decodable, Identifiable, Equatable {
     let createdAt: Date
     /// Both people pssted within 10 seconds, by the server's clock.
     var sameMoment: Bool? = nil
+    /// A doodle's strokes (effect "doodle").
+    var doodle: DoodleStrokes? = nil
 
     var signal: Signal { Signal(rawValue: effectId) ?? .psst }
+}
+
+/// The newest doodle sent to you that you haven't answered: what the widget shows.
+struct LatestDoodle: Codable, Equatable {
+    let eventId: UUID
+    let connectionId: UUID
+    let senderName: String
+    let createdAt: Date
+    let doodle: DoodleStrokes
 }
 
 struct SendResult: Decodable, Equatable {

@@ -126,6 +126,32 @@ enum PsstSender {
                 kSecAttrAccessGroup as String: group]
     }
 
+    /// The newest unanswered doodle from the server (latest_doodle), so the widget can
+    /// show one while the app is closed. nil = none; throws when it can't ask.
+    struct FetchedDoodle: Decodable {
+        let connectionId: UUID
+        let senderName: String
+        let doodle: [[[Double]]]
+
+        enum CodingKeys: String, CodingKey {
+            case connectionId = "connection_id", senderName = "sender_name", doodle
+        }
+    }
+
+    static func latestDoodle() async throws -> FetchedDoodle? {
+        guard let baseURL, var session = load() else { throw PsstSendError.signedOut }
+        if session.expiresAt.timeIntervalSinceNow < 60 { session = try await refresh(session, baseURL: baseURL) }
+        var request = URLRequest(url: baseURL.appendingPathComponent("rest/v1/rpc/latest_doodle"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        request.httpBody = Data("{}".utf8)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw PsstSendError.failed }
+        return try JSONDecoder().decode(FetchedDoodle?.self, from: data)
+    }
+
     static func send(to connection: UUID) async throws {
         guard let baseURL, var session = load() else { throw PsstSendError.signedOut }
         if session.expiresAt.timeIntervalSinceNow < 60 { session = try await refresh(session, baseURL: baseURL) }

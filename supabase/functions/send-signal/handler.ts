@@ -12,7 +12,7 @@ export interface SendSignalDeps {
   /** Calls public.send_signal as the caller (their JWT), so the database authorizes it. */
   sendSignal(
     authorization: string,
-    args: { p_event_id: string; p_connection_id: string; p_effect_id: string },
+    args: { p_event_id: string; p_connection_id: string; p_effect_id: string; p_doodle?: unknown },
   ): Promise<{ data: SendSignalResult | null; error: { message: string } | null; status: number }>;
   deliver(eventId: string): Promise<PushStatus>;
   /**
@@ -43,15 +43,18 @@ export async function handleSendSignal(req: Request, deps: SendSignalDeps): Prom
   } catch {
     return json({ error: "invalid_body" }, 400);
   }
-  const { event_id, connection_id, effect_id } = body ?? {};
-  if (!isUuid(event_id) || !isUuid(connection_id) || typeof effect_id !== "string") {
+  const { event_id, connection_id, effect_id, doodle } = body ?? {};
+  if (!isUuid(event_id) || !isUuid(connection_id) || typeof effect_id !== "string" ||
+      (doodle !== undefined && !Array.isArray(doodle))) {
     return json({ error: "invalid_body" }, 400);
   }
 
+  // A doodle's strokes; the database checks their shape and size.
   const { data, error, status } = await deps.sendSignal(authorization, {
     p_event_id: event_id,
     p_connection_id: connection_id,
     p_effect_id: effect_id,
+    ...(doodle !== undefined ? { p_doodle: doodle } : {}),
   });
   if (error || !data) {
     return json({ error: error?.message ?? "send_failed" }, status >= 400 ? status : 500);

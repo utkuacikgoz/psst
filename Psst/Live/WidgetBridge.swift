@@ -40,6 +40,24 @@ enum WidgetBridge {
         if #available(iOS 18.0, *) { ControlCenter.shared.reloadAllControls() }
     }
 
+    /// The newest unanswered doodle for the widget (2A, 4A: shown with or without
+    /// Psst+), or nil to take it off. The widget finds the sender's colour by id.
+    static let doodleKey = "psst.widget.doodle"
+
+    static func publishDoodle(_ doodle: LatestDoodle?, to store: UserDefaults? = nil) {
+        guard let defaults = store ?? Self.defaults else { return }
+        let data = doodle.flatMap { try? JSONEncoder().encode($0) }
+        guard data != defaults.data(forKey: doodleKey) else { return }
+        defaults.set(data, forKey: doodleKey)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    static func showsDoodle(from connectionID: UUID, in store: UserDefaults? = nil) -> Bool {
+        guard let data = (store ?? Self.defaults)?.data(forKey: doodleKey),
+              let doodle = try? JSONDecoder().decode(LatestDoodle.self, from: data) else { return false }
+        return doodle.connectionId == connectionID
+    }
+
     static func everyone(from connections: [ConnectionSummary], colorHex: (UUID, String) -> UInt32) -> [Person] {
         connections.map { Person(id: $0.id, name: $0.otherName, color: colorHex($0.id, $0.otherName)) }
     }

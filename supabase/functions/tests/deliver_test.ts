@@ -120,3 +120,8 @@ Deno.test("a busy or failing APNs gets one retry with the same push", async () =
   assertEquals(await deliver(EVENT, deps), "accepted");
   assertEquals(sent, ["t1", "t1"]);
 });
+
+Deno.test("a doodle's notification says they drew something", () => {
+  const payload = buildPayload(targets({ effect_id: "doodle" })) as { aps: { alert: { title: string; body: string } } };
+  assertEquals(payload.aps.alert.body, "drew you something ✎");
+});

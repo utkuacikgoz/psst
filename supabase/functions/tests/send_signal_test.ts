@@ -111,3 +111,15 @@ Deno.test("a database refusal queues no background push", async () => {
   assertEquals((await handleSendSignal(request(BODY), d)).status, 403);
   assertEquals(queued.length, 0);
 });
+
+Deno.test("passes a doodle's strokes through and rejects a malformed one", async () => {
+  const { d, calls } = deps();
+  const strokes = [[[0.2, 0.3], [0.5, 0.8]]];
+  assertEquals((await handleSendSignal(request({ ...BODY, effect_id: "doodle", doodle: strokes }), d)).status, 200);
+  assertEquals((calls[0].args as Record<string, unknown>).p_doodle, strokes);
+  assertEquals((await handleSendSignal(request({ ...BODY, doodle: "heart" }), d)).status, 400);
+  assertEquals("p_doodle" in (calls[0].args as Record<string, unknown>), true);
+  const plain = deps();
+  await handleSendSignal(request(BODY), plain.d);
+  assertEquals("p_doodle" in (plain.calls[0].args as Record<string, unknown>), false, "plain sends stay three arguments");
+});

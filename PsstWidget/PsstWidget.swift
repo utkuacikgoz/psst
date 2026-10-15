@@ -114,6 +114,15 @@ struct Entry: TimelineEntry {
     let date = Date()
     let people: [WidgetPerson]
     let unlocked: Bool
+    /// The newest doodle sent to you that you haven't answered (free, 4A).
+    var doodle: WidgetDoodle? = nil
+}
+
+/// Mirrors LatestDoodle in the app, with the sender's colour looked up.
+struct WidgetDoodle: Hashable {
+    let senderName: String
+    let color: UInt32
+    let strokes: [[[Double]]]
 }
 
 struct Provider: TimelineProvider {
@@ -121,10 +130,28 @@ struct Provider: TimelineProvider {
         (Bundle.main.object(forInfoDictionaryKey: "PSSTAppGroup") as? String).flatMap(UserDefaults.init(suiteName:))
     }
 
-    private func read() -> Entry {
+    private struct StoredDoodle: Decodable {
+        let connectionId: UUID
+        let senderName: String
+        let doodle: [[[Double]]]
+    }
+
+    private func read(doodle fetched: PsstSender.FetchedDoodle?? = nil) -> Entry {
         let people = defaults?.data(forKey: "psst.widget.people")
             .flatMap { try? JSONDecoder().decode([WidgetPerson].self, from: $0) } ?? []
-        return Entry(people: people, unlocked: defaults?.bool(forKey: "psst.widget.unlocked") ?? false)
+        let everyone = defaults?.data(forKey: "psst.widget.everyone")
+            .flatMap { try? JSONDecoder().decode([WidgetPerson].self, from: $0) } ?? people
+        // What the app saved, unless the widget just asked the server itself.
+        let stored = defaults?.data(forKey: "psst.widget.doodle").flatMap { try? JSONDecoder().decode(StoredDoodle.self, from: $0) }
+        let source: (UUID, String, [[[Double]]])? = switch fetched {
+        case .some(.some(let doodle)): (doodle.connectionId, doodle.senderName, doodle.doodle)
+        case .some(.none): nil
+        case .none: stored.map { ($0.connectionId, $0.senderName, $0.doodle) }
+        }
+        let doodle = source.map { id, name, strokes in
+            WidgetDoodle(senderName: name, color: everyone.first { $0.id == id }?.color ?? 0x713F93, strokes: strokes)
+        }
+        return Entry(people: people, unlocked: defaults?.bool(forKey: "psst.widget.unlocked") ?? false, doodle: doodle)
     }
 
     func placeholder(in context: Context) -> Entry {
@@ -136,8 +163,14 @@ struct Provider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
-        // The app reloads the widget whenever the people change.
-        completion(Timeline(entries: [read()], policy: .never))
+        // The app reloads the widget whenever the people or the doodle change. While
+        // the app is closed, the widget also checks for a new doodle now and then.
+        Task {
+            // nil: couldn't ask (keep what the app saved); .some(nil): no doodle now.
+            let fetched: PsstSender.FetchedDoodle??
+            do { fetched = .some(try await PsstSender.latestDoodle()) } catch { fetched = nil }
+            completion(Timeline(entries: [read(doodle: fetched)], policy: .after(Date().addingTimeInterval(30 * 60))))
+        }
     }
 }
 
@@ -150,7 +183,10 @@ struct PeopleView: View {
     }
 
     var body: some View {
-        if !entry.unlocked {
+        if let doodle = entry.doodle, family == .systemSmall || family == .systemMedium {
+            // 3B: a doodle someone drew for you, as a polaroid, until you psst them back.
+            polaroid(doodle).widgetURL(URL(string: "psst://home"))
+        } else if !entry.unlocked {
             message("Psst+ puts your people here", url: "psst://plus")
         } else if shown.isEmpty {
             message("Invite someone to psst", url: "psst://home")
@@ -182,6 +218,27 @@ struct PeopleView: View {
             .accessibilityLabel("Send \(person.name) a Psst")
     }
 
+    private func polaroid(_ doodle: WidgetDoodle) -> some View {
+        VStack(spacing: 4) {
+            WidgetDoodleShape(strokes: doodle.strokes)
+                .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                .padding(10)
+                .aspectRatio(1, contentMode: .fit)
+                .background(Color(hex: doodle.color), in: RoundedRectangle(cornerRadius: 6))
+            Text("from \(doodle.senderName)")
+                .font(.custom("InterTight-Black", size: 12))
+                .foregroundStyle(Color(hex: 0x241B2C))
+                .lineLimit(1)
+        }
+        .padding(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
+        .background(Color(hex: 0xFBF6EA), in: RoundedRectangle(cornerRadius: 10))
+        .rotationEffect(.degrees(-4))
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("A doodle from \(doodle.senderName). Opens Psst.")
+    }
+
     private func message(_ text: String, url: String) -> some View {
         VStack(spacing: 6) {
             Text("psst")
@@ -204,5 +261,22 @@ private extension Color {
                   red: Double((hex >> 16) & 0xFF) / 255,
                   green: Double((hex >> 8) & 0xFF) / 255,
                   blue: Double(hex & 0xFF) / 255)
+    }
+}
+
+/// A doodle's strokes (points from 0 to 1) in a square. Mirrors DoodleShape in the app.
+struct WidgetDoodleShape: Shape {
+    let strokes: [[[Double]]]
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        for stroke in strokes {
+            let points = stroke.compactMap { $0.count == 2 ? CGPoint(x: rect.minX + $0[0] * rect.width, y: rect.minY + $0[1] * rect.height) : nil }
+            guard let first = points.first else { continue }
+            path.move(to: first)
+            if points.count == 1 { path.addLine(to: CGPoint(x: first.x + 0.5, y: first.y)) }
+            for point in points.dropFirst() { path.addLine(to: point) }
+        }
+        return path
     }
 }

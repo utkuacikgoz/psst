@@ -4,6 +4,8 @@
 <dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>PSSTKeychainGroup</key>
+	<string>$(AppIdentifierPrefix)$(PSST_APP_GROUP)</string>
 	<key>PSSTSupabaseHost</key>
 	<string>$(PSST_SUPABASE_HOST)</string>
 	<key>PSSTSupabaseAnonKey</key>

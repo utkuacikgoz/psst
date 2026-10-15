@@ -14,6 +14,8 @@ enum WidgetBridge {
 
     static let peopleKey = "psst.widget.people"
     static let unlockedKey = "psst.widget.unlocked"
+    /// Everyone, in home's order: the Control Center button's person picker (2A).
+    static let everyoneKey = "psst.widget.everyone"
 
     static var defaults: UserDefaults? {
         guard let group = Bundle.main.object(forInfoDictionaryKey: "PSSTAppGroup") as? String,
@@ -26,12 +28,20 @@ enum WidgetBridge {
     }
 
     /// Writes to the shared App Group, or to `store` in tests.
-    static func publish(_ people: [Person], unlocked: Bool, to store: UserDefaults? = nil) {
+    static func publish(_ people: [Person], unlocked: Bool, everyone: [Person]? = nil, to store: UserDefaults? = nil) {
         guard let defaults = store ?? Self.defaults, let data = try? JSONEncoder().encode(people) else { return }
-        guard data != defaults.data(forKey: peopleKey) || unlocked != defaults.bool(forKey: unlockedKey) else { return }
+        let all = everyone.flatMap { try? JSONEncoder().encode($0) }
+        let allChanged = all != nil && all != defaults.data(forKey: everyoneKey)
+        guard data != defaults.data(forKey: peopleKey) || unlocked != defaults.bool(forKey: unlockedKey) || allChanged else { return }
         defaults.set(data, forKey: peopleKey)
         defaults.set(unlocked, forKey: unlockedKey)
+        if let all { defaults.set(all, forKey: everyoneKey) }
         WidgetCenter.shared.reloadAllTimelines()
+        if #available(iOS 18.0, *) { ControlCenter.shared.reloadAllControls() }
+    }
+
+    static func everyone(from connections: [ConnectionSummary], colorHex: (UUID, String) -> UInt32) -> [Person] {
+        connections.map { Person(id: $0.id, name: $0.otherName, color: colorHex($0.id, $0.otherName)) }
     }
 }
 

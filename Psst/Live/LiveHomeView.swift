@@ -358,7 +358,8 @@ struct LiveHomeView: View {
         .task(id: widgetSignature) {
             WidgetBridge.publish(
                 WidgetBridge.people(from: store.orderedConnections) { personalization.colorHex(for: $0, name: $1) },
-                unlocked: purchases.isUnlocked)
+                unlocked: purchases.isUnlocked,
+                everyone: WidgetBridge.everyone(from: store.orderedConnections) { personalization.colorHex(for: $0, name: $1) })
         }
         .onChange(of: store.pendingInviteCode) { _, code in
             if code != nil { showingInvite = true }
@@ -451,7 +452,7 @@ struct LiveHomeView: View {
     }
 
     private var widgetSignature: String {
-        let people = store.orderedConnections.prefix(3)
+        let people = store.orderedConnections
             .map { "\($0.id)|\($0.otherName)|\(personalization.colorHex(for: $0.id, name: $0.otherName))" }
         return people.joined(separator: ",") + "|\(purchases.isUnlocked)"
     }

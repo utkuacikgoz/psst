@@ -24,6 +24,9 @@ struct PsstWidgetBundle: WidgetBundle {
     var body: some Widget {
         PeopleWidget()
         FavouriteWidget()
+        if #available(iOS 18.0, *) {
+            PsstControl()
+        }
     }
 }
 

@@ -87,6 +87,7 @@ final class APIClient: PsstAPI {
         self.config = config
         self.urlSession = urlSession
         self.store = store
+        store.moveToSharedGroupIfNeeded()
         self.session = store.load()
     }
 
@@ -137,6 +138,24 @@ final class APIClient: PsstAPI {
     }
 
     private func refresh(_ current: AuthSession) async throws -> AuthSession {
+        // The Control Center button (widget extension, 2A) refreshes the same session
+        // when it sends. If it has rotated the token since, use its session instead.
+        if let stored = newerStoredSession(than: current) {
+            session = stored
+            if stored.expiresAt.timeIntervalSinceNow >= 60 { return stored }
+            return try await refreshFromServer(stored)
+        }
+        return try await refreshFromServer(current)
+    }
+
+    /// The stored session, when something else (the widget) saved a newer one for this account.
+    private func newerStoredSession(than current: AuthSession) -> AuthSession? {
+        guard let stored = store.load(), stored.userID == current.userID,
+              stored.refreshToken != current.refreshToken else { return nil }
+        return stored
+    }
+
+    private func refreshFromServer(_ current: AuthSession) async throws -> AuthSession {
         do {
             let response: AuthResponse = try await request(
                 path: "auth/v1/token?grant_type=refresh_token",
@@ -147,6 +166,12 @@ final class APIClient: PsstAPI {
             // Accounts are anonymous: signing out loses them for good. Only a session
             // the server says is gone ends it; rate limits and hiccups are temporary.
             guard Self.isDeadSession(status: status, code: code) else { throw APIError.offline }
+            // "Already used" can just mean the widget rotated it a moment ago: never
+            // sign out (anonymous accounts can't come back) while a newer one is stored.
+            if let stored = newerStoredSession(than: current) {
+                session = stored
+                return stored
+            }
             signOutLocally()
             throw APIError.signedOut
         }
@@ -412,15 +437,56 @@ final class APIClient: PsstAPI {
 protocol SessionStore {
     func load() -> AuthSession?
     func save(_ session: AuthSession?)
+    /// Moves a session saved by an older version into the group shared with the widget.
+    func moveToSharedGroupIfNeeded()
+}
+
+extension SessionStore {
+    func moveToSharedGroupIfNeeded() {}
 }
 
 /// Stored so notification actions can use it after first unlock; never synced off the device.
+/// Since 1.0.6 it lives in a keychain group shared with the widget extension, so the
+/// Control Center button can send a Psst without opening the app (2A).
 struct KeychainSessionStore: SessionStore {
+    var sharedGroup: String? = KeychainSessionStore.configuredGroup
+
+    /// "TEAMID.group.<bundle id>" from Info.plist; nil when the build isn't signed for it.
+    static var configuredGroup: String? {
+        guard let group = Bundle.main.object(forInfoDictionaryKey: "PSSTKeychainGroup") as? String,
+              !group.isEmpty, !group.contains("$("), !group.hasPrefix("group.") else { return nil }
+        return group
+    }
+
     private let query: [String: Any] = [
         kSecClass as String: kSecClassGenericPassword,
         kSecAttrService as String: "app.psst.session",
         kSecAttrAccount as String: "session",
     ]
+
+    func moveToSharedGroupIfNeeded() {
+        guard let sharedGroup else { return }
+        var inShared = query
+        inShared[kSecAttrAccessGroup as String] = sharedGroup
+        if SecItemCopyMatching(inShared as CFDictionary, nil) == errSecSuccess { return }
+        var lookup = query
+        lookup[kSecReturnData as String] = true
+        lookup[kSecReturnAttributes as String] = true
+        lookup[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: AnyObject?
+        guard SecItemCopyMatching(lookup as CFDictionary, &result) == errSecSuccess,
+              let found = result as? [String: Any], let data = found[kSecValueData as String] as? Data else { return }
+        // Add the shared copy first; only then remove the old one, so the session is never lost.
+        var shared = inShared
+        shared[kSecValueData as String] = data
+        shared[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        guard SecItemAdd(shared as CFDictionary, nil) == errSecSuccess else { return }
+        if let oldGroup = found[kSecAttrAccessGroup as String] as? String, oldGroup != sharedGroup {
+            var old = query
+            old[kSecAttrAccessGroup as String] = oldGroup
+            SecItemDelete(old as CFDictionary)
+        }
+    }
 
     func load() -> AuthSession? {
         var lookup = query
@@ -439,6 +505,11 @@ struct KeychainSessionStore: SessionStore {
         var item = query
         item[kSecValueData as String] = data
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        if let sharedGroup {
+            var shared = item
+            shared[kSecAttrAccessGroup as String] = sharedGroup
+            if SecItemAdd(shared as CFDictionary, nil) == errSecSuccess { return }
+        }
         SecItemAdd(item as CFDictionary, nil)
     }
 }

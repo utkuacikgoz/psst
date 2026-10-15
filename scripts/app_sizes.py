@@ -50,7 +50,15 @@ app = get("/apps", **{"filter[bundleId]": os.environ["BUNDLE_ID"]})["data"]
 if not app:
     sys.exit("No app with that bundle ID in App Store Connect.")
 builds = get("/builds", **{"filter[app]": app[0]["id"], "sort": "-uploadedDate", "limit": LIMIT,
-                           "include": "preReleaseVersion,buildBundles"})
+                           "include": "preReleaseVersion,buildBundles,buildBetaDetail"})
+details = {d["id"]: d["attributes"] for d in builds.get("included", []) if d["type"] == "buildBetaDetails"}
+for build in builds["data"]:
+    ref = (build["relationships"].get("buildBetaDetail") or {}).get("data") or {}
+    beta = details.get(ref.get("id"), {})
+    print(f"build {build['attributes']['version']}: processing {build['attributes'].get('processingState')}, "
+          f"TestFlight internal {beta.get('internalBuildState')}, external {beta.get('externalBuildState')}, "
+          f"export compliance {build['attributes'].get('usesNonExemptEncryption')}, expired {build['attributes'].get('expired')}")
+print()
 included = builds.get("included", [])
 versions = {v["id"]: v["attributes"]["version"] for v in included if v["type"] == "preReleaseVersions"}
 bundles = {b["id"]: b["attributes"] for b in included if b["type"] == "buildBundles"}

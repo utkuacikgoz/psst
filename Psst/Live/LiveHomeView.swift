@@ -702,6 +702,10 @@ struct LiveHomeView: View {
             // Remove, block and report: a long press here, the VoiceOver action,
             // or Settings → People. Each explains itself before acting.
             .contextMenu {
+                // 1A (owner pick): hold a band → Doodle for <name>, first in the menu.
+                Button {
+                    doodlePerson = connection
+                } label: { Label("Doodle for \(connection.otherName)", systemImage: "scribble") }
                 Button {
                     store.dismissSuperHint()
                     superPerson = connection
@@ -722,6 +726,7 @@ struct LiveHomeView: View {
                 }
             }
             .accessibilityAction(named: "Super Psst") { superPerson = connection }
+            .accessibilityAction(named: "Doodle") { doodlePerson = connection }
             .accessibilityAction(named: "Manage \(connection.otherName)") { managing = connection }
             .accessibilityAction(named: "Move up") { withAnimation { store.move(connection.id, by: -1) } }
             .accessibilityAction(named: "Move down") { withAnimation { store.move(connection.id, by: 1) } }

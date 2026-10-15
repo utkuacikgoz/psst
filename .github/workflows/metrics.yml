@@ -1,0 +1,36 @@
+name: Numbers
+
+# Daily, Linux only: the private dashboard's counts (6A). The report is encrypted
+# with scripts/metrics_public.pem before it leaves the job; only the dashboard
+# holds the private key. Nothing about the numbers is printed (public logs).
+on:
+  schedule:
+    - cron: "40 0 * * *"   # after the nightly metrics snapshot (00:10 UTC)
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_PROD }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Read and encrypt the counts
+        run: python3 scripts/metrics_report.py
+      - name: Publish the encrypted file to the metrics branch
+        run: |
+          mkdir out && mv metrics.enc out/
+          cd out
+          git init -q -b metrics
+          git config user.name "Utku"
+          git config user.email "55285576+utkuacikgoz@users.noreply.github.com"
+          git add -A && git commit -q -m "Encrypted numbers [skip ci]"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" metrics

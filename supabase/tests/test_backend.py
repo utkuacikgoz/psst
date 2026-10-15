@@ -151,6 +151,21 @@ class BackendTests(unittest.TestCase):
         with self.assertRaises(psycopg.Error):
             Api("anon").rpc("invite_progress")
 
+    def test_metrics_report_is_counts_only_and_server_only(self):
+        ada, emre = new_user("Ada"), new_user("Emre")
+        connect(ada, emre)
+        admin("select private.snapshot_metrics(current_date)")
+        report = Api("service_role").rpc("metrics_report")
+        self.assertGreaterEqual(report["accounts_now"], 2)
+        self.assertEqual(report["plus_now"], 0)
+        today = report["days"][-1]
+        self.assertGreaterEqual(today["accepted_invites"], 1)
+        self.assertNotIn(str(ada.user_id), json.dumps(report), "no ids")
+        self.assertNotIn("Ada", json.dumps(report), "no names")
+        for caller in (ada, Api("anon")):
+            with self.assertRaises(psycopg.Error):
+                caller.rpc("metrics_report")
+
     def test_invite_accept_creates_mutual_connection(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         code = ada.rpc("create_invite")["code"]

@@ -249,7 +249,7 @@ The other 1.0.4 changes collect nothing new:
 
 ## 1.0.6 (build 34 or later)
 
-Submit the newest 1.0.6 build: 34 or later (same content as 1.0.5 build 33, with the version bumped to 1.0.6). The backend for everything below (streaks, weekly recap, Psst links, doodles and the 40 KB doodle limit) is deployed to production.
+Submit the newest 1.0.6 build: 34 or later. 1.0.5 build 29 (commit 486c752) is the live version and the baseline for rule 3. The backend for everything below (streaks, weekly recap, Psst links, doodles and the 40 KB doodle limit) is deployed to production.
 
 **Before submitting:**
 1. Create two fresh review codes for the Psst Team profile:
@@ -270,13 +270,10 @@ Submit the newest 1.0.6 build: 34 or later (same content as 1.0.5 build 33, with
 ```
 • Doodles! Hold someone's band, draw them something, and it lands on their Home Screen widget
 • A Control Center button that sends a Psst without opening the app (iOS 18)
-• Psst someone who isn't on Psst yet: send a Psst link, and it's waiting for them when they join
-• Streaks: psst each other 3 days in a row and a little flame keeps count
-• Weekly recap: your week on Sundays — your total, your #1 and your longest streak
-• Super Psst is now a nudge: it shakes their screen
-• Cats! Pull home down and one waves hello. There's one napping in Settings, too
 • Group invite codes show who's joined
-• A faster leaderboard, and small fixes
+• Settings, tidied: everything one tap away
+• The weekly recap is now on for everyone (turn it off in Settings)
+• A smaller download, faster sending, and fixes
 ```
 
 **Notes for the reviewer:**
@@ -285,14 +282,11 @@ Submit the newest 1.0.6 build: 34 or later (same content as 1.0.5 build 33, with
 Psst lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
 
 What's new in 1.0.6:
-- Psst someone new: + band → "Psst someone new" makes a one-person link (psstapp.fun/p/CODE, valid 7 days) and opens the share sheet. The web page shows only the sender's first name. If the recipient installs Psst and opens the link, they connect with the sender (both have agreed: one sent the link, the other accepted it) and that Psst arrives as their first. Nothing is sent to anyone who doesn't open the link.
-- Streaks: when two connected people have both pssted each other on 3 or more days in a row, a flame and the day count show in the corner of that person's band. Days follow each phone's own time zone, which the app saves on the account for this.
-- Weekly recap (on by default; Settings → Weekly recap turns it off): a push notification on Sundays at 6 PM opens a summary of the user's own week (their totals, their most-pssted person, their longest streak). It is only about the user's own Pssts, contains no promotional content, is skipped in weeks with no Pssts, and can be turned off in Settings → Weekly recap.
-- Super Psst is now shown as a "nudge": its mark on the band is a cat between shake lines, and the screen shakes when one arrives (no shake with Reduce Motion).
-- Doodles (free): hold a band → "Doodle for <name>", draw with one finger, then SEND DOODLE. The other person gets a notification ("<name> drew you something") and sees the drawing full screen when they open it; it also shows on their Home Screen widget until they psst back. Doodles only go between two people who have both agreed to connect, are limited to 60 strokes, and are deleted after 30 days like every Psst. Holding the sender's band offers Report and Block, which also takes their doodle off the widget.
+- Doodles (free): hold a band → "Doodle for <name>", draw with one finger, then SEND DOODLE. The other person gets a notification ("<name> drew you something") and sees the drawing full screen when they open it; it also shows on their Home Screen widget until they psst back. Doodles only go between two people who have both agreed to connect, are limited to 60 strokes, and are deleted after 30 days like every Psst. On the doodle itself, ••• (top left) offers Hide doodle, Block and Report; holding the sender's band offers Report and Block too.
 - Control Center (iOS 18): Control Center → + → Add a Control → Psst → "Psst someone", then pick a person. Tapping it sends a Psst without opening the app. Also available as a Shortcuts action, "Send a Psst".
 - Group codes: the invite sheet shows how many people joined a code ("3 of 10 joined · 6 days left") and who.
-- Small illustrations: a cat appears when pulling home down, while loading, on connection errors, under the version in Settings, and when a Psst arrives.
+- Settings is now a short front page; People, Notifications, Psst+ and Privacy and help each open their own page. Psst+ (with Restore purchase) is reachable from Settings too.
+- Weekly recap is on by default (it was opt-in in 1.0.5): a push notification on Sundays at 6 PM opens a summary of the user's own week. It is only about the user's own Pssts, contains no promotional content, is skipped in weeks with no Pssts, and can be turned off in Settings → Weekly recap.
 
 To try it with a real person (our team):
 1. Open the app, enter any name, and choose whether to allow notifications.

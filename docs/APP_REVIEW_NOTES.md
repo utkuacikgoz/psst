@@ -247,9 +247,9 @@ The other 1.0.4 changes collect nothing new:
 - Invites joined per code are already covered by the existing account and contacts-free connection data.
 - Purchase verification failure reasons are stored on the server without any account or purchase identifiers.
 
-## 1.0.5 (build 32 or later)
+## 1.0.5 (build 33 or later)
 
-Submit the newest 1.0.5 build: 32 or later (31 and earlier have the doodle size bug fixed in 12b5a36). The backend for everything below (streaks, weekly recap, Psst links, doodles and the 40 KB doodle limit) is deployed to production.
+Submit the newest 1.0.5 build: 33 or later (33 has the launch fixes and the new Settings; 31 and earlier have the doodle size bug). The backend for everything below (streaks, weekly recap, Psst links, doodles and the 40 KB doodle limit) is deployed to production.
 
 **Before submitting:**
 1. Create two fresh review codes for the Psst Team profile:

@@ -51,6 +51,7 @@ final class LiveStore {
     private(set) var isExistingUser = false
 
     static let coachKey = "psst.live.coachShown"
+    static let doodleTipKey = "psst.live.doodleTipShown"
     static let reviewAskedKey = "psst.live.reviewAsked"
     static let myNameKey = "psst.live.myName"
     /// The last list of people from the server, shown at launch while it refreshes.
@@ -144,6 +145,10 @@ final class LiveStore {
         featureIntroSeen = defaults.bool(forKey: Self.featureIntroKey)
         superHintSeen = defaults.bool(forKey: Self.superHintKey)
         coachDismissed = defaults.bool(forKey: Self.coachKey)
+        doodleTipDismissed = defaults.bool(forKey: Self.doodleTipKey)
+        // Never right after the first tip: someone who just met Psst sees this one
+        // on a later launch.
+        doodleTipEligible = coachDismissed
         myName = defaults.string(forKey: Self.myNameKey)
         pinnedOrder = (defaults.stringArray(forKey: Self.pinnedOrderKey) ?? []).compactMap(UUID.init(uuidString:))
         // Show the people from last time straight away; refresh() replaces them.
@@ -525,6 +530,21 @@ final class LiveStore {
     }
 
     private(set) var coachDismissed = false
+
+    // MARK: Doodle tip (owner pick 1B, 16 Oct 2026)
+
+    /// "Hold a band to doodle", once, over home, like the first tip.
+    var showsDoodleTip: Bool {
+        doodleTipEligible && !doodleTipDismissed && !connections.isEmpty && arrival == nil
+    }
+
+    private(set) var doodleTipDismissed = false
+    @ObservationIgnored private var doodleTipEligible = false
+
+    func dismissDoodleTip() {
+        doodleTipDismissed = true
+        defaults.set(true, forKey: Self.doodleTipKey)
+    }
 
     func dismissFeatureIntro() {
         featureIntroSeen = true
@@ -914,6 +934,9 @@ final class LiveStore {
         isExistingUser = false
         defaults.removeObject(forKey: Self.coachKey)
         coachDismissed = false
+        defaults.removeObject(forKey: Self.doodleTipKey)
+        doodleTipDismissed = false
+        doodleTipEligible = false
         arrival = nil
         arrivalQueue = []
         pendingAcks = [:]

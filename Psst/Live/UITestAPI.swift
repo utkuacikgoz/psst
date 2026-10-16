@@ -36,11 +36,13 @@ final class UITestAPI: PsstAPI {
         }
         if scenario == .features || scenario == .returning || scenario == .superArrival {
             defaults.set(true, forKey: LiveStore.coachKey)
+            defaults.set(true, forKey: LiveStore.doodleTipKey)
             defaults.set(true, forKey: LiveStore.superHintKey)
             if scenario != .returning { defaults.set(true, forKey: LiveStore.featureIntroKey) }
         }
         if [.store, .loadFailure, .settingsFailure].contains(scenario) {
             defaults.set(true, forKey: LiveStore.coachKey)
+            defaults.set(true, forKey: LiveStore.doodleTipKey)
             defaults.set(true, forKey: LiveStore.superHintKey)
             defaults.set(true, forKey: LiveStore.featureIntroKey)
         }

@@ -516,6 +516,20 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertNil(store.sendDoodle(mia, strokes: strokes), "not one still sending: the pad stays open")
     }
 
+    func testDoodleTipShowsOnceOnALaterLaunchThanTheFirstTip() async {
+        api.connections = [connection(name: "Mia")]
+        await store.refresh()
+        XCTAssertTrue(store.showsCoach)
+        store.dismissCoach()
+        XCTAssertFalse(store.showsDoodleTip, "never straight after the first tip")
+
+        let later = LiveStore(api: api, defaults: defaults)
+        await later.refresh()
+        XCTAssertTrue(later.showsDoodleTip)
+        later.dismissDoodleTip()
+        XCTAssertFalse(LiveStore(api: api, defaults: defaults).showsDoodleTip, "once")
+    }
+
     func testDoodlePayloadFlag() {
         let event = UUID(), connection = UUID()
         let payload = SignalPayload(userInfo: ["psst": [

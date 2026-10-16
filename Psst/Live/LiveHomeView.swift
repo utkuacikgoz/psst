@@ -190,6 +190,7 @@ struct LiveHomeView: View {
 
     /// The tip waits for any full-screen moment to finish, so the two never stack.
     private var showsCoach: Bool { store.showsCoach && store.hasLoadedConnections && !anySheet && store.arrival == nil }
+    private var showsDoodleTip: Bool { store.showsDoodleTip && !showsCoach && store.hasLoadedConnections && !anySheet }
 
     private var anySheet: Bool {
         showingFeatureIntro || superPerson != nil || doodlePerson != nil || showingInvite || enteringCode || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
@@ -293,11 +294,13 @@ struct LiveHomeView: View {
             }
         }
         // Behind a sheet, an arrival or the tip, VoiceOver can't reach (and tap-send) the bands.
-        .accessibilityHidden(anySheet || store.arrival != nil || showsCoach)
+        .accessibilityHidden(anySheet || store.arrival != nil || showsCoach || showsDoodleTip)
         .background(Color.psstCanvas.ignoresSafeArea())
         .overlay {
             if showsCoach {
                 CoachOverlay { withAnimation { store.dismissCoach() } }
+            } else if showsDoodleTip {
+                DoodleTipOverlay { withAnimation { store.dismissDoodleTip() } }
             }
         }
         .overlay {
@@ -942,6 +945,56 @@ struct CoachOverlay: View {
         .transition(.opacity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Tip: tap a band to send a Psst. Hold for Super Psst, colours, moving or managing people.")
+        .accessibilityHint("Dismisses the tip.")
+        .accessibilityAddTraits([.isButton, .isModal])
+        .task {
+            guard !reduceMotion else { return }
+            while !Task.isCancelled {
+                withAnimation(.easeInOut(duration: 0.35)) { pressing = true }
+                try? await Task.sleep(for: .milliseconds(450))
+                withAnimation(.easeInOut(duration: 0.35)) { pressing = false }
+                try? await Task.sleep(for: .milliseconds(1100))
+            }
+        }
+    }
+}
+
+/// 1B (owner pick, 16 Oct 2026): doodles live in the hold menu, so a one-time tip
+/// says so, in the same dark overlay as the first tip. Any tap dismisses it; it
+/// never sends or opens anything.
+struct DoodleTipOverlay: View {
+    let onDismiss: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pressing = false
+
+    var body: some View {
+        Button(action: onDismiss) {
+            VStack(spacing: Tokens.Space.l) {
+                Image(systemName: "scribble")
+                    .font(.system(size: 56, weight: .bold))
+                    .scaleEffect(pressing ? 0.88 : 1)
+                    .accessibilityHidden(true)
+                Text("Hold a band to doodle")
+                    .font(.psst(.title2, weight: .black))
+                Text("Draw them something for their widget.")
+                    .font(.psst(.body, weight: .medium))
+                Text("Tap anywhere to start")
+                    .font(.psst(.footnote, weight: .semibold))
+                    .foregroundStyle(Color.onCanvasSecondary)
+                    .padding(.top, Tokens.Space.l)
+            }
+            .multilineTextAlignment(.center)
+            .foregroundStyle(Color.onCanvas)
+            .padding(Tokens.Space.xl)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.black.opacity(0.8).ignoresSafeArea())
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .transition(.opacity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("New: hold a band, or use the Doodle action, to draw someone a doodle for their widget.")
         .accessibilityHint("Dismisses the tip.")
         .accessibilityAddTraits([.isButton, .isModal])
         .task {

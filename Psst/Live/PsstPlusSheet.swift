@@ -45,6 +45,7 @@ struct PsstPlusSheet: View {
                 if purchases.isUnlocked {
                     IconSection()
                     SoundSection()
+                    WordSection()
                     Section {
                         Text("To change someone's colour, hold their band and choose Colour….")
                             .font(.subheadline)
@@ -277,6 +278,62 @@ private struct SoundSection: View {
         Task {
             do {
                 try await store.api.setNotificationSound(file)
+            } catch {
+                chosen = previous
+                failed = true
+            }
+        }
+    }
+}
+
+/// Your word (owner picks 1A 2A 3A, 16 Oct 2026): one word, from ten, that everyone
+/// you psst sees instead of "psst", in their notification and the full-screen moment.
+private struct WordSection: View {
+    @Environment(LiveStore.self) private var store
+    @State private var chosen = "psst"
+    @State private var failed = false
+
+    private let columns = [GridItem(.adaptive(minimum: 78), spacing: Tokens.Space.s)]
+
+    var body: some View {
+        Section {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: Tokens.Space.s) {
+                ForEach(PsstWord.all, id: \.self) { word in
+                    Button {
+                        choose(word)
+                    } label: {
+                        Text(verbatim: word)
+                            .font(.psst(.body, weight: .heavy))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .foregroundStyle(chosen == word ? Color.white : Color.ink)
+                            .padding(.horizontal, Tokens.Space.m)
+                            .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
+                            .background(chosen == word ? Color.psstCanvas : Color.psstCanvas.opacity(0.08), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(chosen == word ? .isSelected : [])
+                }
+            }
+            .padding(.vertical, Tokens.Space.xs)
+        } header: {
+            Text("Your word")
+        } footer: {
+            Text(failed ? "That didn't save. Check you're online and try again."
+                        : "What your people see when you psst them. Pssting is still free; your word is a Psst+ extra.")
+        }
+        .task {
+            if let saved = try? await store.api.myPsstWord() { chosen = PsstWord.shown(saved) ?? "psst" }
+        }
+    }
+
+    private func choose(_ word: String) {
+        let previous = chosen
+        chosen = word
+        failed = false
+        Task {
+            do {
+                try await store.api.setPsstWord(word == "psst" ? nil : word)
             } catch {
                 chosen = previous
                 failed = true

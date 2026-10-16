@@ -28,6 +28,8 @@ struct UnseenSignal: Decodable, Identifiable, Equatable {
     var sameMoment: Bool? = nil
     /// A doodle's strokes (effect "doodle").
     var doodle: DoodleStrokes? = nil
+    /// The sender's Psst+ word for a plain Psst ("boop"); nil = "psst".
+    var word: String? = nil
 
     var signal: Signal { Signal(rawValue: effectId) ?? .psst }
 }
@@ -133,12 +135,15 @@ struct SignalPayload: Equatable {
     let connectionID: UUID
     let signal: Signal
     var sameMoment = false
+    /// The sender's Psst+ word ("boop"), when they chose one.
+    var word: String? = nil
 
-    init(eventID: UUID, connectionID: UUID, signal: Signal, sameMoment: Bool = false) {
+    init(eventID: UUID, connectionID: UUID, signal: Signal, sameMoment: Bool = false, word: String? = nil) {
         self.eventID = eventID
         self.connectionID = connectionID
         self.signal = signal
         self.sameMoment = sameMoment
+        self.word = word
     }
 
     init?(userInfo: [AnyHashable: Any]) {
@@ -150,7 +155,8 @@ struct SignalPayload: Equatable {
         self.init(eventID: event, connectionID: connection,
                   signal: psst["super_psst"] as? Bool == true ? .superPsst
                       : psst["doodle"] as? Bool == true ? .doodle : signal,
-                  sameMoment: psst["same_moment"] as? Bool ?? false)
+                  sameMoment: psst["same_moment"] as? Bool ?? false,
+                  word: PsstWord.shown(psst["word"] as? String))
     }
 }
 
@@ -257,4 +263,17 @@ struct WeeklyRecap: Decodable, Equatable {
 struct WeeklyRecapStatus: Decodable, Equatable {
     let enabled: Bool
     let weekTotal: Int
+}
+
+/// Your word (owner picks 1A 2A 3A, 16 Oct 2026; Psst+): what the people you psst
+/// see instead of "psst". A fixed list (the server checks the same one); the name
+/// and the verb stay Psst.
+enum PsstWord {
+    static let all = ["psst", "hey", "boop", "oi", "yo", "hiii", "mwah", "pışt", "ねぇ", "psst psst"]
+
+    /// A word from the list to show, or nil for plain "psst" (and anything unknown).
+    static func shown(_ word: String?) -> String? {
+        guard let word, word != "psst", all.contains(word) else { return nil }
+        return word
+    }
 }

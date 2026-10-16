@@ -128,3 +128,12 @@ Deno.test("a doodle's notification says they drew something", () => {
   const routing = (payload as unknown as { psst: { effect_id: string; doodle: boolean; super_psst: boolean } }).psst;
   assertEquals([routing.effect_id, routing.doodle, routing.super_psst], ["psst", true, false]);
 });
+
+Deno.test("a sender's Psst+ word replaces Psst in the notification and rides along for the app", () => {
+  const payload = buildPayload(targets({ effect_id: "psst", word: "boop" })) as unknown as {
+    aps: { alert: { body: string } }; psst: { word?: string; effect_id: string };
+  };
+  assertEquals([payload.aps.alert.body, payload.psst.word, payload.psst.effect_id], ["boop", "boop", "psst"]);
+  const plain = buildPayload(targets({ effect_id: "psst", word: null })) as unknown as { aps: { alert: { body: string } }; psst: { word?: string } };
+  assertEquals([plain.aps.alert.body, plain.psst.word], ["Psst", undefined]);
+});

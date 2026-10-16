@@ -793,6 +793,30 @@ class BackendTests(unittest.TestCase):
         admin("update private.plus_entitlements set valid_until=now()-interval '1 minute' where user_id=%s", a.user_id)
         with self.fails("super_daily_limit", 409): a.rpc("send_signal", uuid.uuid4(), pair, "super_psst")
 
+    def test_your_word_needs_plus_and_reaches_only_plain_pssts(self):
+        ada, emre = new_user("Ada"), new_user("Emre")
+        pair = connect(ada, emre)
+        service = Api("service_role")
+        with self.fails("plus_required", 403):
+            ada.rpc("set_psst_word", "boop")
+        with self.fails("invalid_word", 422):
+            ada.rpc("set_psst_word", "anything I like")
+        admin("select public.record_verified_plus(%s,%s,true)", ada.user_id, str(uuid.uuid4()))
+        ada.rpc("set_psst_word", "boop")
+        self.assertEqual(ada.rpc("my_psst_word"), "boop")
+        event = uuid.uuid4()
+        ada.rpc("send_signal", event, pair, "psst")
+        self.assertEqual(service.rpc("push_targets", event)["word"], "boop")
+        self.assertEqual(emre.rows("select word from public.list_unseen()")[0][0], "boop")
+        superevent = uuid.uuid4()
+        ada.rpc("send_signal", superevent, pair, "super_psst")
+        self.assertIsNone(service.rpc("push_targets", superevent)["word"], "Super Psst keeps its own wording")
+        # When Psst+ lapses the word stops showing; "psst" clears it.
+        admin("update private.plus_entitlements set valid_until=now()-interval '1 minute' where user_id=%s", ada.user_id)
+        self.assertIsNone(service.rpc("push_targets", event)["word"])
+        ada.rpc("set_psst_word", "psst")
+        self.assertIsNone(ada.rpc("my_psst_word"))
+
     def test_connected_people_see_only_each_others_name(self):
         ada, emre = new_user("Ada"), new_user("Emre")
         connect(ada, emre)

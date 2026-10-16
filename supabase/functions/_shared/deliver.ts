@@ -12,6 +12,8 @@ export interface PushTargets {
   sound?: string;
   push_status: PushStatus;
   sender_name: string;
+  /** The sender's Psst+ word for a plain Psst ("boop"); null or absent = "Psst". */
+  word?: string | null;
   tokens: { token: string; environment: ApnsEnvironment }[];
 }
 
@@ -49,7 +51,7 @@ export function buildPayload(targets: PushTargets) {
     aps: {
       alert: {
         title: targets.sender_name,
-        body: EFFECT_TITLES[targets.effect_id] ?? "Signal",
+        body: (targets.effect_id === "psst" && targets.word) || (EFFECT_TITLES[targets.effect_id] ?? "Signal"),
       },
       // Bundled in the app (Psst/psst.wav). iOS falls back to the default
       // sound if the file is missing; silent mode and Focus still apply.
@@ -66,6 +68,7 @@ export function buildPayload(targets: PushTargets) {
       super_psst: targets.effect_id === "super_psst",
       doodle: targets.effect_id === "doodle",
       same_moment: targets.same_moment ?? false,
+      ...(targets.word ? { word: targets.word } : {}),
     },
   };
 }

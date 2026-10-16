@@ -17,6 +17,8 @@ struct Arrival: Identifiable, Equatable {
     var total: Int? = nil
     /// One quiet line under "psst", e.g. "Sent yesterday, before you had Psst" (5A).
     var note: String? = nil
+    /// The sender's Psst+ word, shown where "psst" is (1A); nil = "psst".
+    var word: String? = nil
 }
 
 /// The person's colour fills the screen for a moment, then it settles back
@@ -79,7 +81,7 @@ struct ArrivalView: View {
 
     private var announcement: String {
         switch arrival.kind {
-        case .signal: "\(countPrefix)Psst from \(name)"
+        case .signal: arrival.word.map { "\(countPrefix)\($0) from \(name)" } ?? "\(countPrefix)Psst from \(name)"
         case .superPsst: "\(countPrefix)Super Psst from \(name)"
         case .doodle: "\(countPrefix)\(name) drew you a doodle"
         case .joined: "\(name) is in. You're connected."
@@ -281,9 +283,11 @@ struct ArrivalView: View {
                         }
                     } else if isPsst {
                         VStack(spacing: Tokens.Space.s) {
-                            Text("psst")
-                                .font(.psst(size: psstSize, weight: .heavy))
-                                .tracking(Tokens.Band.wordmarkTracking)
+                            Group {
+                                if arrival.kind == .signal, let word = arrival.word { Text(verbatim: word) } else { Text("psst") }
+                            }
+                            .font(.psst(size: psstSize, weight: .heavy))
+                            .tracking(Tokens.Band.wordmarkTracking)
                             if let note = arrival.note {
                                 Text(note).font(.psst(.subheadline, weight: .semibold))
                             }

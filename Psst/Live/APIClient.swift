@@ -29,6 +29,9 @@ protocol PsstAPI: AnyObject {
     func sendSignal(eventID: UUID, connectionID: UUID, signal: Signal) async throws -> SendResult
     func sendDoodle(eventID: UUID, connectionID: UUID, strokes: DoodleStrokes) async throws -> SendResult
     func latestDoodle() async throws -> LatestDoodle?
+    /// Your Psst+ word (nil or "psst" = plain Psst), and what's saved now.
+    func setPsstWord(_ word: String?) async throws
+    func myPsstWord() async throws -> String?
     func createInvite() async throws -> CreatedInvite
     func createPsstInvite() async throws -> CreatedInvite
     func previewInvite(code: String) async throws -> InvitePreview
@@ -69,6 +72,8 @@ extension PsstAPI {
         throw APIError.server(status: 503, code: "feature_unavailable")
     }
     func latestDoodle() async throws -> LatestDoodle? { nil }
+    func setPsstWord(_ word: String?) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
+    func myPsstWord() async throws -> String? { nil }
     func weeklyRecap() async throws -> WeeklyRecap { throw APIError.server(status: 503, code: "feature_unavailable") }
     func weeklyRecapStatus() async throws -> WeeklyRecapStatus { throw APIError.server(status: 503, code: "feature_unavailable") }
     func setWeeklyRecap(_ enabled: Bool) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
@@ -239,6 +244,14 @@ final class APIClient: PsstAPI {
 
     func latestDoodle() async throws -> LatestDoodle? {
         try await rpc("latest_doodle", [String: String]())
+    }
+
+    func setPsstWord(_ word: String?) async throws {
+        try await rpcVoid("set_psst_word", ["p_word": word ?? "psst"])
+    }
+
+    func myPsstWord() async throws -> String? {
+        try await rpc("my_psst_word", [String: String]())
     }
 
     func createInvite() async throws -> CreatedInvite {

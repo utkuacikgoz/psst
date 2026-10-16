@@ -530,6 +530,16 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertFalse(LiveStore(api: api, defaults: defaults).showsDoodleTip, "once")
     }
 
+    func testYourWordRidesThePushAndOnlyListedWordsShow() {
+        let event = UUID(), connection = UUID()
+        let payload = SignalPayload(userInfo: ["psst": [
+            "event_id": event.uuidString, "connection_id": connection.uuidString, "effect_id": "psst", "word": "boop"]])
+        XCTAssertEqual(payload?.word, "boop")
+        XCTAssertNil(PsstWord.shown("psst"), "psst is the plain default")
+        XCTAssertNil(PsstWord.shown("anything else"))
+        XCTAssertEqual(PsstWord.shown("ねぇ"), "ねぇ")
+    }
+
     func testDoodlePayloadFlag() {
         let event = UUID(), connection = UUID()
         let payload = SignalPayload(userInfo: ["psst": [

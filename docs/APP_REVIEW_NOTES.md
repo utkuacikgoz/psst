@@ -249,7 +249,7 @@ The other 1.0.4 changes collect nothing new:
 
 ## 1.0.6 (build 35 or later)
 
-Submit the newest 1.0.6 build: 35 or later. 1.0.5 build 29 (commit 486c752) is the live version and the baseline for rule 3. The backend for everything below (streaks, weekly recap, Psst links, doodles and the 40 KB doodle limit) is deployed to production.
+**Submitted 16 Oct 2026 with build 35 (commit 6a09ab4).** Once Apple releases it: `update public.app_config set latest_build = 35, latest_version = '1.0.6';` (soft update notice). 1.0.5 build 29 (commit 486c752) is the live version and the baseline for rule 3. The backend for everything below (streaks, weekly recap, Psst links, doodles and the 40 KB doodle limit) is deployed to production.
 
 **Before submitting:**
 1. Create two fresh review codes for the Psst Team profile:

@@ -247,9 +247,9 @@ The other 1.0.4 changes collect nothing new:
 - Invites joined per code are already covered by the existing account and contacts-free connection data.
 - Purchase verification failure reasons are stored on the server without any account or purchase identifiers.
 
-## 1.0.6 (build 34 or later)
+## 1.0.6 (build 35 or later)
 
-Submit the newest 1.0.6 build: 34 or later. 1.0.5 build 29 (commit 486c752) is the live version and the baseline for rule 3. The backend for everything below (streaks, weekly recap, Psst links, doodles and the 40 KB doodle limit) is deployed to production.
+Submit the newest 1.0.6 build: 35 or later. 1.0.5 build 29 (commit 486c752) is the live version and the baseline for rule 3. The backend for everything below (streaks, weekly recap, Psst links, doodles and the 40 KB doodle limit) is deployed to production.
 
 **Before submitting:**
 1. Create two fresh review codes for the Psst Team profile:
@@ -268,7 +268,7 @@ Submit the newest 1.0.6 build: 34 or later. 1.0.5 build 29 (commit 486c752) is t
 **What's New in This Version:**
 
 ```
-• Doodles! Hold someone's band, draw them something, and it lands on their Home Screen widget
+• Doodles! Hold someone's band, draw them something, and it lands on their Home Screen widget. Free
 • A Control Center button that sends a Psst without opening the app (iOS 18)
 • Group invite codes show who's joined
 • Super Psst opens a small card instead of a whole page
@@ -301,7 +301,7 @@ To try it with a real person (our team):
 
 Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. Settings → Delete account removes all server data immediately.
 
-Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "Psst+" next to Settings (or Settings → Psst+) → Unlock, or from the Super Psst card once today's free one is used. It adds unlimited Super Psst, per-person band colours, alternate app icons, whisper sounds and Home Screen / Lock Screen widgets. "Restore purchase" is on both sheets. Pssting, replies and invites are free.
+Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "Psst+" next to Settings (or Settings → Psst+) → Unlock, or from the Super Psst card once today's free one is used. It adds unlimited Super Psst, per-person band colours, alternate app icons, whisper sounds and Home Screen / Lock Screen widgets. Doodles, including the doodle shown on the recipient's widget, and the Control Center button are free. "Restore purchase" is on both sheets. Pssting, replies and invites are free.
 
 Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
 ```

@@ -25,6 +25,13 @@ struct PsstApp: App {
                             }
                         }
                     }
+                    // Tell the server about Psst+ whenever this phone has a purchase to show
+                    // (launch, buy, restore), so unlimited Super Psst and your word work
+                    // without first opening the Super Psst card. The server skips a fresh one.
+                    .task(id: purchases.signedTransaction) {
+                        guard let proof = purchases.signedTransaction, store.api.isSignedIn else { return }
+                        try? await store.api.verifyPlus(signedTransaction: proof)
+                    }
                     // "Offline" follows iOS's network status, not a single failed request.
                     .task {
                         for await available in NetworkWatcher.updates() {

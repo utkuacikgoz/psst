@@ -269,7 +269,7 @@ struct WeeklyRecapStatus: Decodable, Equatable {
 /// see instead of "psst". A fixed list (the server checks the same one); the name
 /// and the verb stay Psst.
 enum PsstWord {
-    static let all = ["psst", "hey", "boop", "oi", "yo", "hiii", "mwah", "pışt", "ねぇ", "psst psst"]
+    static let all = ["psst", "hey", "boop", "oi", "yo", "hiii", "mwah", "psst psst"]
 
     /// A word from the list to show, or nil for plain "psst" (and anything unknown).
     static func shown(_ word: String?) -> String? {

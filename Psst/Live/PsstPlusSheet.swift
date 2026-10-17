@@ -286,7 +286,7 @@ private struct SoundSection: View {
     }
 }
 
-/// Your word (owner picks 1A 2A 3A, 16 Oct 2026): one word, from ten, that everyone
+/// Your word (owner picks 1A 2A 3A, 16 Oct 2026): one word, from eight (English only since 17 Oct), that everyone
 /// you psst sees instead of "psst", in their notification and the full-screen moment.
 private struct WordSection: View {
     @Environment(LiveStore.self) private var store

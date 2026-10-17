@@ -1,6 +1,5 @@
-import { Buffer } from "node:buffer";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { AppStoreServerAPIClient, Environment, SignedDataVerifier } from "npm:@apple/app-store-server-library@3.1.0";
+import { type AppleEnvironment, fetchSignedTransaction, verifySignedTransaction } from "./apple.ts";
 import { handleVerifyPlus } from "./handler.ts";
 import { parseRoots } from "./roots.ts";
 
@@ -24,7 +23,7 @@ Deno.serve((req) => handleVerifyPlus(req, {
       await logFailure("config", "APP_STORE_ENVIRONMENT not set");
       throw new Error("Not configured");
     }
-    const order = env === "Production" ? [Environment.PRODUCTION, Environment.SANDBOX] : [Environment.SANDBOX];
+    const order: AppleEnvironment[] = env === "Production" ? ["Production", "Sandbox"] : ["Sandbox"];
     let lastError: unknown;
     for (const environment of order) {
       try {
@@ -51,27 +50,27 @@ Deno.serve((req) => handleVerifyPlus(req, {
   },
 }));
 
-async function verifyIn(environment: Environment, proof: string) {
-  const bundle = Deno.env.get("APP_STORE_BUNDLE_ID")!;
+async function verifyIn(environment: AppleEnvironment, proof: string) {
+  const bundleId = Deno.env.get("APP_STORE_BUNDLE_ID")!;
   const roots = parseRoots(Deno.env.get("APPLE_ROOT_CA_BASE64") ?? "");
-  if (!roots.length) throw new Error("Missing trust roots");
-  const production = environment === Environment.PRODUCTION;
-  const verifier = new SignedDataVerifier(roots.map(root => Buffer.from(root, "base64")), true,
-    environment, bundle, production ? Number(Deno.env.get("APP_STORE_APP_ID")) : undefined);
-  const device = await verifier.verifyAndDecodeTransaction(proof);
+  const expect = { bundleId, environment,
+    appAppleId: environment === "Production" ? Number(Deno.env.get("APP_STORE_APP_ID")) : undefined };
+  const device = await verifySignedTransaction(proof, roots, expect);
   if (device.productId !== "psstplus.unlock" || !device.transactionId || !device.originalTransactionId) {
     throw new Error("Invalid product");
   }
-  const apple = new AppStoreServerAPIClient(Deno.env.get("APP_STORE_PRIVATE_KEY")!,
-    Deno.env.get("APP_STORE_KEY_ID")!, Deno.env.get("APP_STORE_ISSUER_ID")!, bundle, environment);
-  const info = await apple.getTransactionInfo(device.transactionId);
-  const current = await verifier.verifyAndDecodeTransaction(info.signedTransactionInfo!);
-  if (current.productId !== "psstplus.unlock" || current.originalTransactionId !== device.originalTransactionId) {
+  // Apple's own, current record: catches refunds since the phone signed its copy.
+  const signed = await fetchSignedTransaction(device.transactionId, environment, {
+    privateKey: Deno.env.get("APP_STORE_PRIVATE_KEY")!, keyId: Deno.env.get("APP_STORE_KEY_ID")!,
+    issuerId: Deno.env.get("APP_STORE_ISSUER_ID")!, bundleId,
+  });
+  const latest = await verifySignedTransaction(signed, roots, expect);
+  if (latest.productId !== "psstplus.unlock" || latest.originalTransactionId !== device.originalTransactionId) {
     throw new Error("Invalid transaction");
   }
-  return { originalTransactionId: current.originalTransactionId,
-    appAccountToken: current.appAccountToken,
-    active: current.revocationDate === undefined };
+  return { originalTransactionId: latest.originalTransactionId,
+    appAccountToken: latest.appAccountToken,
+    active: latest.revocationDate === undefined };
 }
 
 /** The reason only, never the proof or a key: read back by the diagnose-purchases workflow. */

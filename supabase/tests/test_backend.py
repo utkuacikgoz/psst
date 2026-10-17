@@ -801,6 +801,8 @@ class BackendTests(unittest.TestCase):
             ada.rpc("set_psst_word", "boop")
         with self.fails("invalid_word", 422):
             ada.rpc("set_psst_word", "anything I like")
+        with self.fails("invalid_word", 422):
+            ada.rpc("set_psst_word", "pışt")
         admin("select public.record_verified_plus(%s,%s,true)", ada.user_id, str(uuid.uuid4()))
         ada.rpc("set_psst_word", "boop")
         self.assertEqual(ada.rpc("my_psst_word"), "boop")

@@ -537,7 +537,8 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(payload?.word, "boop")
         XCTAssertNil(PsstWord.shown("psst"), "psst is the plain default")
         XCTAssertNil(PsstWord.shown("anything else"))
-        XCTAssertEqual(PsstWord.shown("ねぇ"), "ねぇ")
+        XCTAssertEqual(PsstWord.shown("mwah"), "mwah")
+        XCTAssertNil(PsstWord.shown("pışt"), "English only since 17 Oct")
     }
 
     func testDoodlePayloadFlag() {

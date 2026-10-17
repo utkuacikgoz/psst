@@ -307,3 +307,41 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 ```
 
 **App Privacy:** doodles are covered by the existing **User Content → Other User Content** (linked, not tracking, App Functionality); the privacy manifest now lists it too. The device's time zone is now saved on the account (streak days and the recap's Sunday 6 PM). Apple has no time-zone category and it is far coarser than "Coarse Location", so the safe declaration is **Other Data → App Functionality, linked to the user, not used for tracking**. Weekly recap and Psst links collect nothing else new: the recap is computed from Pssts already stored, and a Psst link stores only the same invite row as an invite code.
+
+## 1.0.7 (build 37 or later)
+
+1.0.6 (build 35) is the live version and the baseline for rule 3. Submit with the Release to App Store workflow (version 1.0.7, the newest build, mode prepare to check, then submit); it reads the two blocks below.
+
+**What's New in This Version:**
+
+```
+• Your word (Psst+): choose what your people see when you psst them: hey, boop, oi, yo, hiii, mwah or psst psst
+• Psst+ now unlocks unlimited Super Psst reliably on every iPhone
+• Small fixes
+```
+
+**Notes for the reviewer:**
+
+```
+Psst lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
+
+What's new in 1.0.7:
+- Your word (Psst+ only): Psst+ sheet → "Your word" lets the buyer pick one word from a fixed list (psst, hey, boop, oi, yo, hiii, mwah, psst psst). The people they psst then see that word instead of "psst" in the notification ("Mia · boop") and the full-screen moment. It is a fixed list, so there is no free text; the server only accepts these words and only from accounts with a verified Psst+ purchase.
+- Psst+ purchases are now verified on our server reliably, so unlimited Super Psst works on every device after buying or restoring.
+
+To try it with a real person (our team):
+1. Open the app, enter any name, and choose whether to allow notifications.
+2. On home, tap "I have a code" and enter:  PSSTFIVE
+   (backup code:  PSSTCATS)
+3. Tap Connect. A band for "Psst Team" appears on home.
+4. Tap the band to send a Psst. We'll psst you back within a few minutes during review hours.
+5. To see Your word: home → "Psst+" → Unlock (sandbox purchase), then pick a word under "Your word" and psst us; we'll reply so you can see ours.
+
+Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. On a doodle, ••• offers Hide doodle, Block and Report. Settings → Delete account removes all server data immediately.
+
+Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "Psst+" next to Settings (or Settings → Psst+) → Unlock. It adds unlimited Super Psst, per-person band colours, alternate app icons, whisper sounds, Your word and Home Screen / Lock Screen widgets. Doodles and the Control Center button are free. "Restore purchase" is on the Psst+ sheet. Pssting, replies and invites are free.
+
+Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
+```
+
+**App Privacy:** nothing new to declare: your word is a setting on the account (covered by the existing linked, not tracking, App Functionality items).

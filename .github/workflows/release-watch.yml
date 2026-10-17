@@ -1,0 +1,29 @@
+name: Release watch
+
+# Linux only. Every 6 hours: once a new version is live on the App Store, turn
+# on the soft-update notice (app_config.latest_build / latest_version). Never
+# changes min_build.
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_PROD }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: pip install -q pyjwt cryptography
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: python3 scripts/release_watch.py

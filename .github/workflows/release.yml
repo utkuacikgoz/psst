@@ -1,0 +1,42 @@
+name: Release to App Store
+
+# Manual, Linux only. Puts a processed build up for App Store review: creates
+# the version, attaches the build, fills What's New and the review notes from
+# docs/APP_REVIEW_NOTES.md (the "## <version> (" section). "prepare" stops
+# before sending; "submit" sends it to App Review.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: App version, e.g. 1.0.7
+        required: true
+      build:
+        description: Build number (the TestFlight run number), e.g. 37
+        required: true
+      mode:
+        description: prepare (fill everything) or submit (also send for review)
+        type: choice
+        options: [prepare, submit]
+        default: prepare
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+      VERSION: ${{ inputs.version }}
+      BUILD: ${{ inputs.build }}
+      MODE: ${{ inputs.mode }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: pip install -q pyjwt cryptography
+      - run: python3 scripts/release.py

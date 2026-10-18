@@ -281,7 +281,7 @@ private struct WordHero: View {
     @State private var failed = false
     @ScaledMetric(relativeTo: .largeTitle) private var wordSize: CGFloat = 56
 
-    private let columns = [GridItem(.adaptive(minimum: 70), spacing: Tokens.Space.s)]
+    private let columns = [GridItem(.adaptive(minimum: 92), spacing: Tokens.Space.s)]
 
     var body: some View {
         VStack(spacing: Tokens.Space.m) {
@@ -309,7 +309,7 @@ private struct WordHero: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                             .foregroundStyle(chosen == word ? Color.psstCanvas : Color.white)
-                            .padding(.horizontal, Tokens.Space.m)
+                            .padding(.horizontal, Tokens.Space.s)
                             .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
                             .background(chosen == word ? Color.white : Color.white.opacity(0.18), in: Capsule())
                     }

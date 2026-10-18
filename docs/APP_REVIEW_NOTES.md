@@ -308,7 +308,7 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 
 **App Privacy:** doodles are covered by the existing **User Content → Other User Content** (linked, not tracking, App Functionality); the privacy manifest now lists it too. The device's time zone is now saved on the account (streak days and the recap's Sunday 6 PM). Apple has no time-zone category and it is far coarser than "Coarse Location", so the safe declaration is **Other Data → App Functionality, linked to the user, not used for tracking**. Weekly recap and Psst links collect nothing else new: the recap is computed from Pssts already stored, and a Psst link stores only the same invite row as an invite code.
 
-## 1.0.7 (build 40 or later)
+## 1.0.7 (build 42)
 
 1.0.6 (build 35) is the live version and the baseline for rule 3. Submit with the Release to App Store workflow (version 1.0.7, the newest build, mode prepare to check, then submit); it reads the two blocks below.
 

@@ -2,7 +2,8 @@ name: Release to App Store
 
 # Manual, Linux only. Puts a processed build up for App Store review: creates
 # the version, attaches the build, fills What's New and the review notes from
-# docs/APP_REVIEW_NOTES.md (the "## <version> (" section). "prepare" stops
+# docs/APP_REVIEW_NOTES.md (the "## <version> (" section), replaces the App
+# Store screenshots with brand/appstore unless told to keep them. "prepare" stops
 # before sending; "submit" sends it to App Review.
 on:
   workflow_dispatch:
@@ -18,6 +19,11 @@ on:
         type: choice
         options: [prepare, submit]
         default: prepare
+      screenshots:
+        description: upload (replace the App Store screenshots with brand/appstore) or keep
+        type: choice
+        options: [upload, keep]
+        default: upload
 
 concurrency:
   group: release
@@ -27,7 +33,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 10
+    timeout-minutes: 25
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -36,6 +42,7 @@ jobs:
       VERSION: ${{ inputs.version }}
       BUILD: ${{ inputs.build }}
       MODE: ${{ inputs.mode }}
+      SCREENSHOTS: ${{ inputs.screenshots }}
     steps:
       - uses: actions/checkout@v5
       - run: pip install -q pyjwt cryptography

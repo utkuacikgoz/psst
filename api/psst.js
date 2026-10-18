@@ -17,14 +17,19 @@ function page(code, info) {
   const expires = pending && info.expires_at
     ? new Date(info.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
     : null;
-  const title = gone ? "This Psst has been opened" : `${who} pssted you`;
+  // A Psst link holding a drawing (owner picks 2A 3A, 18 Oct 2026). The strokes
+  // never leave the server before joining: the page only knows there is one.
+  const doodle = pending && info.doodle === true;
+  const title = gone ? "This Psst has been opened" : doodle ? `${who} drew you something` : `${who} pssted you`;
   const link = SITE + "/p/" + code;
   // Link previews (owner pick 4A): the first name in the title and a per-link card.
   const meta = previewMeta({
-    title: gone ? title : name ? `${name} pssted you · 1 Psst waiting` : "Someone pssted you",
+    title: gone ? title
+      : doodle ? `${name || "Someone"} drew you something`
+      : name ? `${name} pssted you · 1 Psst waiting` : "Someone pssted you",
     description: `Open it to see, and psst ${name ? "them" : "back"}.`,
     url: link,
-    image: name ? cardImageURL(code, "p") : SITE + "/img/home.webp",
+    image: doodle ? cardImageURL(code, "doodle") : name ? cardImageURL(code, "p") : SITE + "/img/home.webp",
   });
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -48,21 +53,33 @@ ${meta}
   .sealed span { font-size: 15px; font-weight: 600; opacity: .9; }
   .btn { display: block; text-align: center; background: var(--ink); color: #fff; text-decoration: none; font: 800 18px var(--display); padding: 18px; border-radius: 16px; margin-top: 26px; }
   .small { font-size: 14px; opacity: .85; font-weight: 500; text-align: center; }
-  .small a { color: #fff; }
+  .small a { color: #fff; }${doodle ? `
+  .polaroid { width: 150px; box-sizing: border-box; margin: 30px auto 4px; padding: 10px 10px 26px; background: #FBF6EA; border-radius: 14px;
+              box-shadow: 0 10px 26px rgba(0,0,0,.24), 0 2px 6px rgba(0,0,0,.12); transform: rotate(-4deg); position: relative; }
+  .polaroid .frost { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden;
+                     background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.55), rgba(255,255,255,0) 60%), linear-gradient(135deg, #EFA9C4, #D46A92); }
+  .polaroid .sticker { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-6deg); background: #fff; color: #AC3E68;
+                       font: 900 12px/1 var(--display); letter-spacing: .08em; padding: 7px 9px; border-radius: 5px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.18); }
+  .polaroid .from { position: absolute; left: 10px; right: 10px; bottom: 0; height: 26px; line-height: 26px; text-align: center; color: #241B2C;
+                    font: 800 12px/26px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }` : ""}
 </style>
 </head>
 <body class="invite">
 <main>
   <a class="wordmark" href="/">psst</a>
-  <h1>${gone ? "This Psst has been opened." : `${who} pssted you.`}</h1>
+  <h1>${gone ? "This Psst has been opened." : doodle ? `${who} drew you something.` : `${who} pssted you.`}</h1>
   <p>${gone
     ? "Each one is for one person and lasts a week. Ask them to psst you again, or get Psst and invite them."
     : "Psst is a tiny app for the people you're close to: one tap says <em>thinking of you</em>."}</p>
-  ${gone ? "" : `<div class="sealed">
+  ${doodle ? `<div class="polaroid" role="img" aria-label="A sealed doodle from ${who}">
+    <div class="frost"><span class="sticker">SEALED ✎</span></div>
+    <div class="from">from ${who}</div>
+  </div>
+  ` : ""}${gone ? "" : `<div class="sealed">
     <svg width="44" height="40" viewBox="0 0 100 90" aria-hidden="true"><path fill="#fff" d="M12 86 Q1 55 15 30 L13 5 L38 24 Q52 17 65 24 L88 4 L86 33 Q99 55 88 86 Z"/><g fill="none" stroke="#AC3E68" stroke-width="7" stroke-linecap="round"><path d="M27 48 L40 53"/><path d="M61 52 Q70 44 75 47"/><path d="M45 66 L52 72 L59 66"/></g></svg>
-    <div><b>1 Psst from ${who}</b><span>Waiting for you in the app</span></div>
+    <div><b>${doodle ? "1 doodle" : "1 Psst"} from ${who}</b><span>Waiting for you in the app</span></div>
   </div>`}
-  <a class="btn" id="get" href="${STORE}" data-code="${escape(code)}">${gone ? "Get Psst" : "Get Psst to open it"}</a>
+  <a class="btn" id="get" href="${STORE}" data-code="${escape(code)}">${gone ? "Get Psst" : doodle ? "GET PSST TO SEE IT" : "Get Psst to open it"}</a>
   <p class="small" style="margin-top:12px">Already have it? <a href="psst://invite/${escape(code)}">Open in Psst</a></p>
   <p class="small" style="margin-top:22px">${expires ? `This link is for one person · expires ${escape(expires)}` : "This link is for one person and lasts a week."}
     <br><a href="/privacy">Privacy</a> · <a href="/support">Support</a></p>

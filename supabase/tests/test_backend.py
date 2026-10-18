@@ -311,12 +311,46 @@ class BackendTests(unittest.TestCase):
         self.assertEqual((result["status"], result["held_psst"]), ("accepted", True))
         unseen = kim.rows("select sender_name, effect_id from public.list_unseen()")
         self.assertEqual(unseen, [("Ada Lovelace", "psst")], "Ada's Psst is Kim's first")
-        self.assertEqual(Api("service_role").rpc("joined_push_targets", result["connection_id"])["held_psst"], True)
+        joined = Api("service_role").rpc("joined_push_targets", result["connection_id"])
+        self.assertEqual((joined["held_psst"], joined["held_doodle"]), (True, False))
 
         self.assertEqual(anon.rpc("public_invite_card", code), {"status": "unavailable"}, "nothing shown once used")
         with self.fails("invite_used", 409):
             sam.rpc("accept_invite", code)
         self.assertEqual(ada.rows("select code from public.list_open_invites()"), [])
+
+    def test_doodle_link_stays_sealed_until_they_join(self):
+        ada, kim = new_user("Ada"), new_user("Kim")
+        heart = json.dumps([[[0.2, 0.3], [0.5, 0.8], [0.8, 0.3]]])
+        invite = ada.rpc("create_psst_invite", heart)
+        self.assertEqual((invite["kind"], invite["doodle"]), ("psst", True))
+        code = invite["code"]
+
+        card = Api("anon").rpc("public_invite_card", code)
+        self.assertEqual((card["doodle"], card["first_name"]), (True, "Ada"))
+        self.assertNotIn("0.2", json.dumps(card), "the web never sees the strokes")
+        self.assertFalse(Api("anon").rpc("public_invite_card", ada.rpc("create_psst_invite")["code"])["doodle"])
+        with self.assertRaises(errors.InsufficientPrivilege):
+            Api("anon").rows("select doodle from public.invites")
+
+        result = kim.rpc("accept_invite", code)
+        self.assertTrue(result["held_psst"])
+        unseen = kim.rows("select sender_name, effect_id, doodle from public.list_unseen()")
+        self.assertEqual(unseen, [("Ada", "doodle", json.loads(heart))], "the drawing is Kim's first moment")
+        self.assertEqual(admin("select doodle from public.invites where code = %s", code), [(None,)], "the link keeps no copy")
+        targets = Api("service_role").rpc("joined_push_targets", result["connection_id"])
+        self.assertEqual((targets["held_psst"], targets["held_doodle"]), (True, True))
+
+        with self.fails("invalid_doodle", 422):
+            ada.rpc("create_psst_invite", json.dumps([[[2, 2]]]))
+        cancelled = ada.rpc("create_psst_invite", heart)["code"]
+        ada.rpc("revoke_invite", cancelled)
+        self.assertEqual(admin("select doodle from public.invites where code = %s", cancelled), [(None,)],
+                         "cancelling drops the drawing")
+        expired = ada.rpc("create_psst_invite", heart)["code"]
+        admin("update public.invites set expires_at = now() - interval '1 minute' where code = %s", expired)
+        admin("select private.purge_expired()")
+        self.assertEqual(admin("select doodle from public.invites where code = %s", expired), [(None,)])
 
     def test_making_codes_never_retires_a_waiting_psst(self):
         ada = new_user("Ada")

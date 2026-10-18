@@ -11,6 +11,8 @@ export interface JoinedTargets {
   joiner_name: string;
   /** They joined through your Psst (5A): the push says so. */
   held_psst?: boolean;
+  /** …and it held a drawing (doodle as the invite, 18 Oct 2026). */
+  held_doodle?: boolean;
   sound?: string;
   tokens: { token: string; environment: ApnsEnvironment }[];
 }
@@ -41,7 +43,9 @@ export function buildJoinedPayload(targets: JoinedTargets) {
     aps: {
       alert: {
         title: `${targets.joiner_name} is in`,
-        body: targets.held_psst
+        body: targets.held_doodle
+          ? `${targets.joiner_name} got your doodle and joined. Tap to psst them.`
+          : targets.held_psst
           ? `${targets.joiner_name} got your Psst and joined. Tap to psst them.`
           : "Tap to send your first Psst",
       },

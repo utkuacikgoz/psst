@@ -7,7 +7,9 @@
 // With &image=p or &image=invite it answers the link-preview card instead
 // (owner pick 4A): a 1200x630 PNG, "<Name> pssted you" + "1 Psst waiting" for
 // /p/ links, "<Name> invited you" for /invite/ codes; "Someone" when the name
-// isn't known. The name always comes from the server, never from the URL.
+// isn't known. &image=doodle (owner picks 2A 3A, 18 Oct 2026) is "<Name> drew
+// you something" beside a sealed polaroid: no strokes, only a frosted square.
+// The name always comes from the server, never from the URL.
 
 const { cleanCode, fetchCard, firstName } = require("./_lib/invite-card");
 const { renderCard } = require("./_card/render");
@@ -15,12 +17,12 @@ const { renderCard } = require("./_card/render");
 module.exports = async (req, res) => {
   const query = req.query || {};
   const code = cleanCode(query.code);
-  const image = query.image === "p" || query.image === "invite" ? query.image : null;
+  const image = ["p", "invite", "doodle"].includes(query.image) ? query.image : null;
   const info = await fetchCard(code);
 
   if (image) {
     // /p/ only names the sender of a waiting Psst (same rule as api/psst.js).
-    const name = firstName(info, image === "p" ? "psst" : null);
+    const name = firstName(info, image === "invite" ? null : "psst");
     let body;
     try {
       body = renderCard(name, image);

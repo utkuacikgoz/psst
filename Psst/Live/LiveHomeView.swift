@@ -379,7 +379,8 @@ struct LiveHomeView: View {
         .sheet(item: $superPerson) { SuperPsstSheet(connection: $0) }
         .fullScreenCover(item: $doodlePerson) { person in
             DoodleSheet(connection: person,
-                        color: Color(hex: bandColors[person.id] ?? personalization.colorHex(for: person.id, name: person.otherName)))
+                        color: Color(hex: bandColors[person.id] ?? personalization.colorHex(for: person.id, name: person.otherName)),
+                        store: store)
         }
         .sheet(isPresented: $showingInvite) { InviteSheet() }
         .sheet(isPresented: $startingPsst) { InviteSheet(startPsst: true) }

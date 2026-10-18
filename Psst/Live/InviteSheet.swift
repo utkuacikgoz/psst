@@ -28,6 +28,13 @@ struct InviteSheet: View {
     @State private var psstError: String?
     /// After a Psst link is made: it waits for them until this date (3A).
     @State private var psstWaitingUntil: Date?
+    /// Doodle as the invite (owner picks 1A 2A 3A 4A, 18 Oct 2026): the pad, and the
+    /// drawing kept until its link is made, so a failed try doesn't lose it.
+    @State private var drawingInvite = false
+    @State private var inviteDoodle: DoodleStrokes?
+    @State private var creatingDoodle = false
+    @State private var doodleError: String?
+    @State private var waitingIsDoodle = false
 
     // Enter
     @State private var code = ""
@@ -51,6 +58,12 @@ struct InviteSheet: View {
         .background(Color.psstCanvas.ignoresSafeArea())
         .presentationBackground(Color.psstCanvas)
         .sheet(item: $psstShare) { ShareSheet(items: $0.items) }
+        .fullScreenCover(isPresented: $drawingInvite, onDismiss: { if inviteDoodle != nil { createDoodle() } }) {
+            DoodleSheet(title: "For someone new", sendTitle: "SEND AS A LINK", color: Color(hex: 0xAC3E68)) { strokes in
+                inviteDoodle = strokes
+                return true
+            }
+        }
         .task { progress = try? await store.api.inviteProgress() }
         .onAppear {
             if startEntering {
@@ -101,9 +114,16 @@ struct InviteSheet: View {
             chooserBand(title: "Psst someone new",
                         subtitle: psstError ?? (creatingPsst ? "Getting your Psst ready…" : "Not on Psst yet? Your Psst is the invite."),
                         color: Color(hex: 0xAC3E68), tag: "NEW") { createPsst() }
+            chooserBand(title: "Draw someone new",
+                        subtitle: doodleError ?? (creatingDoodle ? "Getting your doodle ready…"
+                            : "Draw them something ✎ They see it when they join."),
+                        color: Color(hex: 0xC2185B), tag: "NEW") {
+                // A drawing whose link failed is sent again rather than drawn again.
+                if inviteDoodle != nil { createDoodle() } else { drawingInvite = true }
+            }
             // 3A (owner pick, 18 Oct 2026): say the Psst is waiting, and until when.
             if let psstWaitingUntil {
-                Text("Your Psst is waiting for them · expires \(psstWaitingUntil.formatted(.dateTime.month(.abbreviated).day()))")
+                Text("Your \(waitingIsDoodle ? "doodle" : "Psst") is waiting for them · expires \(psstWaitingUntil.formatted(.dateTime.month(.abbreviated).day()))")
                     .font(.psst(.subheadline, weight: .bold))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, Tokens.Space.m)
@@ -235,6 +255,7 @@ struct InviteSheet: View {
                 let invite = try await store.api.createPsstInvite()
                 psstShare = PsstShare(items: [PsstShare.message, invite.link])
                 psstWaitingUntil = invite.expiresAt
+                waitingIsDoodle = false
             } catch APIError.server(_, "too_many_invites") {
                 psstError = "That's a lot of invites today. Try again tomorrow."
             } catch APIError.offline {
@@ -243,6 +264,33 @@ struct InviteSheet: View {
                 psstError = "Couldn't get your Psst ready. Try again."
             }
             creatingPsst = false
+        }
+    }
+
+    /// Makes a one-person link holding the drawing, then opens the share sheet.
+    private func createDoodle() {
+        guard let strokes = inviteDoodle, !creatingDoodle else { return }
+        creatingDoodle = true
+        doodleError = nil
+        Task {
+            do {
+                let invite = try await store.api.createDoodleInvite(strokes: strokes)
+                inviteDoodle = nil
+                psstShare = PsstShare(items: [PsstShare.doodleMessage, invite.link])
+                psstWaitingUntil = invite.expiresAt
+                waitingIsDoodle = true
+            } catch APIError.server(_, "too_many_invites") {
+                doodleError = "That's a lot of invites today. Try again tomorrow."
+            } catch APIError.server(_, "invalid_doodle") {
+                // The same strokes would fail again: draw a new one.
+                inviteDoodle = nil
+                doodleError = "Couldn't send that drawing. Draw another?"
+            } catch APIError.offline {
+                doodleError = "You're offline. Try again once you're back online."
+            } catch {
+                doodleError = "Couldn't get your doodle ready. Try again."
+            }
+            creatingDoodle = false
         }
     }
 
@@ -405,6 +453,7 @@ struct PsstShare: Identifiable {
     let items: [Any]
 
     static let message = "I pssted you. Open it to see, and psst me back."
+    static let doodleMessage = "I drew you something. Open it to see, and psst me back."
 
     /// The same one-person link again (the day-5 reminder, 3A).
     static func resend(code: String) -> PsstShare? {

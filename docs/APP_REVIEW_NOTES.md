@@ -316,6 +316,7 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 
 ```
 • Your word (Psst+): choose what your people see when you psst them: hey, boop, oi, yo, hiii, mwah or psst psst
+• Draw someone new: send a doodle to someone who isn't on Psst yet. It stays sealed until they join
 • Psst someone new: with nobody on home yet, one tap shares a Psst link. If it isn't opened in 5 days, we'll remind you once
 • Got sent a Psst before you had the app? Paste the link when you pick your name
 • Link previews now show who it's from
@@ -334,6 +335,7 @@ What's new in 1.0.7:
 - Psst+ purchases are now verified on our server reliably, so unlimited Super Psst works on every device after buying or restoring.
 - Name step: "Someone sent you a Psst?" with Apple's system Paste button. It reads the clipboard only when tapped (no prompt) and only uses a psstapp.fun invite link or code found there.
 - Empty home: the gold band shares a one-person Psst link. If nobody opens it within 5 days, the sender gets one notification ("Your Psst hasn't been opened") that reopens the share sheet. Only once per link.
+- Draw someone new (+ → Draw someone new): draw a doodle and share it as a one-person link. The web page only says "Utku drew you something" with a sealed picture; the drawing is shown in the app only after the recipient joins with that link. Same safety as doodles between people (hold the band to Block or Report).
 - The Control Center / Lock Screen button now requires Face ID or the passcode on a locked iPhone.
 
 To try it with a real person (our team):

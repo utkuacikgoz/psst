@@ -232,3 +232,93 @@ test("card JSON for invite.js is unchanged", async () => {
   const bad = await call(card, { code: "AB12CD34", image: "<svg>" });
   assert.equal(bad.headers["content-type"], "application/json; charset=utf-8");
 });
+
+// Doodle Psst links (owner picks 2A 3A, 18 Oct 2026).
+const doodle = (first_name) => ({ ...pending(first_name), doodle: true });
+
+test("/p/ doodle: heading, sealed polaroid, box, button and preview", async () => {
+  answer = doodle("Utku");
+  const r = await call(psst, { code: "AB12CD34" });
+  assert.match(r.body, /<h1>Utku drew you something\.<\/h1>/);
+  assert.match(r.body, /<title>Utku drew you something<\/title>/);
+  assert.match(r.body, /<b>1 doodle from Utku<\/b><span>Waiting for you in the app<\/span>/);
+  assert.match(r.body, /<a class="btn" id="get" href="[^"]+" data-code="AB12CD34">GET PSST TO SEE IT<\/a>/);
+  assert.ok(r.body.indexOf('class="polaroid"') < r.body.indexOf('class="sealed"'), "polaroid above the waiting box");
+  assert.match(r.body, /<span class="sticker">SEALED ✎<\/span>/);
+  assert.match(r.body, /<div class="from">from Utku<\/div>/);
+  assert.equal(meta(r.body, "og:title"), "Utku drew you something");
+  assert.equal(meta(r.body, "twitter:title"), "Utku drew you something");
+  assert.equal(meta(r.body, "og:image"), "https://psstapp.fun/api/card?code=AB12CD34&amp;image=doodle");
+  assert.equal(meta(r.body, "twitter:card"), "summary_large_image");
+});
+
+test("/p/ doodle: the polaroid carries no strokes or drawing data", async () => {
+  answer = { ...doodle("Utku"), strokes: [[{ x: 1, y: 2 }]], drawing: "SECRET-STROKES" };
+  const r = await call(psst, { code: "AB12CD34" });
+  const polaroid = r.body.slice(r.body.indexOf('<div class="polaroid"'), r.body.indexOf('<div class="sealed"'));
+  assert.ok(polaroid.length > 0);
+  assert.ok(!/<svg|<img|<canvas|<path|data-|url\(/.test(polaroid), polaroid);
+  assert.ok(!r.body.includes("SECRET-STROKES") && !r.body.includes("strokes"));
+});
+
+test("/p/ doodle: falls back to Someone, and escapes the name", async () => {
+  answer = doodle("");
+  let r = await call(psst, { code: "AB12CD34" });
+  assert.match(r.body, /<h1>Someone drew you something\.<\/h1>/);
+  assert.match(r.body, /<b>1 doodle from Someone<\/b>/);
+  assert.equal(meta(r.body, "og:title"), "Someone drew you something");
+  answer = doodle(`<i>"x'`);
+  r = await call(psst, { code: "AB12CD34" });
+  assert.ok(!r.body.includes("<i>\""));
+  assert.match(r.body, /from &lt;i&gt;&quot;x&#39;<\/div>/);
+  assert.equal(meta(r.body, "og:title"), "&lt;i&gt;&quot;x&#39; drew you something");
+});
+
+test("/p/ doodle flag only counts as exactly true on a waiting Psst link", async () => {
+  for (const value of [pending("Utku"), { ...pending("Utku"), doodle: false }, { ...pending("Utku"), doodle: "true" }]) {
+    answer = value;
+    const r = await call(psst, { code: "AB12CD34" });
+    assert.match(r.body, /<h1>Utku pssted you\.<\/h1>/);
+    assert.match(r.body, /<b>1 Psst from Utku<\/b>/);
+    assert.match(r.body, />Get Psst to open it<\/a>/);
+    assert.ok(!r.body.includes("polaroid"));
+    assert.equal(meta(r.body, "og:title"), "Utku pssted you · 1 Psst waiting");
+  }
+  answer = { status: "unavailable", doodle: true };
+  const gone = await call(psst, { code: "AB12CD34" });
+  assert.ok(!gone.body.includes("polaroid"));
+  assert.match(gone.body, /This Psst has been opened\./);
+});
+
+test("/p/ without a doodle is unchanged by the doodle work", () => {
+  const page = psst.page("AB12CD34", { ...pending("Utku"), doodle: false });
+  assert.equal(page, psst.page("AB12CD34", pending("Utku")));
+  assert.ok(!page.includes(".polaroid") && !page.includes("SEALED") && !page.includes("drew you"));
+});
+
+test("card image: doodle variant is a 1200x630 pink PNG, name from the server", async () => {
+  answer = doodle("Utku");
+  const r = await call(card, { code: "AB12CD34", image: "doodle", name: "Hacker" });
+  assert.equal(r.status, 200);
+  assert.equal(r.headers["content-type"], "image/png");
+  assert.equal(r.headers["cache-control"], "public, max-age=300");
+  const png = readPNG(r.body);
+  assert.equal(png.width, 1200);
+  assert.equal(png.height, 630);
+  assert.deepEqual(png.pixel(5, 5), [0xC2, 0x18, 0x5B]);
+  const [fr, fg, fb] = png.pixel(960, 400); // frosted square: light pink, not strokes
+  assert.ok(fr > 200 && fg > 100 && fg < 200 && fb > 130, `frosted pink, got ${[fr, fg, fb]}`);
+  const [r0, g0, b0] = png.pixel(905, 160); // the frame's cream near its top
+  assert.ok(r0 > 240 && g0 > 230 && b0 > 210, `cream frame, got ${[r0, g0, b0]}`);
+  answer = doodle("Mia");
+  const other = await call(card, { code: "AB12CD34", image: "doodle" });
+  answer = doodle("Utku");
+  const plain = await call(card, { code: "AB12CD34", image: "doodle" });
+  assert.deepEqual(r.body, plain.body, "a name in the URL is ignored");
+  assert.notDeepEqual(r.body, other.body);
+  answer = null;
+  const someone = await call(card, { code: "AB12CD34", image: "doodle" });
+  answer = doodle("日本");
+  const unknownGlyphs = await call(card, { code: "AB12CD34", image: "doodle" });
+  assert.deepEqual(someone.body, unknownGlyphs.body);
+});

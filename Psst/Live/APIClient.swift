@@ -34,6 +34,8 @@ protocol PsstAPI: AnyObject {
     func myPsstWord() async throws -> String?
     func createInvite() async throws -> CreatedInvite
     func createPsstInvite() async throws -> CreatedInvite
+    /// A Psst link that holds a drawing, sealed until they join (doodle as the invite).
+    func createDoodleInvite(strokes: DoodleStrokes) async throws -> CreatedInvite
     func previewInvite(code: String) async throws -> InvitePreview
     func acceptInvite(code: String) async throws -> AcceptedInvite
     func removeConnection(_ id: UUID) async throws
@@ -67,6 +69,9 @@ extension PsstAPI {
     func reportAppVersion(_ version: String, build: Int) async throws {}
     func setTimeZone(_ identifier: String) async throws {}
     func createPsstInvite() async throws -> CreatedInvite { throw APIError.server(status: 503, code: "feature_unavailable") }
+    func createDoodleInvite(strokes: DoodleStrokes) async throws -> CreatedInvite {
+        throw APIError.server(status: 503, code: "feature_unavailable")
+    }
     func inviteProgress() async throws -> InviteProgress? { nil }
     func sendDoodle(eventID: UUID, connectionID: UUID, strokes: DoodleStrokes) async throws -> SendResult {
         throw APIError.server(status: 503, code: "feature_unavailable")
@@ -259,6 +264,14 @@ final class APIClient: PsstAPI {
     }
     func createPsstInvite() async throws -> CreatedInvite {
         try await rpc("create_psst_invite", [String: String]())
+    }
+
+    private struct DoodleInviteBody: Encodable {
+        let p_doodle: DoodleStrokes
+    }
+
+    func createDoodleInvite(strokes: DoodleStrokes) async throws -> CreatedInvite {
+        try await rpc("create_psst_invite", DoodleInviteBody(p_doodle: strokes))
     }
 
     func previewInvite(code: String) async throws -> InvitePreview {

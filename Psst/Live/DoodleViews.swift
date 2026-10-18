@@ -60,10 +60,26 @@ struct DoodlePolaroid: View {
 /// 1A: hold a band → Doodle for Mia. Draw with one finger in white on their colour,
 /// then SEND DOODLE. Undo takes back the last stroke.
 struct DoodleSheet: View {
-    let connection: ConnectionSummary
+    let title: String
+    let sendTitle: String
     let color: Color
+    /// Sends the drawing; false keeps the pad open (nothing was sent).
+    let send: @MainActor (DoodleStrokes) -> Bool
 
-    @Environment(LiveStore.self) private var store
+    init(title: String, sendTitle: String, color: Color, send: @escaping @MainActor (DoodleStrokes) -> Bool) {
+        self.title = title
+        self.sendTitle = sendTitle
+        self.color = color
+        self.send = send
+    }
+
+    /// For one of your people.
+    init(connection: ConnectionSummary, color: Color, store: LiveStore) {
+        self.init(title: "To \(connection.otherName)", sendTitle: "SEND DOODLE", color: color) { strokes in
+            store.sendDoodle(connection, strokes: strokes) != nil
+        }
+    }
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var strokes: DoodleStrokes = []
@@ -78,7 +94,7 @@ struct DoodleSheet: View {
             HStack {
                 Button("Cancel") { dismiss() }
                 Spacer()
-                Text("To \(connection.otherName)").font(.psst(.body, weight: .bold))
+                Text(title).font(.psst(.body, weight: .bold))
                 Spacer()
                 Button("Undo") { if !strokes.isEmpty { strokes.removeLast(); atLimit = false } }
                     .disabled(strokes.isEmpty)
@@ -115,9 +131,9 @@ struct DoodleSheet: View {
 
             Button {
                 // Nothing sent (a send to them is still going): keep the drawing open.
-                if store.sendDoodle(connection, strokes: strokes) != nil { dismiss() } else { refused += 1 }
+                if send(strokes) { dismiss() } else { refused += 1 }
             } label: {
-                Text("SEND DOODLE")
+                Text(sendTitle)
                     .font(.psst(.title3, weight: .black))
                     .tracking(Tokens.Band.labelTracking)
                     .foregroundStyle(Color.ink)

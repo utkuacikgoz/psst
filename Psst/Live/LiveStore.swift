@@ -488,7 +488,7 @@ final class LiveStore {
                     doodle: s.doodle,
                     position: many ? index + 1 : nil, total: many ? senders.count : nil,
                     note: heldPsstConnections.remove(s.connectionId) == nil ? nil
-                        : "Sent \(PersonRow.lowercasedStart(ExchangeTime.label(s.createdAt, now: now()))), before you had Psst",
+                        : "\(s.signal == .doodle ? "Drawn" : "Sent") \(PersonRow.lowercasedStart(ExchangeTime.label(s.createdAt, now: now()))), before you had Psst",
                     word: PsstWord.shown(s.word))
         }
         // "Seen" is reported when each sender's moment is actually on screen, not

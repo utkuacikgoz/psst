@@ -27,31 +27,44 @@ struct PsstPlusSheet: View {
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
                     .accessibilityElement(children: .combine)
-                    if !purchases.isUnlocked {
-                        PlusPreview()
-                            .listRowBackground(Color.clear)
-                    }
                 }
                 .listRowInsets(EdgeInsets(top: 0, leading: Tokens.Space.l, bottom: Tokens.Space.s, trailing: Tokens.Space.l))
 
+                // 1A / 2A (owner picks, 18 Oct 2026): your word is the hero, before and
+                // after buying. Colours and app icons are a quiet extra.
                 Section {
-                    perk("Unlimited Super Pssts", symbol: "sparkles", tint: 0xB87500)
-                    perk("Choose each person's colour", symbol: "paintpalette.fill", tint: 0xAC3E68)
-                    perk("Alternate app icons", symbol: "app.fill", tint: 0x2476AA)
-                    perk("Choose your whisper sound", symbol: "speaker.wave.2.fill", tint: 0x187F69)
-                    perk("Home Screen and Lock Screen widgets", symbol: "rectangle.grid.1x2.fill", tint: 0x5F61AE)
+                    WordHero(unlocked: purchases.isUnlocked)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.psstCanvas)
                 }
 
                 if purchases.isUnlocked {
-                    IconSection()
                     SoundSection()
-                    WordSection()
                     Section {
-                        Text("To change someone's colour, hold their band and choose Colour….")
+                        NavigationLink {
+                            Form { IconSection() }.navigationTitle("App icon")
+                        } label: {
+                            LabeledContent("App icon", value: Personalization.icons.first {
+                                $0.name == UIApplication.shared.alternateIconName
+                            }?.title ?? "Purple")
+                        }
+                        Text("Band colours: hold someone's band → Colour…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } header: {
+                        Text("Looks")
+                    }
+                } else {
+                    Section {
+                        perk("Unlimited Super Pssts", symbol: "sparkles", tint: 0xB87500)
+                        perk("Your whisper sound", symbol: "speaker.wave.2.fill", tint: 0x187F69)
+                        perk("Home Screen and Lock Screen widgets", symbol: "rectangle.grid.1x2.fill", tint: 0x5F61AE)
+                    }
+                    Section {
+                        Text("Also: band colours and app icons")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-                } else {
                     buySection
                 }
             }
@@ -140,35 +153,6 @@ struct PsstPlusSheet: View {
     @ViewBuilder private var legalLinks: some View {
         Link("Terms of use", destination: AppConfig.termsURL).font(.footnote)
         Link("Privacy policy", destination: AppConfig.privacyURL).font(.footnote)
-    }
-}
-
-/// Before buying: what the colours and icons actually look like. Display only.
-private struct PlusPreview: View {
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: Tokens.Space.s), count: 6)
-
-    var body: some View {
-        VStack(spacing: Tokens.Space.m) {
-            LazyVGrid(columns: columns, spacing: Tokens.Space.s) {
-                ForEach(Personalization.palette, id: \.self) { hex in
-                    Circle().fill(Color(hex: hex)).frame(width: 28, height: 28)
-                }
-            }
-            HStack(spacing: Tokens.Space.m) {
-                ForEach(Personalization.icons.indices, id: \.self) { index in
-                    let icon = Personalization.icons[index]
-                    Text("psst")
-                        .font(.psst(size: 11, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(Color(hex: icon.preview), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }
-            }
-        }
-        .padding(.vertical, Tokens.Space.s)
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("12 band colours and 5 app icons")
     }
 }
 
@@ -286,18 +270,36 @@ private struct SoundSection: View {
     }
 }
 
-/// Your word (owner picks 1A 2A 3A, 16 Oct 2026): one word, from eight (English only since 17 Oct), that everyone
-/// you psst sees instead of "psst", in their notification and the full-screen moment.
-private struct WordSection: View {
-    @Environment(LiveStore.self) private var store
-    @State private var chosen = "psst"
-    @State private var failed = false
+/// Your word (owner picks 1A 2A 3A, 16 Oct 2026; English only since 17 Oct) as the
+/// Psst+ hero (1A / 2A, 18 Oct): the word huge, a notification showing what your
+/// people see, and the chips. Before buying the chips only preview; after, they save.
+private struct WordHero: View {
+    let unlocked: Bool
 
-    private let columns = [GridItem(.adaptive(minimum: 78), spacing: Tokens.Space.s)]
+    @Environment(LiveStore.self) private var store
+    @State private var chosen = "boop"
+    @State private var failed = false
+    @ScaledMetric(relativeTo: .largeTitle) private var wordSize: CGFloat = 56
+
+    private let columns = [GridItem(.adaptive(minimum: 70), spacing: Tokens.Space.s)]
 
     var body: some View {
-        Section {
-            LazyVGrid(columns: columns, alignment: .leading, spacing: Tokens.Space.s) {
+        VStack(spacing: Tokens.Space.m) {
+            Text(unlocked ? "YOUR WORD" : "SAY IT YOUR WAY")
+                .font(.psst(.caption, weight: .bold))
+                .tracking(Tokens.Band.labelTracking)
+                .opacity(0.85)
+            Text(verbatim: chosen)
+                .font(.psst(size: wordSize, weight: .black))
+                .tracking(Tokens.Band.titleTracking)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .accessibilityHidden(true)
+            Text(unlocked ? "Your people see this when you psst them." : "Pick the word your people see when you psst them.")
+                .font(.psst(.subheadline, weight: .semibold))
+                .multilineTextAlignment(.center)
+            notification
+            LazyVGrid(columns: columns, spacing: Tokens.Space.s) {
                 ForEach(PsstWord.all, id: \.self) { word in
                     Button {
                         choose(word)
@@ -306,28 +308,54 @@ private struct WordSection: View {
                             .font(.psst(.body, weight: .heavy))
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
-                            .foregroundStyle(chosen == word ? Color.white : Color.ink)
+                            .foregroundStyle(chosen == word ? Color.psstCanvas : Color.white)
                             .padding(.horizontal, Tokens.Space.m)
                             .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
-                            .background(chosen == word ? Color.psstCanvas : Color.psstCanvas.opacity(0.08), in: Capsule())
+                            .background(chosen == word ? Color.white : Color.white.opacity(0.18), in: Capsule())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(word)
                     .accessibilityAddTraits(chosen == word ? .isSelected : [])
                 }
             }
-            .padding(.vertical, Tokens.Space.xs)
-        } header: {
-            Text("Your word")
-        } footer: {
-            Text(failed ? "That didn't save. Check you're online and try again."
-                        : "What your people see when you psst them. Pssting is still free; your word is a Psst+ extra.")
+            if failed {
+                Text("That didn't save. Check you're online and try again.")
+                    .font(.psst(.footnote, weight: .semibold))
+            }
         }
+        .foregroundStyle(Color.white)
+        .padding(Tokens.Space.l)
+        .frame(maxWidth: .infinity)
         .task {
-            if let saved = try? await store.api.myPsstWord() { chosen = PsstWord.shown(saved) ?? "psst" }
+            guard unlocked else { return }
+            chosen = PsstWord.shown(try? await store.api.myPsstWord()) ?? "psst"
         }
     }
 
+    /// What lands on their phone, with your name and the word.
+    private var notification: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("PSST")
+                Spacer()
+                Text("now")
+            }
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(Color.black.opacity(0.5))
+            Text(store.myName ?? "You").font(.subheadline.weight(.bold))
+            Text(verbatim: chosen).font(.subheadline)
+        }
+        .foregroundStyle(Color.black)
+        .padding(.horizontal, Tokens.Space.m)
+        .padding(.vertical, Tokens.Space.s)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 13))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("What your people see: \(store.myName ?? "You"), \(chosen)")
+    }
+
     private func choose(_ word: String) {
+        guard unlocked else { chosen = word; return }
         let previous = chosen
         chosen = word
         failed = false

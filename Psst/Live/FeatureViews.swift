@@ -746,7 +746,7 @@ struct SuperPsstSheet: View {
         VStack(spacing: Tokens.Space.xs) {
             Text("PSST+")
                 .bandTitle("Psst+", size: plusTitleSize, tracking: Tokens.Band.titleTracking)
-            Text("Unlimited Super Pssts, plus colours, app icons, whisper sounds and widgets.")
+            Text("Your word, unlimited Super Pssts, whisper sounds and widgets.")
                 .font(.psst(.callout, weight: .bold))
             Text("One purchase. Yours for good. No subscription.")
                 .font(.psst(.footnote, weight: .medium))

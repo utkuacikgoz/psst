@@ -49,6 +49,10 @@
     "One tap sends a Psst to a person you're connected with",
     "Psst back from the notification",
     "Same moment when you both psst within 10 seconds",
+    "Doodles that show on their Home Screen widget",
+    "Psst or draw someone new with a one-person link, sealed until they join",
+    "Streaks",
+    "Control Center and Lock Screen button (iOS 18)",
     "Mutual invites by link or code",
     "Block and report",
     "Optional Psst+ one-time purchase: your word, unlimited Super Pssts, whisper sounds and widgets"
@@ -64,7 +68,7 @@
    "name": "Psst – Tap a Friend",
    "description": "Psst is a free iPhone app for the people you're close to: tap a friend and they get a whispered “psst” that says thinking of you. They psst you back in one tap.",
    "inLanguage": "en",
-   "dateModified": "2026-10-05",
+   "dateModified": "2026-10-18",
    "isPartOf": {
     "@id": "https://psstapp.fun/#website"
    },
@@ -85,7 +89,23 @@
      "name": "Is Psst free?",
      "acceptedAnswer": {
       "@type": "Answer",
-      "text": "Yes. Downloading Psst, sending and replying, and inviting people are free. Psst+ is an optional one-time purchase for personal extras: each person's colour, alternate app icons and your whisper sound."
+      "text": "Yes. Pssting, replying, doodles, inviting people and one Super Psst a day are free, and so is the Control Center button. Psst+ is an optional one-time purchase: your word, unlimited Super Pssts, whisper sounds, widgets for your people, band colours and app icons."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "What's a doodle?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Hold someone's band and choose Doodle to draw them something with one finger. It fills their screen when they open Psst, and if they've added the Psst widget it sits on their Home Screen as a little polaroid until they psst you back. Doodles are free and, like every Psst, deleted after 30 days."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can I psst someone who isn't on Psst?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. Tap the + band and choose Psst someone new or Draw someone new. They get a link that works for one person for 7 days. Your Psst or doodle stays sealed until they get Psst and join, then it's the first thing they see."
      }
     },
     {
@@ -137,80 +157,23 @@
 <section class="hero">
   <div class="hero-copy">
     <h1>Miss them?<br><span class="mark pink">Psst</span> them.</h1>
-    <p class="lede">Psst is a free iPhone app for your people. One tap says <em>thinking of you</em>. They feel a little whisper, and psst you back. No typing. No feed.</p>
+    <p class="lede">Psst is a free iPhone app for your people. One tap says <em>thinking of you</em>. Or draw them a doodle. No typing. No feed.</p>
     <p class="cta"><a class="soon" href="https://apps.apple.com/app/apple-store/id6815764359?pt=129413467&amp;ct=site-home&amp;mt=8">Get it on the App Store</a></p>
     <p class="under">Free on iPhone · <b>One code brings up to 10 friends</b></p>
   </div>
-  <div class="phone tilt-r"><img src="/img/home.webp" alt="Psst home screen: a colour band for each person, Zoe, Mia and Ava, with a gold plus band to invite someone." width="600" height="1290"></div>
+  <div class="mock tilt-r2" role="img" aria-label="Psst home: Zoe, Mia with a 7-day streak flame, and Ava, each with the little cat in the corner, then the gold + band."><div class="scr"><div class="hd">psst</div><div class="bd c" style="background:#2476AA"><div class="nm">ZOE</div><div class="ln">Sent 1m ago · seen ✓</div><div class="corner-r"><svg width="46" height="26" viewBox="-40 0 180 92" aria-hidden="true" style="display:block"><g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M-6 22 Q-16 45 -6 68"/><path d="M-20 14 Q-34 45 -20 76"/><path d="M106 22 Q116 45 106 68"/><path d="M120 14 Q134 45 120 76"/></g><path fill="#fff" d="M12 86 Q1 55 15 30 L13 5 L38 24 Q52 17 65 24 L88 4 L86 33 Q99 55 88 86 Z"/><g fill="none" stroke="#2476AA" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M27 48 L40 53"/><path d="M61 52 Q70 44 75 47"/><path d="M45 66 L52 72 L59 66"/></g></svg></div></div><div class="bd c" style="background:#187F69"><div class="nm">MIA</div><div class="ln">Received 4m ago</div><div class="corner-l"><svg width="10" height="13" viewBox="0 0 20 25" aria-hidden="true" style="display:block"><path fill="rgba(255,255,255,.88)" d="M10 0 C11 5 18 8.5 18 15.5 A8 8 0 0 1 2 15.5 C2 12 4 9.5 5.5 8 C5.5 10.5 6.8 12 8.2 12.4 C7.6 8 8.4 4 10 0 Z"/></svg>7</div><div class="corner-r"><svg width="46" height="26" viewBox="-40 0 180 92" aria-hidden="true" style="display:block"><g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M-6 22 Q-16 45 -6 68"/><path d="M-20 14 Q-34 45 -20 76"/><path d="M106 22 Q116 45 106 68"/><path d="M120 14 Q134 45 120 76"/></g><path fill="#fff" d="M12 86 Q1 55 15 30 L13 5 L38 24 Q52 17 65 24 L88 4 L86 33 Q99 55 88 86 Z"/><g fill="none" stroke="#187F69" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M27 48 L40 53"/><path d="M61 52 Q70 44 75 47"/><path d="M45 66 L52 72 L59 66"/></g></svg></div></div><div class="bd c" style="background:#AC3E68"><div class="nm">AVA</div><div class="corner-r"><svg width="46" height="26" viewBox="-40 0 180 92" aria-hidden="true" style="display:block"><g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M-6 22 Q-16 45 -6 68"/><path d="M-20 14 Q-34 45 -20 76"/><path d="M106 22 Q116 45 106 68"/><path d="M120 14 Q134 45 120 76"/></g><path fill="#fff" d="M12 86 Q1 55 15 30 L13 5 L38 24 Q52 17 65 24 L88 4 L86 33 Q99 55 88 86 Z"/><g fill="none" stroke="#AC3E68" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M27 48 L40 53"/><path d="M61 52 Q70 44 75 47"/><path d="M45 66 L52 72 L59 66"/></g></svg></div></div><div class="plusband gold">+</div><div class="ft"><span>Settings ·</span><b>Psst+</b></div></div></div>
 </section>
 
 <section class="bands" id="how">
-  <div class="band band-purple">
-    <div class="band-copy">
-      <p class="kicker">01 · Tap</p>
-      <h2>No text.<br><span class="mark yellow">Still close.</span></h2>
-      <p>Everyone you love is a big colour band. Tap one and they get a whispered “psst”. That's the whole thing, on purpose.</p>
-    </div>
-    <div class="phone tilt-l"><img src="/img/invited.webp" alt="An invite from Lily: their code K7QX4MPA, Lily invited you, and a Connect with Lily button." width="600" height="1276" loading="lazy"></div>
-  </div>
-
-  <div class="band band-yellow">
-    <div class="phone tilt-r"><img src="/img/same-moment.webp" alt="The same-moment screen: YOU above, MIA below, with SAME MOMENT across the middle." width="600" height="1294" loading="lazy"></div>
-    <div class="band-copy">
-      <p class="kicker">02 · Same moment</p>
-      <h2>You were both<br><span class="mark pink">thinking it.</span></h2>
-      <p>Psst each other within 10 seconds and both phones light up with SAME MOMENT. It's rare. That's what makes it good.</p>
-    </div>
-  </div>
-
-  <div class="band band-pink">
-    <div class="band-copy">
-      <p class="kicker">03 · Invite</p>
-      <h2>Start an<br><span class="mark yellow">inside joke.</span></h2>
-      <p>Send one person a link. Nothing happens until you've both said yes. No contacts upload, no strangers, no public anything.</p>
-    </div>
-    <div class="phone tilt-l"><img src="/img/invite.webp" alt="The invite screen with two bands: Share my invite, and I have a code." width="600" height="1303" loading="lazy"></div>
-  </div>
-
-  <div class="band band-green">
-    <div class="phone tilt-r"><img src="/img/arrival.webp" alt="A Psst arriving: FROM MIA, Psst!, tap to psst back." width="600" height="1285" loading="lazy"></div>
-    <div class="band-copy">
-      <p class="kicker">04 · Psst back</p>
-      <h2>A little hello.<br><span class="mark yellow">A tap right back.</span></h2>
-      <p>Answer straight from the notification with Psst back, or open the app to see who's thinking of you. A small “seen ✓” tells you it landed.</p>
-    </div>
-  </div>
-
-  <div class="band band-indigo">
-    <div class="band-copy">
-      <p class="kicker">05 · Groups</p>
-      <h2>One code.<br><span class="mark yellow">Up to 10 friends.</span></h2>
-      <p>Drop one code in the group chat. Everyone who joins gets their own colour band, and nothing is shared until they say yes. Codes last a week.</p>
-    </div>
-    <div class="codecard" aria-label="An example Psst code, K7QX4MPA, that works for up to 10 people for 7 days">
-      <p class="lbl">Your Psst code</p>
-      <p class="c">K7QX4MPA</p>
-      <p class="uses">Works for up to 10 people · 7 days</p>
-      <p class="faces" aria-hidden="true"><span style="background:#5F61AE">M</span><span style="background:#187F69">Z</span><span style="background:#AC3E68">A</span><span style="background:#2476AA">K</span></p>
-      <p class="pill" aria-hidden="true">Share my invite</p>
-    </div>
-  </div>
-
-  <div class="band band-blue">
-    <div class="band-copy">
-      <p class="kicker">Super Psst</p>
-      <h2>When a psst<br><span class="mark yellow">isn't enough.</span></h2>
-      <p>Hold someone's band and send a Super Psst: a double whisper and a little shake on their screen. One free every day.</p>
-    </div>
-    <div class="mock" role="img" aria-label="Psst home with Mia's band showing Super Psst, sent just now">
-      <div class="scr">
-        <div class="hd">psst</div>
-        <div class="bd" style="background:#5F61AE"><div class="nm"><span class="shake">MIA</span></div><div class="st">Super Psst · sent just now</div><div class="arcs">)))</div></div>
-        <div class="bd short" style="background:#187F69"><div class="nm">ZOE</div></div>
-        <div class="plusband">+</div>
-      </div>
-    </div>
-  </div>
+<div class="band band-purple"><div class="band-copy"><p class="kicker">01 · Tap</p><h2>No text.<br><span class="mark yellow">Still close.</span></h2><p>Everyone you love is a big colour band. Tap one and they get a whispered “psst”. They psst you back straight from the notification, and “seen ✓” tells you it landed.</p></div><div class="mock tilt-l2" role="img" aria-label="A Psst arriving: FROM MIA, psst, and a PSST BACK band."><div class="scr " style="background:#187F69"><div class="arr"><div class="from">FROM</div><div class="who">MIA</div><div class="word">psst</div><div class="sub">Tap to psst back</div></div><div class="back">PSST BACK</div></div></div></div>
+<div class="band band-yellow"><div class="mock tilt-r2" role="img" aria-label="A Home Screen with the Psst widget showing Mia's doodle as a cream polaroid, from Mia, and the notification: Mia, drew you something."><div class="scr springboard" style=""><div class="sb-grid"><div class="wid"><div class="pol"><div class="sq" style="background:#187F69"><svg width="50" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 82 C 20 62, 8 44, 20 28 C 30 15, 46 20, 50 33 C 54 20, 70 15, 80 28 C 92 44, 80 62, 50 82" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 70 Q 24 40 34 62 T 54 58 T 74 46 T 90 30" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".9" transform="translate(0 14) scale(1 .35)"/></svg></div><div class="fr">from Mia</div></div></div><div class="app"></div><div class="app"></div><div class="app"></div><div class="app"></div><div class="sb-lab">Psst</div><div></div><div></div><div class="app"></div><div class="app"></div><div class="app"></div><div class="app"></div></div><div class="notif"><div class="ntop"><span><span class="ic">psst</span>PSST</span><span>now</span></div><div class="t1">Mia</div><div class="t2">drew you something ✎</div></div></div></div>
+<div class="band-copy"><p class="kicker">02 · Doodle</p><h2>Draw on their<br><span class="mark pink">Home Screen.</span></h2><p>Hold someone's band and draw with one finger. It fills their screen when they open Psst, and sits on their Psst widget as a little polaroid until they psst you back. Free.</p></div></div>
+<div class="band band-pink"><div class="band-copy"><p class="kicker">03 · Same moment</p><h2>You were both<br><span class="mark yellow">thinking it.</span></h2><p>Psst each other within 10 seconds and both phones light up with SAME MOMENT. It's rare. That's what makes it good.</p></div><div class="mock tilt-l2" role="img" aria-label="Same moment: YOU above, MIA below, SAME MOMENT across the seam."><div class="scr " style=""><div class="half top" style="background:var(--purple)">YOU</div><div class="half bot" style="background:#187F69">MIA</div><div class="seam"><span>SAME MOMENT</span></div></div></div></div>
+<div class="band band-green"><div class="mock tilt-r2" role="img" aria-label="Psst home: Mia's band with a flame and 7 in its corner and the line 7 days in a row."><div class="scr"><div class="hd">psst</div><div class="bd c" style="background:#187F69"><div class="nm">MIA</div><div class="ln">Sent just now</div><div class="ln" style="font-weight:800"><svg width="10" height="12" viewBox="0 0 20 25" aria-hidden="true" style="display:block"><path fill="#fff" d="M10 0 C11 5 18 8.5 18 15.5 A8 8 0 0 1 2 15.5 C2 12 4 9.5 5.5 8 C5.5 10.5 6.8 12 8.2 12.4 C7.6 8 8.4 4 10 0 Z"/></svg>7 days in a row</div><div class="corner-l"><svg width="10" height="13" viewBox="0 0 20 25" aria-hidden="true" style="display:block"><path fill="rgba(255,255,255,.88)" d="M10 0 C11 5 18 8.5 18 15.5 A8 8 0 0 1 2 15.5 C2 12 4 9.5 5.5 8 C5.5 10.5 6.8 12 8.2 12.4 C7.6 8 8.4 4 10 0 Z"/></svg>7</div><div class="corner-r"><svg width="46" height="26" viewBox="-40 0 180 92" aria-hidden="true" style="display:block"><g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M-6 22 Q-16 45 -6 68"/><path d="M-20 14 Q-34 45 -20 76"/><path d="M106 22 Q116 45 106 68"/><path d="M120 14 Q134 45 120 76"/></g><path fill="#fff" d="M12 86 Q1 55 15 30 L13 5 L38 24 Q52 17 65 24 L88 4 L86 33 Q99 55 88 86 Z"/><g fill="none" stroke="#187F69" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M27 48 L40 53"/><path d="M61 52 Q70 44 75 47"/><path d="M45 66 L52 72 L59 66"/></g></svg></div></div><div class="bd c" style="background:#2476AA"><div class="nm">ZOE</div><div class="ln">Sent 1m ago · seen ✓</div><div class="corner-l"><svg width="10" height="13" viewBox="0 0 20 25" aria-hidden="true" style="display:block"><path fill="rgba(255,255,255,.88)" d="M10 0 C11 5 18 8.5 18 15.5 A8 8 0 0 1 2 15.5 C2 12 4 9.5 5.5 8 C5.5 10.5 6.8 12 8.2 12.4 C7.6 8 8.4 4 10 0 Z"/></svg>4</div><div class="corner-r"><svg width="46" height="26" viewBox="-40 0 180 92" aria-hidden="true" style="display:block"><g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M-6 22 Q-16 45 -6 68"/><path d="M-20 14 Q-34 45 -20 76"/><path d="M106 22 Q116 45 106 68"/><path d="M120 14 Q134 45 120 76"/></g><path fill="#fff" d="M12 86 Q1 55 15 30 L13 5 L38 24 Q52 17 65 24 L88 4 L86 33 Q99 55 88 86 Z"/><g fill="none" stroke="#2476AA" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M27 48 L40 53"/><path d="M61 52 Q70 44 75 47"/><path d="M45 66 L52 72 L59 66"/></g></svg></div></div><div class="bd c" style="background:#AC3E68"><div class="nm">AVA</div><div class="corner-r"><svg width="46" height="26" viewBox="-40 0 180 92" aria-hidden="true" style="display:block"><g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M-6 22 Q-16 45 -6 68"/><path d="M-20 14 Q-34 45 -20 76"/><path d="M106 22 Q116 45 106 68"/><path d="M120 14 Q134 45 120 76"/></g><path fill="#fff" d="M12 86 Q1 55 15 30 L13 5 L38 24 Q52 17 65 24 L88 4 L86 33 Q99 55 88 86 Z"/><g fill="none" stroke="#AC3E68" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M27 48 L40 53"/><path d="M61 52 Q70 44 75 47"/><path d="M45 66 L52 72 L59 66"/></g></svg></div></div><div class="plusband gold">+</div><div class="ft"><span>Settings ·</span><b>Psst+</b></div></div></div>
+<div class="band-copy"><p class="kicker">04 · Streaks</p><h2>Keep the<br><span class="mark yellow">flame going.</span></h2><p>Psst each other on the same day, three days running, and a flame and the count appear in their band's corner. Miss a day and it starts again.</p></div></div>
+<div class="band band-indigo"><div class="band-copy"><p class="kicker">05 · Invite</p><h2>Start an<br><span class="mark yellow">inside joke.</span></h2><p>Psst or draw someone who isn't on Psst yet. They get a link for one person, sealed until they join. For the group chat, one code brings up to 10 friends. Nothing happens until you've both said yes.</p></div><div class="mock tilt-l2" role="img" aria-label="The link page: Mia drew you something, a sealed cream polaroid from Mia, and GET PSST TO SEE IT."><div class="scr linkpg" style=""><div class="wm">psst</div><h3>Mia drew you something.</h3><div class="sealpol"><div class="frost"><span class="stk">SEALED ✎</span></div><div class="fr">from Mia</div></div><div class="seal"><svg width="34" viewBox="-6 -10 112 100" style="display:block;overflow:visible" aria-hidden="true"><path fill="#fff" d="M12 86 Q1 55 15 30 L13 5 L38 24 Q52 17 65 24 L88 4 L86 33 Q99 55 88 86 Z"/><g fill="none" stroke="#AC3E68" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M27 48 L40 53"/><path d="M61 52 Q70 44 75 47"/><path d="M45 66 L52 72 L59 66"/></g></svg><div><b>1 doodle from Mia</b><span>Waiting for you in the app</span></div></div><div class="get">GET PSST TO SEE IT</div><div class="one">This link is for one person · expires Oct 25</div></div></div></div>
+<div class="band band-blue"><div class="band-copy"><p class="kicker">06 · Super Psst</p><h2>When a psst<br><span class="mark yellow">isn't enough.</span></h2><p>Tap the little cat in someone's band for a Super Psst: a double whisper and a shake on their screen. One free every day.</p></div><div class="mock tilt-r2" role="img" aria-label="The Super Psst card rising over home in Mia's colour: the cat, SUPER PSST for Mia, 1 available today, SEND SUPER PSST."><div class="scr " style=""><div class="hd">psst</div><div class="bd c" style="background:#187F69"><div class="nm">MIA</div><div class="ln">Sent 1m ago · seen ✓</div><div class="corner-r"><svg width="46" height="26" viewBox="-40 0 180 92" aria-hidden="true" style="display:block"><g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M-6 22 Q-16 45 -6 68"/><path d="M-20 14 Q-34 45 -20 76"/><path d="M106 22 Q116 45 106 68"/><path d="M120 14 Q134 45 120 76"/></g><path fill="#fff" d="M12 86 Q1 55 15 30 L13 5 L38 24 Q52 17 65 24 L88 4 L86 33 Q99 55 88 86 Z"/><g fill="none" stroke="#187F69" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M27 48 L40 53"/><path d="M61 52 Q70 44 75 47"/><path d="M45 66 L52 72 L59 66"/></g></svg></div></div><div class="bd c" style="background:#2476AA"><div class="nm">ZOE</div><div class="corner-r"><svg width="46" height="26" viewBox="-40 0 180 92" aria-hidden="true" style="display:block"><g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M-6 22 Q-16 45 -6 68"/><path d="M-20 14 Q-34 45 -20 76"/><path d="M106 22 Q116 45 106 68"/><path d="M120 14 Q134 45 120 76"/></g><path fill="#fff" d="M12 86 Q1 55 15 30 L13 5 L38 24 Q52 17 65 24 L88 4 L86 33 Q99 55 88 86 Z"/><g fill="none" stroke="#2476AA" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M27 48 L40 53"/><path d="M61 52 Q70 44 75 47"/><path d="M45 66 L52 72 L59 66"/></g></svg></div></div><div class="plusband gold">+</div><div class="ft"><span>Settings ·</span><b>Psst+</b></div><div class="dim"></div><div class="spcard" style="background:#187F69"><div class="grab"></div><svg width="70" viewBox="-6 -10 112 100" style="display:block;overflow:visible" aria-hidden="true"><path fill="#fff" d="M12 86 Q1 55 15 30 L13 5 L38 24 Q52 17 65 24 L88 4 L86 33 Q99 55 88 86 Z"/><g fill="none" stroke="#187F69" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M27 48 L40 53"/><path d="M61 52 Q70 44 75 47"/><path d="M45 66 L52 72 L59 66"/></g></svg><div class="t">SUPER PSST</div><div class="f">for Mia</div><div class="d">Double whisper.</div><div class="av">✦ 1 available today</div><div class="btn" style="color:#187F69">SEND SUPER PSST</div></div></div></div></div>
+<div class="band band-yellow"><div class="band-copy"><p class="kicker">07 · Widgets</p><h2>Psst without<br><span class="mark pink">opening the app.</span></h2><p>Put a Psst button in Control Center or on your Lock Screen and psst your top person in one press. Free on iOS 18. Psst+ adds Home Screen and Lock Screen widgets for your people.</p></div><div class="mock tilt-l2" role="img" aria-label="A Lock Screen with the Psst button in the corner, Psst Mia, and a Psst widget showing MIA."><div class="scr lock" style=""><div class="dt">Saturday 18 October</div><div class="tm">9:41</div><div class="lw"><div class="k">PSST</div><div class="n">MIA</div></div><div class="ctltag">Psst Mia</div><div class="ctl"><svg width="30" viewBox="-6 -10 112 100" style="display:block;overflow:visible" aria-hidden="true"><path fill="#fff" d="M12 86 Q1 55 15 30 L13 5 L38 24 Q52 17 65 24 L88 4 L86 33 Q99 55 88 86 Z"/><g fill="none" stroke="#4A3868" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M27 48 L40 53"/><path d="M61 52 Q70 44 75 47"/><path d="M45 66 L52 72 L59 66"/></g></svg></div><div class="ctl2"></div></div></div></div>
 </section>
 
 <section class="kind">
@@ -230,7 +193,15 @@
     </div>
     <div class="qa">
       <h3>Is Psst free?</h3>
-      <p>Yes. Downloading Psst, sending and replying, and inviting people are free. Psst+ is an optional one-time purchase for personal extras: each person's colour, alternate app icons and your whisper sound.</p>
+      <p>Yes. Pssting, replying, doodles, inviting people and one Super Psst a day are free, and so is the Control Center button. Psst+ is an optional one-time purchase: your word, unlimited Super Pssts, whisper sounds, widgets for your people, band colours and app icons.</p>
+    </div>
+    <div class="qa">
+      <h3>What's a doodle?</h3>
+      <p>Hold someone's band and choose Doodle to draw them something with one finger. It fills their screen when they open Psst, and if they've added the Psst widget it sits on their Home Screen as a little polaroid until they psst you back. Doodles are free and, like every Psst, deleted after 30 days.</p>
+    </div>
+    <div class="qa">
+      <h3>Can I psst someone who isn't on Psst?</h3>
+      <p>Yes. Tap the + band and choose Psst someone new or Draw someone new. They get a link that works for one person for 7 days. Your Psst or doodle stays sealed until they get Psst and join, then it's the first thing they see.</p>
     </div>
     <div class="qa">
       <h3>Who can send me a Psst?</h3>
@@ -252,13 +223,12 @@
 </section>
 
 <section class="plus" id="plus">
-  <div class="plus-card">
+  <div class="plus-card word">
     <p class="kicker">Psst+</p>
-    <h2>Make it yours.</h2>
-    <ul class="perks">
-      <li>Unlimited Super Pssts</li><li>Choose each person's colour</li><li>Home Screen and Lock Screen widgets</li>
-      <li>Alternate app icons</li><li>Choose your whisper sound</li>
-    </ul>
+    <h2>Say it your way.</h2>
+    <p>Pick the word your people see when you psst them.</p>
+    <div class="wordcard" role="img" aria-label="Your word: boop. The notification reads Mia, boop."><p class="k2">YOUR WORD</p><p class="big">boop</p><div class="notif"><div class="ntop"><span><span class="ic">psst</span>PSST</span><span>now</span></div><div class="t1">Mia</div><div class="t2">boop</div></div><ul class="wchips" aria-hidden="true"><li>psst</li><li>hey</li><li class="on">boop</li><li>oi</li><li>yo</li><li>hiii</li><li>mwah</li><li>psst psst</li></ul></div>
+    <p class="also">Plus unlimited Super Pssts, whisper sounds, widgets, band colours and app icons.</p>
     <p class="once">One purchase, yours for good.</p>
     <p class="free">Pssting, replies and invites are always free.</p>
   </div>

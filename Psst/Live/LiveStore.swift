@@ -331,6 +331,8 @@ final class LiveStore {
         nextArrival()
     }
 
+    @ObservationIgnored private var publishedDoodle = false
+
     func publishDoodle() async {
         do { WidgetBridge.publishDoodle(try await api.latestDoodle()) } catch {}
     }
@@ -392,8 +394,9 @@ final class LiveStore {
     private func load() async {
         do {
             let latest = try await api.listConnections()
+            let changed = latest != connections
             // Unchanged polls leave the list alone, so home doesn't redraw and the cache isn't rewritten.
-            if latest != connections {
+            if changed {
                 noteStreaks(from: connections, to: latest)
                 connections = latest
                 if let data = try? JSONEncoder().encode(latest) {
@@ -404,11 +407,17 @@ final class LiveStore {
             hasLoadedConnections = true
             connectionsLoadFailed = false
             noteReachable()
+            // What someone sent you first; housekeeping after.
+            await showUnseenIfVisible()
             await retryDeviceToken()
             await reportTimeZone()
             await loadRecapStatus()
-            await showUnseenIfVisible()
-            await publishDoodle()
+            // A new doodle changes the list (its last Psst), so an unchanged poll
+            // doesn't need to download the drawing again.
+            if changed || !publishedDoodle {
+                await publishDoodle()
+                publishedDoodle = true
+            }
         } catch APIError.offline {
             connectionsLoadFailed = true
             noteUnreachable()

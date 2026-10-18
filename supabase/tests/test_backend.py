@@ -778,14 +778,27 @@ class BackendTests(unittest.TestCase):
         self.assertTrue(a.rpc("super_allowance")["unlimited"])
         for _ in range(2): a.rpc("send_signal", uuid.uuid4(), pair, "super_psst")
         original = admin("select original_transaction_id from private.plus_entitlements where user_id=%s", a.user_id)[0][0]
-        # Restoring on a new account moves the purchase there.
+        # The same purchase on another account (iPad, new phone) works there too...
         admin("select public.record_verified_plus(%s,%s,true)", b.user_id, original)
         self.assertTrue(b.rpc("super_allowance")["unlimited"])
-        self.assertFalse(a.rpc("super_allowance")["unlimited"])
+        self.assertTrue(a.rpc("super_allowance")["unlimited"])
+        # ...on up to 3 accounts: a 4th evicts the one checked longest ago.
+        c, d = new_user("C"), new_user("D")
+        admin("update private.plus_entitlements set verified_at=now()-interval '1 hour' where user_id=%s", a.user_id)
+        for other in (c, d):
+            admin("select public.record_verified_plus(%s,%s,true)", other.user_id, original)
+        self.assertFalse(a.rpc("super_allowance")["unlimited"], "evicted: oldest check of four")
+        self.assertTrue(d.rpc("super_allowance")["unlimited"])
         with self.assertRaises(errors.InsufficientPrivilege):
             a.rpc("plus_is_current", a.user_id)
         self.assertTrue(admin("select public.plus_is_current(%s)", b.user_id)[0][0])
+        # Valid for days, but Apple is asked again after 6 hours.
+        admin("update private.plus_entitlements set verified_at=now()-interval '7 hours' where user_id=%s", b.user_id)
+        self.assertFalse(admin("select public.plus_is_current(%s)", b.user_id)[0][0])
+        self.assertTrue(b.rpc("super_allowance")["unlimited"])
+        # A refund ends it for every account holding the purchase.
         admin("select public.record_verified_plus(%s,%s,false)", a.user_id, original)
+        self.assertFalse(d.rpc("super_allowance")["unlimited"])
         self.assertFalse(b.rpc("super_allowance")["unlimited"])
         self.assertFalse(a.rpc("super_allowance")["unlimited"])
         with self.fails("super_daily_limit", 409): a.rpc("send_signal", uuid.uuid4(), pair, "super_psst")

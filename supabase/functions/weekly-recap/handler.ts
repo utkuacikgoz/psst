@@ -53,7 +53,9 @@ export async function handleWeeklyRecap(req: Request, deps: WeeklyRecapDeps): Pr
   const expiresAt = deps.nowSeconds() + RECAP_PUSH_LIFETIME_SECONDS;
   const invalid: string[] = [];
   let sent = 0;
-  for (const target of targets) {
+  // 50 people at a time: one at a time would run past the function's time limit
+  // with a few thousand recipients, and they're already marked sent.
+  const pushOne = async (target: RecapTarget) => {
     const payload = buildRecapPayload(target);
     await Promise.all(target.tokens.map(async ({ token, environment }) => {
       try {
@@ -65,6 +67,9 @@ export async function handleWeeklyRecap(req: Request, deps: WeeklyRecapDeps): Pr
         // Best effort: it's marked sent either way, so nobody gets two.
       }
     }));
+  };
+  for (let i = 0; i < targets.length; i += 50) {
+    await Promise.all(targets.slice(i, i + 50).map(pushOne));
   }
   if (invalid.length > 0) await deps.removeTokens(invalid).catch(() => {});
   return json({ people: targets.length, sent }, 200);

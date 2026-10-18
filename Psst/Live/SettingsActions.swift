@@ -52,7 +52,7 @@ final class SettingsActions {
             nameMessage = "Saved. People you're connected with now see \(name)."
             return true
         } catch APIError.offline {
-            nameMessage = "No internet right now. Your name hasn't changed. Try again once you're online."
+            nameMessage = "You're offline. Your name hasn't changed. Try again once you're back online."
         } catch {
             nameMessage = "Couldn't save your name. Try again."
         }

@@ -9,11 +9,21 @@ export interface RecapTarget {
   tokens: { token: string; environment: ApnsEnvironment }[];
 }
 
+/** A Psst link nobody has opened by day 5 (owner pick 3A): one reminder to its sender. */
+export interface InviteReminderTarget {
+  user_id: string;
+  code: string;
+  sound?: string | null;
+  tokens: { token: string; environment: ApnsEnvironment }[];
+}
+
 export interface WeeklyRecapDeps {
   /** True only for the hourly job's secret (kept in the database's vault). */
   cronOk(secret: string): Promise<boolean>;
   /** Everyone due a recap now; the database marks them sent as it returns them. */
   targets(): Promise<RecapTarget[]>;
+  /** Psst links due their one reminder; the database marks them reminded as it returns them. */
+  inviteReminders(): Promise<InviteReminderTarget[]>;
   removeTokens(tokens: string[]): Promise<void>;
   sendPush(
     token: string,
@@ -37,6 +47,21 @@ export function buildRecapPayload(target: RecapTarget) {
       "thread-id": "weekly-recap",
     },
     psst: { recap: true },
+  };
+}
+
+/** The link still works for two more days; after a day the nudge is stale. */
+export const INVITE_REMINDER_LIFETIME_SECONDS = 24 * 60 * 60;
+
+/** Opening it shows the share sheet with the same link (owner pick 3A). */
+export function buildInviteReminderPayload(target: InviteReminderTarget) {
+  return {
+    aps: {
+      alert: { title: "Your Psst hasn't been opened", body: "Send it again?" },
+      sound: target.sound ?? "psst.wav",
+      "thread-id": "invite-reminder",
+    },
+    psst: { invite_reminder: true, code: target.code },
   };
 }
 
@@ -71,6 +96,32 @@ export async function handleWeeklyRecap(req: Request, deps: WeeklyRecapDeps): Pr
   for (let i = 0; i < targets.length; i += 50) {
     await Promise.all(targets.slice(i, i + 50).map(pushOne));
   }
-  if (invalid.length > 0) await deps.removeTokens(invalid).catch(() => {});
-  return json({ people: targets.length, sent }, 200);
+
+  // After the recaps, the Psst link reminders (3A), on the same terms: best
+  // effort, and each link is already marked reminded, so nobody gets two.
+  const reminders = await deps.inviteReminders().catch(() => [] as InviteReminderTarget[]);
+  const reminderExpiresAt = deps.nowSeconds() + INVITE_REMINDER_LIFETIME_SECONDS;
+  let remindersSent = 0;
+  const remindOne = async (target: InviteReminderTarget) => {
+    const payload = buildInviteReminderPayload(target);
+    await Promise.all(target.tokens.map(async ({ token, environment }) => {
+      try {
+        const result = await deps.sendPush(token, environment, payload, {
+          apnsId: deps.newId(),
+          expiresAt: reminderExpiresAt,
+        });
+        const outcome = classify(result);
+        if (outcome === "invalid_token") invalid.push(token);
+        if (outcome === "accepted") remindersSent += 1;
+      } catch {
+        // Best effort, as above.
+      }
+    }));
+  };
+  for (let i = 0; i < reminders.length; i += 50) {
+    await Promise.all(reminders.slice(i, i + 50).map(remindOne));
+  }
+
+  if (invalid.length > 0) await deps.removeTokens([...new Set(invalid)]).catch(() => {});
+  return json({ people: targets.length, sent, reminders: reminders.length, reminders_sent: remindersSent }, 200);
 }

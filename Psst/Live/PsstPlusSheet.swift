@@ -56,9 +56,9 @@ struct PsstPlusSheet: View {
                     }
                 } else {
                     Section {
-                        perk("Unlimited Super Pssts", symbol: "sparkles", tint: 0xB87500)
-                        perk("Your whisper sound", symbol: "speaker.wave.2.fill", tint: 0x187F69)
-                        perk("Home Screen and Lock Screen widgets", symbol: "rectangle.grid.1x2.fill", tint: 0x5F61AE)
+                        perk("Unlimited Super Pssts", symbol: "sparkles", tint: Color.inviteGold)
+                        perk("Your whisper sound", symbol: "speaker.wave.2.fill", tint: Color(hex: 0x187F69))
+                        perk("Home Screen and Lock Screen widgets", symbol: "rectangle.grid.1x2.fill", tint: Color(hex: 0x5F61AE))
                     }
                     Section {
                         Text("Also: band colours and app icons")
@@ -76,10 +76,10 @@ struct PsstPlusSheet: View {
             }
         }
         .tint(Color.psstCanvas)
-        .environment(\.colorScheme, .light)
+        .preferredColorScheme(.light)
     }
 
-    private func perk(_ title: String, symbol: String, tint: UInt32) -> some View {
+    private func perk(_ title: String, symbol: String, tint: Color) -> some View {
         Label {
             Text(title)
         } icon: {
@@ -87,7 +87,7 @@ struct PsstPlusSheet: View {
                 .font(.footnote)
                 .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
-                .background(Color(hex: tint), in: RoundedRectangle(cornerRadius: 7))
+                .background(tint, in: RoundedRectangle(cornerRadius: 7))
         }
     }
 
@@ -415,7 +415,7 @@ struct ColourSheet: View {
             }
         }
         .tint(Color.psstCanvas)
-        .environment(\.colorScheme, .light)
+        .preferredColorScheme(.light)
         .presentationDetents([.medium, .large])
     }
 }

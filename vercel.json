@@ -5,6 +5,14 @@
   "installCommand": "",
   "outputDirectory": "site",
   "cleanUrls": true,
+  "functions": {
+    "api/invite.js": {
+      "includeFiles": "site/invite.html"
+    },
+    "api/card.js": {
+      "includeFiles": "api/_card/glyphs.bin"
+    }
+  },
   "trailingSlash": false,
   "headers": [
     {
@@ -37,7 +45,7 @@
   "rewrites": [
     {
       "source": "/invite/:code",
-      "destination": "/invite"
+      "destination": "/api/invite?code=:code"
     },
     {
       "source": "/p/:code",

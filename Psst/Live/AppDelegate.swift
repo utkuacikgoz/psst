@@ -69,6 +69,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         (userInfo["psst"] as? [String: Any])?["recap"] as? Bool == true
     }
 
+    /// Day 5 of an unopened Psst link (3A): the code to share again.
+    nonisolated static func inviteReminderCode(_ userInfo: [AnyHashable: Any]) -> String? {
+        guard let psst = userInfo["psst"] as? [String: Any], psst["invite_reminder"] as? Bool == true else { return nil }
+        return psst["code"] as? String
+    }
+
     /// The push the inviter gets when someone accepts (accept-invite function).
     nonisolated static func isJoined(_ userInfo: [AnyHashable: Any]) -> Bool {
         (userInfo["psst"] as? [String: Any])?["joined"] as? Bool == true
@@ -91,6 +97,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             }
             if Self.isRecap(userInfo) {
                 self.store?.showingRecap = true
+                return
+            }
+            if let code = Self.inviteReminderCode(userInfo) {
+                self.store?.reshareCode = code
                 return
             }
             guard let store = self.store, let payload = SignalPayload(userInfo: userInfo) else { return }

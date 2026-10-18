@@ -106,7 +106,7 @@ struct SettingsSheet: View {
             if let allowance = try? await store.api.superAllowance() { superEffectsEnabled = allowance.effectsEnabled }
         }
         .tint(Color.psstCanvas)
-        .environment(\.colorScheme, .light)
+        .preferredColorScheme(.light)
         .task {
             notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
             await actions.load(api: store.api)
@@ -285,7 +285,7 @@ struct SettingsSheet: View {
                 Link("Terms of use", destination: AppConfig.termsURL)
                 Link("Help and support", destination: AppConfig.supportURL)
             } footer: {
-                Text("Psst stores your name, connections, the last 30 days of Pssts and daily allowances, and your notification token. Psst+ also keeps a purchase record for verification. It doesn't read your contacts or location.")
+                Text("Psst stores your name, connections, the last 30 days of Pssts and doodles, a running count of Pssts with each person, your settings and your notification token. Psst+ also keeps a purchase record for verification. It doesn't read your contacts or location.")
             }
         }
         .navigationTitle("Privacy and help")
@@ -296,7 +296,7 @@ struct SettingsSheet: View {
         case .authorized, .provisional, .ephemeral:
             "On. Sounds and alert style follow your iPhone's settings, including Focus and silent mode."
         case .denied:
-            "Off. Signals still appear when you open Psst."
+            "Off. Pssts still wait for you in the app."
         default:
             "Off. You chose Not now when you started; turn them on to hear when someone pssts you."
         }

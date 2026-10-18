@@ -159,6 +159,10 @@ struct LiveHomeView: View {
     @State private var doodlePerson: ConnectionSummary?
     @AppStorage("psst.hapticsEnabled") private var hapticsEnabled = true
     @State private var showingInvite = false
+    /// The empty home's gold band: straight to sharing a Psst link (2A).
+    @State private var startingPsst = false
+    /// A Psst link shared again from its day-5 reminder (3A).
+    @State private var reshare: PsstShare?
     @State private var enteringCode = false
     @State private var searchText = ""
     @FocusState private var searchFocused: Bool
@@ -180,9 +184,9 @@ struct LiveHomeView: View {
             } else {
                 LoadingCat()
                 Text(store.isOffline ? "Waiting for a connection…" : "Loading your people…")
-                .font(.psst(.subheadline, weight: .semibold))
             }
         }
+        .font(.psst(.subheadline, weight: .semibold))
         .foregroundStyle(Color.onCanvas)
         .frame(maxWidth: .infinity, minHeight: minHeight)
         .accessibilityElement(children: .combine)
@@ -193,7 +197,7 @@ struct LiveHomeView: View {
     private var showsDoodleTip: Bool { store.showsDoodleTip && !showsCoach && store.hasLoadedConnections && !anySheet }
 
     private var anySheet: Bool {
-        showingFeatureIntro || superPerson != nil || doodlePerson != nil || showingInvite || enteringCode || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
+        showingFeatureIntro || superPerson != nil || doodlePerson != nil || showingInvite || startingPsst || reshare != nil || enteringCode || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
     }
 
     var body: some View {
@@ -378,6 +382,13 @@ struct LiveHomeView: View {
                         color: Color(hex: bandColors[person.id] ?? personalization.colorHex(for: person.id, name: person.otherName)))
         }
         .sheet(isPresented: $showingInvite) { InviteSheet() }
+        .sheet(isPresented: $startingPsst) { InviteSheet(startPsst: true) }
+        .sheet(item: $reshare) { ShareSheet(items: $0.items) }
+        .task(id: store.reshareCode) {
+            guard let code = store.reshareCode else { return }
+            store.reshareCode = nil
+            reshare = PsstShare.resend(code: code)
+        }
         .sheet(isPresented: $enteringCode) { InviteSheet(startEntering: true) }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
         .fullScreenCover(isPresented: Binding(get: { store.showingRecap }, set: { store.showingRecap = $0 })) {
@@ -418,6 +429,8 @@ struct LiveHomeView: View {
         superPerson = nil
         doodlePerson = nil
         showingInvite = false
+        startingPsst = false
+        reshare = nil
         enteringCode = false
         showingSettings = false
         managing = nil
@@ -524,7 +537,7 @@ struct LiveHomeView: View {
                     .contentShape(Rectangle())
             }
             .foregroundStyle(Color(hex: 0xFFD27A))
-            .accessibilityHint(purchases.isUnlocked ? "Your Super Pssts, colours, icons and sounds." : "An optional one-time unlock.")
+            .accessibilityHint(purchases.isUnlocked ? "Your word, sounds, icons and colours." : "An optional one-time unlock.")
         }
         .font(.psst(.subheadline, weight: .semibold))
         .frame(maxWidth: .infinity)
@@ -597,10 +610,10 @@ struct LiveHomeView: View {
 
     @ViewBuilder private var notices: some View {
         if store.isExistingUser && store.featureIntroSeen && !store.superHintSeen && !store.connections.isEmpty {
-            NoticeView(symbol: "sparkles", text: "Hold a person for Super Psst", actionTitle: "Got it") { store.dismissSuperHint() }
+            NoticeView(symbol: "sparkles", text: "Tap the cat on a band for Super Psst", actionTitle: "Got it") { store.dismissSuperHint() }
         }
         if store.connectionsLoadFailed && !store.connections.isEmpty {
-            NoticeView(symbol: "arrow.clockwise", text: "Couldn't refresh your people", actionTitle: "Retry") {
+            NoticeView(symbol: "arrow.clockwise", text: "Couldn't refresh your people", actionTitle: "Try again") {
                 Task { await store.refresh() }
             }
         }
@@ -653,17 +666,19 @@ struct LiveHomeView: View {
         .accessibilityAddTraits(.isButton)
     }
 
-    /// Option E2: before anyone accepts, home is one gold band.
+    /// Option E2: before anyone accepts, home is one gold band. Since 2A (owner pick,
+    /// 18 Oct 2026) it goes straight to sharing a Psst link; holding it still offers
+    /// the group invite.
     private func firstInviteBand(minHeight: CGFloat) -> some View {
         Button {
-            showingInvite = true
+            startingPsst = true
         } label: {
             VStack(spacing: Tokens.Space.m) {
                 MischiefCat().frame(width: 52, height: 44)
-                Text("INVITE YOUR FIRST PERSON")
-                    .bandTitle("Invite your first person", size: firstInviteTitleSize, tracking: Tokens.Band.titleTracking)
+                Text("PSST SOMEONE NEW")
+                    .bandTitle("Psst someone new", size: firstInviteTitleSize, tracking: Tokens.Band.titleTracking)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("They'll appear here as a band")
+                Text("Your Psst is the invite.")
                     .font(.psst(.subheadline, weight: .medium))
             }
             .multilineTextAlignment(.center)
@@ -674,10 +689,14 @@ struct LiveHomeView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            Button { showingInvite = true } label: { Label("Share my invite", systemImage: "person.badge.plus") }
+        }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Invite someone")
-        .accessibilityHint("No one here yet. They'll appear here once they accept.")
+        .accessibilityLabel("Psst someone new")
+        .accessibilityHint("Shares a link with your Psst. They join when they open it.")
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: "Share my invite") { showingInvite = true }
     }
 
     static let scrollSpace = "homeScroll"
@@ -727,7 +746,7 @@ struct LiveHomeView: View {
                 isBusy: Self.isBusy(status),
                 statusSymbol: Self.symbol(for: status),
                 minHeight: minHeight,
-                cornerMark: dynamicTypeSize.isAccessibilitySize ? nil : Self.cornerMark(for: status),
+                cornerMark: Self.cornerMark(for: status),
                 isDimmed: Self.isPaused(status),
                 color: Color(hex: colour ?? personalization.colorHex(for: connection.id, name: connection.otherName)),
                 exchangeDate: connection.lastCreatedAt,
@@ -802,24 +821,8 @@ struct LiveHomeView: View {
                 withAnimation(reduceMotion ? nil : .snappy) { store.move(dragged, onto: connection.id) }
                 return true
             }
-        return Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 0) {
-                    person
-                    if let mark = Self.cornerMark(for: status) {
-                        Text(mark == "seen" ? "seen ✓" : mark)
-                            .font(.footnote.weight(.bold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                            .padding(.horizontal, Tokens.Space.l)
-                            .padding(.vertical, Tokens.Space.s)
-                            .background(personalization.color(for: connection.id, name: connection.otherName))
-                    }
-                }
-            } else {
-                person
-            }
-        }
+        // At every text size the mark stays inline, in the band's corner (6A, 18 Oct 2026).
+        return person
     }
 
     static func isBusy(_ status: LiveRowStatus) -> Bool {
@@ -922,13 +925,13 @@ struct CoachOverlay: View {
         Button(action: onDismiss) {
             VStack(spacing: Tokens.Space.l) {
                 Image(systemName: "hand.tap.fill")
-                    .font(.system(size: 56))
+                    .font(.system(size: 56, weight: .bold))
                     .scaleEffect(pressing ? 0.88 : 1)
                     .accessibilityHidden(true)
                 Text("Tap a band to psst")
-                    .font(.title2.weight(.heavy))
+                    .font(.psst(.title2, weight: .black))
                 Text("Hold for Super Psst")
-                    .font(.body.weight(.medium))
+                    .font(.psst(.body, weight: .medium))
                 Text("Tap anywhere to start")
                     .font(.psst(.footnote, weight: .semibold))
                     .foregroundStyle(Color.onCanvasSecondary)
@@ -938,7 +941,7 @@ struct CoachOverlay: View {
             .foregroundStyle(Color.onCanvas)
             .padding(Tokens.Space.xl)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.black.opacity(0.6).ignoresSafeArea())
+            .background(Color.black.opacity(0.8).ignoresSafeArea())
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -41,6 +41,8 @@ struct SendPsstIntent: AppIntent {
     static let title: LocalizedStringResource = "Send a Psst"
     static let description = IntentDescription("Sends a Psst without opening the app.")
     static let openAppWhenRun = false
+    /// 7A (18 Oct 2026): from a locked phone, iOS asks for Face ID first.
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @Parameter(title: "Person")
     var person: PsstPersonEntity?

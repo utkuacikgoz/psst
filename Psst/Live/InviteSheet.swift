@@ -8,6 +8,8 @@ struct InviteSheet: View {
 
     /// Opens straight on entering a code ("I have a code" on the empty home).
     var startEntering = false
+    /// Opens straight on sharing a Psst link (the empty home's gold band, 2A).
+    var startPsst = false
 
     private enum Mode { case choose, share, enter }
 
@@ -24,6 +26,8 @@ struct InviteSheet: View {
     @State private var psstShare: PsstShare?
     @State private var creatingPsst = false
     @State private var psstError: String?
+    /// After a Psst link is made: it waits for them until this date (3A).
+    @State private var psstWaitingUntil: Date?
 
     // Enter
     @State private var code = ""
@@ -53,6 +57,7 @@ struct InviteSheet: View {
                 mode = .enter
                 codeFocused = true
             }
+            if startPsst { createPsst() }
             if let pending = store.pendingInviteCode {
                 store.pendingInviteCode = nil
                 code = pending
@@ -96,6 +101,17 @@ struct InviteSheet: View {
             chooserBand(title: "Psst someone new",
                         subtitle: psstError ?? (creatingPsst ? "Getting your Psst ready…" : "Not on Psst yet? Your Psst is the invite."),
                         color: Color(hex: 0xAC3E68), tag: "NEW") { createPsst() }
+            // 3A (owner pick, 18 Oct 2026): say the Psst is waiting, and until when.
+            if let psstWaitingUntil {
+                Text("Your Psst is waiting for them · expires \(psstWaitingUntil.formatted(.dateTime.month(.abbreviated).day()))")
+                    .font(.psst(.subheadline, weight: .bold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Tokens.Space.m)
+                    .padding(.vertical, Tokens.Space.s)
+                    .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+                    .padding(.horizontal, Tokens.Space.l)
+                    .padding(.vertical, Tokens.Space.s)
+            }
             chooserBand(title: "Share my invite", subtitle: progress?.summary() ?? "Send a link to your friends", color: .inviteGold) {
                 withAnimation { mode = .share }
                 // Keep sharing the code that's already filling up, rather than starting a new one.
@@ -217,13 +233,14 @@ struct InviteSheet: View {
         Task {
             do {
                 let invite = try await store.api.createPsstInvite()
-                psstShare = PsstShare(items: ["I pssted you. Open it to see, and psst me back.", invite.link])
+                psstShare = PsstShare(items: [PsstShare.message, invite.link])
+                psstWaitingUntil = invite.expiresAt
             } catch APIError.server(_, "too_many_invites") {
                 psstError = "That's a lot of invites today. Try again tomorrow."
             } catch APIError.offline {
-                psstError = "No internet right now. Try again once you're online."
+                psstError = "You're offline. Try again once you're back online."
             } catch {
-                psstError = "Your Psst didn't get ready. Try again?"
+                psstError = "Couldn't get your Psst ready. Try again."
             }
             creatingPsst = false
         }
@@ -239,9 +256,9 @@ struct InviteSheet: View {
             } catch APIError.server(_, "too_many_invites") {
                 createError = "You have 5 open invites. Wait for one to be used or expire."
             } catch APIError.offline {
-                createError = "No internet right now. Try again once you're online."
+                createError = "You're offline. Try again once you're back online."
             } catch {
-                createError = "That invite didn't happen. Try again?"
+                createError = "Couldn't make an invite. Try again."
             }
             isCreating = false
         }
@@ -337,7 +354,7 @@ struct InviteSheet: View {
         switch status {
         case .pending: "\(name) invited you."
         case .own: "This is your own invite. Share it with someone else."
-        case .used: "This invite has already been used. Ask for a new one."
+        case .used: "This invite has no places left. Ask for a new one."
         case .alreadyConnected: "You're already connected with \(name)."
         case .revoked: "This invite was cancelled. Ask for a new one."
         case .expired: "This invite has expired. Ask for a new one."
@@ -354,9 +371,9 @@ struct InviteSheet: View {
             do {
                 preview = try await store.api.previewInvite(code: trimmed)
             } catch APIError.offline {
-                enterError = "No internet right now. Try again once you're online."
+                enterError = "You're offline. Try again once you're back online."
             } catch {
-                enterError = "That code didn't check out. Try again?"
+                enterError = "Couldn't check that code. Try again."
             }
             isChecking = false
         }
@@ -371,11 +388,11 @@ struct InviteSheet: View {
                 _ = try await store.acceptInvite(code: code)
                 dismiss()
             } catch APIError.offline {
-                enterError = "No internet right now. Try again once you're online."
+                enterError = "You're offline. Try again once you're back online."
             } catch {
                 // The invite changed since it was checked; show its current state.
                 preview = try? await store.api.previewInvite(code: code)
-                if preview == nil { enterError = "That didn't connect. Try again?" }
+                if preview == nil { enterError = "Couldn't connect. Try again." }
             }
             isAccepting = false
         }
@@ -386,6 +403,14 @@ struct InviteSheet: View {
 struct PsstShare: Identifiable {
     let id = UUID()
     let items: [Any]
+
+    static let message = "I pssted you. Open it to see, and psst me back."
+
+    /// The same one-person link again (the day-5 reminder, 3A).
+    static func resend(code: String) -> PsstShare? {
+        guard let link = URL(string: "https://\(InviteLink.webHost)/p/\(code)") else { return nil }
+        return PsstShare(items: [message, link])
+    }
 }
 
 /// The system share sheet (Messages, WhatsApp, anything).

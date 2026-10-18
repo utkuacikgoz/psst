@@ -957,10 +957,20 @@ final class PsstPlusTests: XCTestCase {
 final class WidgetTests: XCTestCase {
     func testWidgetLinks() {
         let id = UUID()
-        guard case .psst(let parsed)? = WidgetLink(URL(string: "psst://psst/\(id.uuidString)")!) else {
+        guard case .psst(let parsed)? = WidgetLink(URL(string: "psst://psst/\(id.uuidString)?t=abc")!, token: "abc") else {
             return XCTFail("psst link")
         }
         XCTAssertEqual(parsed, id)
+        // 8A: only links carrying this install's token send.
+        XCTAssertNil(WidgetLink(URL(string: "psst://psst/\(id.uuidString)")!, token: "abc"))
+        XCTAssertNil(WidgetLink(URL(string: "psst://psst/\(id.uuidString)?t=xyz")!, token: "abc"))
+        XCTAssertNil(WidgetLink(URL(string: "psst://psst/\(id.uuidString)?t=")!, token: nil))
+        let suite = "WidgetTokenTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        XCTAssertTrue(WidgetLink.makeToken(in: defaults))
+        XCTAssertFalse(WidgetLink.makeToken(in: defaults), "made once per install")
+        XCTAssertEqual(defaults.string(forKey: WidgetLink.tokenKey)?.count, 48)
         guard case .plus? = WidgetLink(URL(string: "psst://plus")!) else { return XCTFail("plus link") }
         XCTAssertNil(WidgetLink(URL(string: "psst://psst/not-a-uuid")!))
         XCTAssertNil(WidgetLink(URL(string: "psst://invite/ABCDEFGH")!), "invites are handled elsewhere")

@@ -3,48 +3,35 @@
 // Reads only the inviter's first name and the link's state (public_invite_card).
 // Needs PSST_SUPABASE_URL and PSST_SUPABASE_ANON_KEY in Vercel's environment;
 // without them, or if anything fails, it shows the same page without the name.
+// Shared code lookup and preview tags live in _lib/invite-card.js.
+
+const { SITE, cleanCode, escape, fetchCard, firstName, cardImageURL, previewMeta } = require("./_lib/invite-card");
 
 const STORE = "https://apps.apple.com/app/apple-store/id6815764359?pt=129413467&ct=psst-invite&mt=8";
-
-function escape(text) {
-  return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
-async function card(code) {
-  const base = process.env.PSST_SUPABASE_URL;
-  const key = process.env.PSST_SUPABASE_ANON_KEY;
-  if (!code || !base || !key) return null;
-  try {
-    const response = await fetch(base.replace(/\/$/, "") + "/rest/v1/rpc/public_invite_card", {
-      method: "POST",
-      headers: { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_code: code }),
-      signal: AbortSignal.timeout(3000),
-    });
-    return response.ok ? await response.json() : null;
-  } catch {
-    return null;
-  }
-}
 
 function page(code, info) {
   const pending = info && info.status === "pending" && info.kind === "psst";
   const gone = info && !pending;
-  const name = pending && info.first_name ? info.first_name : null;
+  const name = pending ? firstName(info, "psst") : null;
   const who = name ? escape(name) : "Someone";
   const expires = pending && info.expires_at
     ? new Date(info.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
     : null;
   const title = gone ? "This Psst has been opened" : `${who} pssted you`;
-  const link = "https://psstapp.fun/p/" + code;
+  const link = SITE + "/p/" + code;
+  // Link previews (owner pick 4A): the first name in the title and a per-link card.
+  const meta = previewMeta({
+    title: gone ? title : name ? `${name} pssted you · 1 Psst waiting` : "Someone pssted you",
+    description: `Open it to see, and psst ${name ? "them" : "back"}.`,
+    url: link,
+    image: name ? cardImageURL(code, "p") : SITE + "/img/home.webp",
+  });
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#AC3E68">
 <meta name="apple-itunes-app" content="app-id=6815764359, app-argument=${escape(link)}">
-<meta property="og:title" content="${title}">
-<meta property="og:description" content="Open it to see, and psst ${name ? "them" : "back"}.">
-<meta property="og:image" content="https://psstapp.fun/img/home.webp">
+${meta}
 <link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>${title}</title>
@@ -85,8 +72,8 @@ function page(code, info) {
 }
 
 module.exports = async (req, res) => {
-  const code = String((req.query && req.query.code) || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
-  const info = await card(code);
+  const code = cleanCode(req.query && req.query.code);
+  const info = await fetchCard(code);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "private, no-store");
   res.status(200).send(page(code, info));

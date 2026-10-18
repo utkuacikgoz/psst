@@ -1,6 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { ApnsClient } from "../_shared/apns.ts";
-import { handleWeeklyRecap, RecapTarget } from "./handler.ts";
+import { handleWeeklyRecap, InviteReminderTarget, RecapTarget } from "./handler.ts";
 
 const service = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
   auth: { persistSession: false },
@@ -23,6 +23,11 @@ Deno.serve((req) =>
       const { data, error } = await service.rpc("recap_push_targets");
       if (error) throw new Error(error.message);
       return (data ?? []) as RecapTarget[];
+    },
+    async inviteReminders() {
+      const { data, error } = await service.rpc("invite_reminder_targets");
+      if (error) throw new Error(error.message);
+      return (data ?? []) as InviteReminderTarget[];
     },
     async removeTokens(tokens) {
       const { error } = await service.rpc("remove_device_tokens", { p_tokens: tokens });

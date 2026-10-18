@@ -38,7 +38,7 @@ struct FavouriteWidget: Widget {
                 .containerBackground(for: .widget) { AccessoryWidgetBackground() }
         }
         .configurationDisplayName("Your person")
-        .description("One tap sends a Psst to the first person on your home screen.")
+        .description("One tap sends a Psst to the person at the top of Psst.")
         .supportedFamilies([.accessoryCircular, .accessoryRectangular])
     }
 }
@@ -54,7 +54,7 @@ struct FavouriteView: View {
         } else if let person = entry.people.first {
             label(big: family == .accessoryCircular ? initials(person.name) : person.name.uppercased(),
                   small: "Tap to psst")
-                .widgetURL(URL(string: "psst://psst/\(person.id.uuidString)"))
+                .widgetURL(WidgetPerson.link(to: person.id))
                 .accessibilityLabel("Send \(person.name) a Psst")
         } else {
             label(big: "psst", small: "Invite someone to psst")
@@ -108,6 +108,13 @@ struct WidgetPerson: Codable, Hashable {
     let id: UUID
     let name: String
     let color: UInt32
+
+    /// Sends this person a Psst, with this install's link token (8A, see WidgetLink).
+    static func link(to id: UUID) -> URL {
+        let group = Bundle.main.object(forInfoDictionaryKey: "PSSTAppGroup") as? String
+        let token = group.flatMap(UserDefaults.init(suiteName:))?.string(forKey: "psst.widget.linkToken") ?? ""
+        return URL(string: "psst://psst/\(id.uuidString)?t=\(token)")!
+    }
 }
 
 struct Entry: TimelineEntry {
@@ -208,7 +215,7 @@ struct PeopleView: View {
     }
 
     private func url(for person: WidgetPerson) -> URL {
-        URL(string: "psst://psst/\(person.id.uuidString)")!
+        WidgetPerson.link(to: person.id)
     }
 
     private func band(_ person: WidgetPerson) -> some View {

@@ -468,7 +468,7 @@ struct ActivityView: View {
                         Divider().padding(.leading, Tokens.Space.l)
                     }
                 }
-                Text("Only you see this. Super Pssts count too. All time counts from 30 days before this update.")
+                Text("Only you see this. Super Pssts count too.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(Tokens.Space.l)

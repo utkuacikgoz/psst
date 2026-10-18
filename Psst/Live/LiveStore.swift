@@ -96,6 +96,8 @@ final class LiveStore {
     var notice: String?
     /// Set from an invite link (https://psstapp.fun/invite/CODE or psst://invite/CODE); the home screen opens the invite sheet with it.
     var pendingInviteCode: String?
+    /// A Psst link to share again, from its day-5 reminder (3A).
+    var reshareCode: String?
     /// IF2: someone new opened an invite link. Their start leads with the
     /// inviter; once they've chosen a name, the invite is accepted for them.
     private(set) var invitedBy: String?
@@ -748,7 +750,7 @@ final class LiveStore {
         } catch APIError.server(_, "super_daily_limit") {
             noteReachable()
             sendStates[connectionID] = nil
-            notice = "Today's Super Psst is used. Hold a person to see when it resets."
+            notice = "Today's Super Psst is used. Tap the cat on a band to see when it resets."
         } catch APIError.server(_, "invalid_doodle") {
             // The same strokes would fail again; never offer a retry that can't work.
             doodleStrokes[eventID] = nil

@@ -308,7 +308,7 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 
 **App Privacy:** doodles are covered by the existing **User Content → Other User Content** (linked, not tracking, App Functionality); the privacy manifest now lists it too. The device's time zone is now saved on the account (streak days and the recap's Sunday 6 PM). Apple has no time-zone category and it is far coarser than "Coarse Location", so the safe declaration is **Other Data → App Functionality, linked to the user, not used for tracking**. Weekly recap and Psst links collect nothing else new: the recap is computed from Pssts already stored, and a Psst link stores only the same invite row as an invite code.
 
-## 1.0.7 (build 37 or later)
+## 1.0.7 (build 40 or later)
 
 1.0.6 (build 35) is the live version and the baseline for rule 3. Submit with the Release to App Store workflow (version 1.0.7, the newest build, mode prepare to check, then submit); it reads the two blocks below.
 
@@ -316,8 +316,12 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 
 ```
 • Your word (Psst+): choose what your people see when you psst them: hey, boop, oi, yo, hiii, mwah or psst psst
+• Psst someone new: with nobody on home yet, one tap shares a Psst link. If it isn't opened in 5 days, we'll remind you once
+• Got sent a Psst before you had the app? Paste the link when you pick your name
+• Link previews now show who it's from
+• The Control Center button asks for Face ID when your iPhone is locked
 • Psst+ now unlocks unlimited Super Psst reliably on every iPhone
-• Small fixes
+• Clearer messages and small fixes
 ```
 
 **Notes for the reviewer:**
@@ -328,6 +332,9 @@ Psst lets two people who have both agreed to connect send each other a one-tap "
 What's new in 1.0.7:
 - Your word (Psst+ only): Psst+ sheet → "Your word" lets the buyer pick one word from a fixed list (psst, hey, boop, oi, yo, hiii, mwah, psst psst). The people they psst then see that word instead of "psst" in the notification ("Mia · boop") and the full-screen moment. It is a fixed list, so there is no free text; the server only accepts these words and only from accounts with a verified Psst+ purchase.
 - Psst+ purchases are now verified on our server reliably, so unlimited Super Psst works on every device after buying or restoring.
+- Name step: "Someone sent you a Psst?" with Apple's system Paste button. It reads the clipboard only when tapped (no prompt) and only uses a psstapp.fun invite link or code found there.
+- Empty home: the gold band shares a one-person Psst link. If nobody opens it within 5 days, the sender gets one notification ("Your Psst hasn't been opened") that reopens the share sheet. Only once per link.
+- The Control Center / Lock Screen button now requires Face ID or the passcode on a locked iPhone.
 
 To try it with a real person (our team):
 1. Open the app, enter any name, and choose whether to allow notifications.

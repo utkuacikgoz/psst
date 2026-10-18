@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import WidgetKit
 
 /// Hands the widget (PsstWidget) what it shows: the first people in home's
@@ -32,7 +33,9 @@ enum WidgetBridge {
         guard let defaults = store ?? Self.defaults, let data = try? JSONEncoder().encode(people) else { return }
         let all = everyone.flatMap { try? JSONEncoder().encode($0) }
         let allChanged = all != nil && all != defaults.data(forKey: everyoneKey)
-        guard data != defaults.data(forKey: peopleKey) || unlocked != defaults.bool(forKey: unlockedKey) || allChanged else { return }
+        let newToken = WidgetLink.makeToken(in: defaults)
+        guard data != defaults.data(forKey: peopleKey) || unlocked != defaults.bool(forKey: unlockedKey) || allChanged
+            || newToken else { return }
         defaults.set(data, forKey: peopleKey)
         defaults.set(unlocked, forKey: unlockedKey)
         if let all { defaults.set(all, forKey: everyoneKey) }
@@ -74,17 +77,39 @@ enum WidgetBridge {
     }
 }
 
-/// Widget taps arrive as psst://psst/<connection id> and psst://plus.
+/// Widget taps arrive as psst://psst/<connection id>?t=<token> and psst://plus.
+/// A send needs this install's own token (8A, 18 Oct 2026), which only the app and
+/// its widget can read, so a link on a web page can't send a Psst for you.
 enum WidgetLink {
     case psst(UUID)
     case plus
 
-    init?(_ url: URL) {
+    static let tokenKey = "psst.widget.linkToken"
+
+    /// Creates this install's token once. True when it was just made.
+    static func makeToken(in defaults: UserDefaults) -> Bool {
+        guard defaults.string(forKey: tokenKey) == nil else { return false }
+        var bytes = [UInt8](repeating: 0, count: 24)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { return false }
+        defaults.set(bytes.map { String(format: "%02x", $0) }.joined(), forKey: tokenKey)
+        return true
+    }
+
+    static var sharedToken: String? {
+        guard let group = Bundle.main.object(forInfoDictionaryKey: "PSSTAppGroup") as? String,
+              !group.isEmpty, !group.hasPrefix("$(") else { return nil }
+        return UserDefaults(suiteName: group)?.string(forKey: tokenKey)
+    }
+
+    init?(_ url: URL, token: String? = WidgetLink.sharedToken) {
         guard url.scheme?.lowercased() == "psst" else { return nil }
         switch url.host?.lowercased() {
         case "plus": self = .plus
         case "psst":
-            guard let id = url.pathComponents.dropFirst().first.flatMap(UUID.init(uuidString:)) else { return nil }
+            guard let id = url.pathComponents.dropFirst().first.flatMap(UUID.init(uuidString:)),
+                  let token, !token.isEmpty,
+                  URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                      .queryItems?.first(where: { $0.name == "t" })?.value == token else { return nil }
             self = .psst(id)
         default: return nil
         }

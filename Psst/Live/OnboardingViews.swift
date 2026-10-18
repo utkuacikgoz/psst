@@ -43,6 +43,32 @@ struct NameStepView: View {
                         .padding(.horizontal, inset)
                         .padding(.top, Tokens.Space.m)
 
+                    // 1A (owner pick, 18 Oct 2026): the App Store drops the invite link
+                    // on install, so a newcomer can paste what they were sent. Apple's
+                    // Paste button reads the clipboard only when tapped (no prompt).
+                    if store.pendingInviteCode == nil {
+                        HStack(spacing: Tokens.Space.m) {
+                            Text("Someone sent you a Psst?")
+                                .font(.psst(.subheadline, weight: .bold))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                            PasteButton(payloadType: String.self) { strings in
+                                guard let code = strings.lazy.compactMap(InviteLink.code(inPasted:)).first else { return }
+                                Task { @MainActor in store.pendingInviteCode = code }
+                            }
+                            .labelStyle(.titleOnly)
+                            .buttonBorderShape(.capsule)
+                            // A secure control: iOS refuses taps when its label and
+                            // background lack contrast, so it stays dark with its own text.
+                            .tint(Color.ink)
+                        }
+                        .padding(.horizontal, Tokens.Space.m)
+                        .padding(.vertical, Tokens.Space.s)
+                        .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+                        .padding(.horizontal, inset)
+                        .padding(.top, Tokens.Space.l)
+                    }
+
                     if let error {
                         Label(error, systemImage: "exclamationmark.circle")
                             .font(.psst(.subheadline, weight: .semibold))
@@ -71,7 +97,7 @@ struct NameStepView: View {
             do {
                 try await store.createProfile(name: trimmed)
             } catch APIError.offline {
-                error = "No internet right now. Try again once you're back online."
+                error = "You're offline. Try again once you're back online."
             } catch {
                 self.error = "That didn't save. Give it another go?"
             }
@@ -157,9 +183,9 @@ struct NameEditSheet: View {
                 try await store.rename(to: trimmed)
                 dismiss()
             } catch APIError.offline {
-                error = "No internet right now. Try again once you're back online."
+                error = "You're offline. Try again once you're back online."
             } catch {
-                self.error = "That didn't save. Try again in a moment."
+                self.error = "That didn't save. Try again."
             }
             isSaving = false
         }
@@ -289,7 +315,7 @@ struct NotificationStepView: View {
                             .contentShape(Rectangle())
                     }
                     .disabled(isAsking)
-                    .accessibilityHint("Signals still appear when you open Psst.")
+                    .accessibilityHint("Pssts still wait for you in the app.")
                 }
             }
             .foregroundStyle(Color.onCanvas)

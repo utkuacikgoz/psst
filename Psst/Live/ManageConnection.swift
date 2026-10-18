@@ -30,7 +30,7 @@ struct ConnectionAction: Identifiable {
         switch kind {
         case .remove: "You both stop seeing each other in Psst. You can connect again later with a new invite."
         case .block: "\(name) can't send you a Psst or connect with you again, and isn't told. You can unblock in Settings."
-        case .report: "\(name) is blocked and the Psst team is sent a report to review. \(name) isn't told."
+        case .report: "\(name) is blocked and we'll review your report within 24 hours. \(name) isn't told."
         }
     }
 

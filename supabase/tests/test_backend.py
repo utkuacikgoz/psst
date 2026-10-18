@@ -325,6 +325,68 @@ class BackendTests(unittest.TestCase):
             ada.rpc("create_invite")
         self.assertIn(waiting, {r[0] for r in ada.rows("select code from public.list_open_invites()")})
 
+    def test_unopened_psst_link_reminds_its_sender_once_from_day_five(self):
+        ada, kim, sam = new_user("Ada"), new_user("Kim"), new_user("Sam")
+        token = "ab" * 32
+        ada.rpc("register_device_token", token, "sandbox")
+        admin("update public.profiles set notification_sound = 'psst-soft.wav' where id = %s", ada.user_id)
+        service = Api("service_role")
+        old = new_user("Old")  # an app from before the reminder (build 39): its link waits
+        old_code = old.rpc("create_psst_invite")["code"]
+        admin("update public.profiles set app_build = 40 where id in (%s, %s)", ada.user_id, sam.user_id)
+        admin("update public.profiles set app_build = 39 where id = %s", old.user_id)
+
+        def age(code, days):
+            admin("update public.invites set created_at = now() - %s * interval '1 day' where code = %s", float(days), code)
+
+        due = ada.rpc("create_psst_invite")["code"]
+        young = ada.rpc("create_psst_invite")["code"]
+        accepted = ada.rpc("create_psst_invite")["code"]
+        revoked = ada.rpc("create_psst_invite")["code"]
+        expired = ada.rpc("create_psst_invite")["code"]
+        group = ada.rpc("create_invite")["code"]
+        no_phone = sam.rpc("create_psst_invite")["code"]
+        age(young, 4.9)
+        for code in (due, accepted, revoked, expired, group, no_phone, old_code):
+            age(code, 5)
+        kim.rpc("accept_invite", accepted)
+        ada.rpc("revoke_invite", revoked)
+        admin("update public.invites set expires_at = now() - interval '1 minute' where code = %s", expired)
+
+        targets = service.rpc("invite_reminder_targets")
+        by_code = {t["code"]: t for t in targets}
+        self.assertEqual(set(by_code), {due, no_phone}, "only day-5+ open Psst links, never group codes")
+        self.assertEqual(by_code[due]["user_id"], str(ada.user_id))
+        self.assertEqual(by_code[due]["sound"], "psst-soft.wav")
+        self.assertEqual(by_code[due]["tokens"], [{"token": token, "environment": "sandbox"}])
+        self.assertEqual(by_code[no_phone]["tokens"], [], "claimed anyway: one chance per link")
+        self.assertEqual(service.rpc("invite_reminder_targets"), [], "once per link")
+        admin("update public.profiles set app_build = 40 where id = %s", old.user_id)
+        self.assertEqual([t["code"] for t in service.rpc("invite_reminder_targets")], [old_code], "once they update")
+
+        age(young, 5)
+        self.assertEqual([t["code"] for t in service.rpc("invite_reminder_targets")], [young])
+
+        # Two runs at once still remind once.
+        late = ada.rpc("create_psst_invite")["code"]
+        age(late, 6)
+        with ThreadPoolExecutor(4) as pool:
+            runs = list(pool.map(lambda _: Api("service_role").rpc("invite_reminder_targets"), range(4)))
+        self.assertEqual(sorted(t["code"] for run in runs for t in run), [late])
+
+        # A deleted account takes its links with it: no reminder.
+        gone = new_user("Gone")
+        admin("update public.profiles set app_build = 40 where id = %s", gone.user_id)
+        gone_code = gone.rpc("create_psst_invite")["code"]
+        age(gone_code, 5)
+        admin("delete from auth.users where id = %s", gone.user_id)
+        self.assertEqual(service.rpc("invite_reminder_targets"), [])
+
+        with self.assertRaises(errors.InsufficientPrivilege):
+            ada.rpc("invite_reminder_targets")
+        with self.assertRaises(errors.InsufficientPrivilege):
+            Api("anon").rpc("invite_reminder_targets")
+
     def test_only_inviter_can_revoke(self):
         ada, sam = new_user("Ada"), new_user("Sam")
         code = ada.rpc("create_invite")["code"]

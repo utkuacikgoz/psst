@@ -192,7 +192,9 @@ struct ArrivalView: View {
                         optionDivider
                         if let onReport { optionRow("Report \(name)", destructive: true, action: onReport) }
                     }
-                    .frame(width: 220, alignment: .leading)
+                    // As wide as its longest row, 220 to 320 (6A, 18 Oct 2026); longer names wrap.
+                    .frame(minWidth: 220, maxWidth: 320, alignment: .leading)
+                    .fixedSize(horizontal: true, vertical: false)
                     .background(Color(white: 0.16).opacity(0.97), in: RoundedRectangle(cornerRadius: 14))
                     .transition(.opacity)
                 }
@@ -214,6 +216,8 @@ struct ArrivalView: View {
             Text(title)
                 .font(.psst(.body, weight: .medium))
                 .foregroundStyle(destructive ? Color(red: 1, green: 0.41, blue: 0.38) : .white)
+                .lineLimit(2)
+                .padding(.vertical, Tokens.Space.xs)
                 .frame(maxWidth: .infinity, minHeight: Tokens.minTouch, alignment: .leading)
                 .padding(.horizontal, Tokens.Space.m)
                 .contentShape(Rectangle())
@@ -260,6 +264,7 @@ struct ArrivalView: View {
                     .bandTitle(name, size: nameSize, tracking: Tokens.Band.titleTracking)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.5)
+                .multilineTextAlignment(.center)
                     .offset(y: settled || reduceMotion ? 0 : 24)
                     .opacity(settled || !reduceMotion ? 1 : 0)
                     .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.25), value: settled)
@@ -311,8 +316,9 @@ struct ArrivalView: View {
             Text(arrival.kind == .sameMoment ? "CLOSE" : isPsst ? "PSST BACK" : "PSST \(name.uppercased())")
                 .font(.psst(size: replySize, weight: .black))
                 .tracking(Tokens.Band.labelTracking)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.6)
+                .multilineTextAlignment(.center)
                 .padding(.horizontal, Tokens.Space.xl)
                 .frame(maxWidth: .infinity, minHeight: Tokens.Band.addBandMinHeight)
                 .background(Color.bandShade.ignoresSafeArea(edges: .bottom))
@@ -345,8 +351,9 @@ struct ArrivalView: View {
                 .font(.psst(size: labelSize, weight: .black))
                 .tracking(Tokens.Band.titleTracking / 2)
                 .foregroundStyle(Color.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.5)
+                .multilineTextAlignment(.center)
                 .padding(.horizontal, Tokens.Space.l)
                 .padding(.vertical, Tokens.Space.s)
                 .background(Color.surface)

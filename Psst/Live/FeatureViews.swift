@@ -402,6 +402,7 @@ struct ActivityView: View {
     @State private var attempted = false
     @ScaledMetric(relativeTo: .largeTitle) private var podiumName: CGFloat = 30
     @ScaledMetric(relativeTo: .largeTitle) private var podiumCount: CGFloat = 30
+    @ScaledMetric(relativeTo: .title3) private var podiumRank: CGFloat = 18
 
     private func count(_ row: ActivitySummary) -> Int {
         switch direction {
@@ -461,7 +462,7 @@ struct ActivityView: View {
                         .padding(Tokens.Space.l)
                 } else {
                     ForEach(Array(entries.prefix(3).enumerated()), id: \.element.id) { index, row in
-                        podiumBand(rank: ranks[index], position: index + 1, row: row)
+                        podiumBand(rank: ranks[index], row: row)
                     }
                     ForEach(Array(entries.enumerated().dropFirst(3)), id: \.element.id) { index, row in
                         listRow(rank: ranks[index], row: row)
@@ -492,25 +493,30 @@ struct ActivityView: View {
         }
     }
 
-    /// First, second and third: their band, their colour, the count.
-    private func podiumBand(rank: Int, position: Int, row: ActivitySummary) -> some View {
-        // Size follows the place on the podium; the number shows the shared rank.
-        let scale: CGFloat = position == 1 ? 1 : position == 2 ? 0.85 : 0.75
-        return HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.m) {
+    /// First, second and third: their band, their colour, the count. Since owner pick
+    /// 1B (18 Oct 2026) all three are one size, the ranks sit in one column so every
+    /// name starts on the same line, and long names wrap to the left.
+    private func podiumBand(rank: Int, row: ActivitySummary) -> some View {
+        HStack(alignment: .center, spacing: Tokens.Space.m) {
             Text("\(rank)")
                 .font(.psst(.title3, weight: .black))
+                .monospacedDigit()
                 .foregroundStyle(Color.onBandSoft)
+                .frame(minWidth: podiumRank, alignment: .leading)
             Text(row.otherName.uppercased())
-                .bandTitle(row.otherName, size: podiumName * scale, tracking: Tokens.Band.titleTracking)
+                .font(.psst(size: podiumName * 0.85, weight: .black))
+                .tracking(Tokens.Band.titleTracking)
                 .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text("\(count(row))")
-                .font(.psst(size: podiumCount * scale, weight: .black))
+                .font(.psst(size: podiumCount * 0.85, weight: .black))
                 .monospacedDigit()
         }
         .foregroundStyle(Color.onCanvas)
         .padding(.horizontal, Tokens.Space.l)
-        .frame(maxWidth: .infinity, minHeight: 72 + 40 * scale)
+        .padding(.vertical, Tokens.Space.m)
+        .frame(maxWidth: .infinity, minHeight: 106)
         .background(Color(hex: personalization.colorHex(for: row.connectionId, name: row.otherName)))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Number \(rank), \(row.otherName), \(count(row))")

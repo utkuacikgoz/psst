@@ -79,7 +79,7 @@ final class SettingsActionsTests: XCTestCase {
         api.renameError = APIError.offline
         let offline = await actions.rename(to: "  Ada  ", api: api)
         XCTAssertFalse(offline); XCTAssertEqual(api.renamedNames, ["Ada"])
-        XCTAssertTrue(actions.nameMessage?.contains("No internet") == true)
+        XCTAssertTrue(actions.nameMessage?.hasPrefix("You're offline.") == true)
         api.renameError = APIError.server(status: 500, code: "server_error")
         let rejected = await actions.rename(to: "Ada", api: api)
         XCTAssertFalse(rejected); XCTAssertEqual(actions.nameMessage, "Couldn't save your name. Try again.")

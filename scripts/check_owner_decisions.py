@@ -23,7 +23,7 @@ CHECKS = [
     ("Empty home offers I have a code", "Psst/Live/LiveHomeView.swift", r"haveCodeBand"),
     ("Home loader while people load", "Psst/Live/LiveHomeView.swift", r"loadingPeople"),
     ("People from last time show at launch", "Psst/Live/LiveStore.swift", r"connectionsCacheKey"),
-    ("Rating asked once after the first Psst", "Psst/Live/LiveHomeView.swift", r"requestReview"),
+    ("Rating asked once after a happy moment", "Psst/Live/LiveHomeView.swift", r"requestReview"),
     ("Not now can turn notifications on later", "Psst/Live/SettingsSheet.swift", r"Turn on notifications"),
     ("Whisper plays with the app open", "Psst/Live/AppDelegate.swift", r"completionHandler\(\[\.sound\]\)"),
     ("ps-st vibration on arrival", "Psst/ArrivalView.swift", r"PsstHaptics\.play"),

@@ -184,10 +184,13 @@ def screenshot_files() -> dict[str, list[str]]:
     return found
 
 
-def replace_screenshots(localization: str, display: str, files: list[str], wait=time.sleep):
+def replace_screenshots(localization: str, display: str, files: list[str], wait=time.sleep,
+                        parent: str = "appStoreVersionLocalization"):
     """Empties (or makes) the localization's screenshot set for this display, uploads the files
-    in order through Apple's upload operations, and waits until Apple has processed them."""
-    sets = call("GET", f"/appStoreVersionLocalizations/{localization}/appScreenshotSets",
+    in order through Apple's upload operations, and waits until Apple has processed them.
+    parent is "appStoreVersionLocalization", or "appCustomProductPageLocalization" for a
+    custom product page."""
+    sets = call("GET", f"/{parent}s/{localization}/appScreenshotSets",
                 **{"filter[screenshotDisplayType]": display})["data"]
     if sets:
         set_id = sets[0]["id"]
@@ -196,8 +199,7 @@ def replace_screenshots(localization: str, display: str, files: list[str], wait=
     else:
         set_id = call("POST", "/appScreenshotSets", {"data": {
             "type": "appScreenshotSets", "attributes": {"screenshotDisplayType": display},
-            "relationships": {"appStoreVersionLocalization": {
-                "data": {"type": "appStoreVersionLocalizations", "id": localization}}}}})["data"]["id"]
+            "relationships": {parent: {"data": {"type": f"{parent}s", "id": localization}}}}})["data"]["id"]
     ids = []
     for path in files:
         data = open(path, "rb").read()

@@ -1,0 +1,32 @@
+name: App Store custom pages
+
+# Manual, Linux only. Creates the custom product pages (one per landing page,
+# owner go 19 Oct 2026) from scripts/custom_pages.py; "submit" also sends them to App Review.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: draft (create and fill) or submit (also send for review)
+        type: choice
+        options: [draft, submit]
+        default: draft
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  pages:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+      MODE: ${{ inputs.mode }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: pip install -q pyjwt cryptography
+      - run: python3 scripts/custom_pages.py

@@ -218,10 +218,13 @@ def replace_screenshots(localization: str, display: str, files: list[str], wait=
     call("PATCH", f"/appScreenshotSets/{set_id}/relationships/appScreenshots",
          {"data": [{"type": "appScreenshots", "id": i} for i in ids]})
     for _ in range(60):
-        states = [call("GET", f"/appScreenshots/{i}")["data"]["attributes"].get("assetDeliveryState", {}).get("state")
-                  for i in ids]
+        delivery = [call("GET", f"/appScreenshots/{i}")["data"]["attributes"].get("assetDeliveryState") or {}
+                    for i in ids]
+        states = [d.get("state") for d in delivery]
         if "FAILED" in states:
-            sys.exit(f"Apple couldn't process a {display} screenshot.")
+            reasons = "; ".join(f"{os.path.basename(files[n])}: {e.get('code')} {e.get('description')}"
+                                for n, d in enumerate(delivery) if d.get("state") == "FAILED" for e in d.get("errors") or [{}])
+            sys.exit(f"Apple couldn't process a {display} screenshot: {reasons}")
         if all(state == "COMPLETE" for state in states):
             print(f"Screenshots set: {len(ids)} for {display}.")
             return

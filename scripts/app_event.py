@@ -9,11 +9,14 @@ Prints what it does, never keys. Reads ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8, BU
 import datetime
 import os
 import sys
+import time
 import urllib.request
 
 import release as R
 
 REFERENCE = "Draw someone new (Oct 2026)"
+# Required by Apple: opens Psst (home, where + leads to Draw someone new).
+DEEP_LINK = "psst://home"
 COPY = {"name": "Draw someone new",
         "shortDescription": "Send a sealed doodle to someone new",
         "longDescription": "Draw with one finger and share it as a link. It stays sealed until they join Psst, "
@@ -53,6 +56,10 @@ def main():
     event = next((e for e in events if e["attributes"].get("referenceName") == REFERENCE), None)
     if event:
         print(f"Event exists ({event['attributes'].get('eventState')}).")
+        if not event["attributes"].get("deepLink"):
+            R.call("PATCH", f"/appEvents/{event['id']}", {"data": {
+                "type": "appEvents", "id": event["id"], "attributes": {"deepLink": DEEP_LINK}}})
+            print(f"Deep link set: {DEEP_LINK}.")
     else:
         start = os.environ.get("START") or (datetime.datetime.now(datetime.timezone.utc)
                                             + datetime.timedelta(days=2)).strftime("%Y-%m-%dT16:00:00Z")
@@ -62,6 +69,7 @@ def main():
         event = R.call("POST", "/appEvents", {"data": {
             "type": "appEvents",
             "attributes": {"referenceName": REFERENCE, "badge": "MAJOR_UPDATE", "primaryLocale": "en-US",
+                           "deepLink": DEEP_LINK,
                            "priority": "HIGH", "purpose": "ATTRACT_NEW_USERS",
                            "purchaseRequirement": "NO_COST_ASSOCIATED",
                            "territorySchedules": [{"territories": territories, "publishStart": start,
@@ -90,6 +98,18 @@ def main():
     for asset_type, name in IMAGES.items():
         if asset_type not in have:
             upload(loc["id"], asset_type, os.path.join(ART, name))
+
+    for _ in range(60):  # Apple must finish processing the images before review
+        states = [(s["attributes"].get("assetDeliveryState") or {}).get("state")
+                  for s in R.call("GET", f"/appEventLocalizations/{loc['id']}/appEventScreenshots")["data"]]
+        if states and all(state == "COMPLETE" for state in states):
+            print("Event images processed.")
+            break
+        if "FAILED" in states:
+            sys.exit("Apple couldn't process an event image.")
+        time.sleep(10)
+    else:
+        sys.exit("Event images weren't processed within 10 minutes. Run again.")
 
     if os.environ.get("MODE", "draft") != "submit":
         print("Event ready as a draft. Not submitted (MODE=draft).")

@@ -71,8 +71,14 @@ def main():
             loc = next((l for l in locs if l["attributes"].get("locale") == primary), locs[0])
             R.call("PATCH", f"/appCustomProductPageLocalizations/{loc['id']}", {"data": {
                 "type": "appCustomProductPageLocalizations", "id": loc["id"], "attributes": {"promotionalText": promo}}})
+            # Only the 6.5" set: Apple refused every 6.9" file on custom pages (SPEC_MISMATCH, 19 Oct
+            # 2026) though the same files are fine on the main page; 6.5" covers every iPhone.
+            for old in R.call("GET", f"/appCustomProductPageLocalizations/{loc['id']}/appScreenshotSets",
+                              **{"filter[screenshotDisplayType]": "APP_IPHONE_67"})["data"]:
+                R.call("DELETE", f"/appScreenshotSets/{old['id']}")
             for display, files in files_in_order(order).items():
-                R.replace_screenshots(loc["id"], display, files, parent="appCustomProductPageLocalization")
+                if display == "APP_IPHONE_65":
+                    R.replace_screenshots(loc["id"], display, files, parent="appCustomProductPageLocalization")
             versions_to_submit.append(version["id"])
         print(f"'{name}': ppid={page['id']} url={page['attributes'].get('url')}")
 

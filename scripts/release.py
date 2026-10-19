@@ -28,9 +28,8 @@ API = "https://api.appstoreconnect.apple.com/v1"
 NOTES = os.path.join(os.path.dirname(__file__), "..", "docs", "APP_REVIEW_NOTES.md")
 ASO = os.path.join(os.path.dirname(__file__), "..", "docs", "ASO.md")
 SHOTS = os.path.join(os.path.dirname(__file__), "..", "brand", "appstore")
-# Apple's APP_IPHONE_67 set takes 1290x2796 (custom product pages refuse 1320x2868 there
-# with SPEC_MISMATCH); APP_IPHONE_65 takes 1284x2778. The 1320x2868 originals stay as masters.
-DISPLAY = {"1290x2796": "APP_IPHONE_67", "1284x2778": "APP_IPHONE_65"}
+# 6.9" screenshots go in Apple's APP_IPHONE_67 set; 6.5" in APP_IPHONE_65.
+DISPLAY = {"1320x2868": "APP_IPHONE_67", "1284x2778": "APP_IPHONE_65"}
 
 
 def key() -> str:

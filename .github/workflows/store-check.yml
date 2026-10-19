@@ -1,0 +1,26 @@
+name: App Store check
+
+# Manual, Linux only, read-only: lists the in-app purchases and their offer codes
+# (e.g. BUILDHOP50) so a new code can be checked without redeeming it.
+on:
+  workflow_dispatch:
+    inputs:
+      code:
+        description: A code to look for, e.g. BUILDHOP50
+        required: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 5
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+      CODE: ${{ inputs.code }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: pip install -q pyjwt cryptography
+      - run: python3 scripts/check_offer_codes.py

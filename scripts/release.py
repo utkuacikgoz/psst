@@ -51,7 +51,9 @@ TOKEN = None
 def call(method: str, path: str, body: dict | None = None, **query) -> dict:
     global TOKEN
     TOKEN = TOKEN or token()
-    url = f"{API}{path}" + (f"?{urllib.parse.urlencode(query)}" if query else "")
+    # Paths are under /v1 unless they name their own version (e.g. /v2/inAppPurchases/...).
+    base = API.rsplit("/v1", 1)[0] if path.startswith(("/v1/", "/v2/", "/v3/")) else API
+    url = f"{base}{path}" + (f"?{urllib.parse.urlencode(query)}" if query else "")
     data = json.dumps(body).encode() if body is not None else None
     request = urllib.request.Request(url, data=data, method=method, headers={
         "Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"})

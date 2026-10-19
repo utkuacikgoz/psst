@@ -6,10 +6,44 @@ Rules Apple applies: the name, subtitle and keywords are all searched together, 
 
 ## English (U.S.) — primary
 
-- **Name (19/30):** Psst – Tap a Friend
-- **Subtitle (27/30):** Thinking of you, in one tap
-- **Keywords (98/100):** `yo,nudge,poke,miss,couple,partner,long,distance,ldr,widget,ping,hello,whisper,bff,family,buzz,love`
-- **Promotional text (145/170):** One tap tells someone you're thinking of them. They can psst you back from the notification. Free, no feed, no chat — just the people you invite.
+Owner picks 1A 2A 3A (19 Oct 2026). The Release workflow reads this section and sets all of it: name and subtitle on the app's editable App Information, the rest on the version. The Promo workflow mode sets the promotional text straight away.
+
+- **Name (30/30):** Psst: Doodle & Miss You Widget
+- **Subtitle (29/30):** For couples, besties & family
+- **Keywords (97/100):** `yo,nudge,poke,partner,long,distance,ldr,bff,love,thinking,draw,drawing,sketch,streak,friend,bf,gf`
+- **Promotional text (141/170):** New: draw a doodle that lands on their Home Screen. One tap says thinking of you, and they psst you back. No feed. No chat. Just your people.
+
+**Description:**
+
+```
+Miss them? Psst them.
+
+Tap someone's colour band and they get a whispered "psst": thinking of you. They psst you back in one tap, straight from the notification. No typing, no feed, no chat.
+
+DRAW THEM A DOODLE
+Hold someone's band and draw with one finger. It fills their screen when they open Psst, and sits on their Home Screen widget as a little polaroid until they psst you back.
+
+PSST SOMEONE NEW
+Psst or draw someone who isn't on Psst yet. They get a one-person link, sealed until they join. For the group chat, one code brings up to 10 friends.
+
+LITTLE MAGIC
+• SAME MOMENT: psst each other within 10 seconds and both phones light up.
+• Streaks: psst each other every day and keep the flame going.
+• Super Psst: a double whisper and a shake. One free every day.
+• A weekly recap of you and your people, every Sunday.
+• A Control Center and Lock Screen button that pssts without opening the app (iOS 18).
+
+JUST YOUR PEOPLE
+• Invite only. Nothing happens until you've both said yes.
+• No ads, no feed, no strangers, no contacts upload, no location.
+• All you need is a name. Delete your account any time in Settings.
+• Hold any band to block or report.
+
+PSST+ (OPTIONAL, ONE PURCHASE)
+Say it your way: pick the word your people see (hey, boop, oi, yo, mwah and more). Plus unlimited Super Pssts, whisper sounds, Home Screen and Lock Screen widgets for your people, band colours and app icons. Pssting, replies and invites are always free.
+
+Inspired by Yo.
+```
 
 ## Turkish (tr) — add under App Store Connect → Localizations → Turkish
 

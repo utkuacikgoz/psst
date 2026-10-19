@@ -4,20 +4,21 @@ name: Release to App Store
 # the version, attaches the build, fills What's New and the review notes from
 # docs/APP_REVIEW_NOTES.md (the "## <version> (" section), replaces the App
 # Store screenshots with brand/appstore unless told to keep them. "prepare" stops
-# before sending; "submit" sends it to App Review.
+# before sending; "submit" sends it to App Review; "promo" only updates the
+# promotional text from docs/ASO.md, which Apple lets change at any time.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: App version, e.g. 1.0.7
-        required: true
+        description: App version, e.g. 1.0.7 (not needed for promo)
+        required: false
       build:
-        description: Build number (the TestFlight run number), e.g. 37
-        required: true
+        description: Build number (the TestFlight run number), e.g. 37 (not needed for promo)
+        required: false
       mode:
-        description: prepare (fill everything) or submit (also send for review)
+        description: prepare (fill everything), submit (also send for review) or promo (only the promotional text, live now)
         type: choice
-        options: [prepare, submit]
+        options: [prepare, submit, promo]
         default: prepare
       screenshots:
         description: upload (replace the App Store screenshots with brand/appstore) or keep

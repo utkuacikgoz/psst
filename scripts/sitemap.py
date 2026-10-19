@@ -12,7 +12,11 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 SITE = "https://psstapp.fun"
 # Indexable pages only: invite and Psst links are per person and kept out of search.
 PAGES = [("/", "site/index.html"), ("/support", "site/support.html"),
-         ("/privacy", "site/privacy.html"), ("/terms", "site/terms.html")]
+         ("/privacy", "site/privacy.html"), ("/terms", "site/terms.html"),
+         # Landing pages (owner pick 5A, 19 Oct 2026): one search, one page.
+         ("/doodle-widget", "site/doodle-widget.html"),
+         ("/long-distance-relationship-app", "site/long-distance-relationship-app.html"),
+         ("/couples-widget", "site/couples-widget.html"), ("/yo-app", "site/yo-app.html")]
 
 
 def last_commit_day(path: str) -> str:

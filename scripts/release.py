@@ -1,9 +1,10 @@
 """Puts a build up for App Store review through the App Store Connect API.
 
 Takes VERSION (e.g. 1.0.7), BUILD (e.g. 37) and MODE ("prepare", "submit" or "promo").
-The store listing (name, subtitle, keywords, promotional text, description) comes
-from docs/ASO.md's English section; MODE=promo only sets the promotional text, on
-the live version and any version in review, and needs no VERSION or BUILD.
+The store listings (name, subtitle, keywords, promotional text, description) come
+from docs/ASO.md, one section per language, adding store pages that don't exist
+yet. MODE=promo only sets the promotional text, on the live version and any
+version in review, and needs no VERSION or BUILD.
 Reads What's New and the reviewer notes from that version's section in
 docs/APP_REVIEW_NOTES.md ("## 1.0.7 (...)"), then: creates the App Store version
 if needed, attaches the build, fills What's New in every localization and the
@@ -85,68 +86,88 @@ def section(version: str) -> tuple[str, str, dict[str, str]]:
     return block("What's New in This Version:"), block("Notes for the reviewer:"), store
 
 
-def listing() -> dict[str, str]:
-    """The main language's store listing from docs/ASO.md ("## English (U.S.) — primary")."""
+def listings() -> dict[str, dict[str, str]]:
+    """Every store listing in docs/ASO.md, by locale ("## en-US · English (U.S.) — primary")."""
     text = open(ASO, encoding="utf-8").read()
-    match = re.search(r"^## English \(U\.S\.\).*?(?=^## |\Z)", text, re.M | re.S)
-    if not match:
-        sys.exit("docs/ASO.md has no '## English (U.S.)' section.")
-    body, found = match.group(0), {}
-    for key, label in (("name", "Name"), ("subtitle", "Subtitle"), ("keywords", "Keywords"),
-                       ("promotionalText", "Promotional text")):
-        line = re.search(rf"^- \*\*{label} \(\d+/\d+\):\*\* `?(.+?)`?$", body, re.M)
-        if line:
-            found[key] = line.group(1).strip()
-    description = re.search(r"\*\*Description:\*\*\s*```\n(.*?)\n```", body, re.S)
-    if description:
-        found["description"] = description.group(1).strip()
     limits = {"name": 30, "subtitle": 30, "keywords": 100, "promotionalText": 170, "description": 4000}
-    for key, value in found.items():
-        if len(value) > limits[key]:
-            sys.exit(f"docs/ASO.md: {key} is {len(value)} characters; the limit is {limits[key]}.")
+    found: dict[str, dict[str, str]] = {}
+    for match in re.finditer(r"^## ([a-z]{2}(?:-[A-Z]{2})?) · .*?(?=^## |\Z)", text, re.M | re.S):
+        body, fields = match.group(0), {}
+        for key, label in (("name", "Name"), ("subtitle", "Subtitle"), ("keywords", "Keywords"),
+                           ("promotionalText", "Promotional text")):
+            line = re.search(rf"^- \*\*{label} \(\d+/\d+\):\*\* `?(.+?)`?$", body, re.M)
+            if line:
+                fields[key] = line.group(1).strip()
+        description = re.search(r"\*\*Description:\*\*\s*```\n(.*?)\n```", body, re.S)
+        if description:
+            fields["description"] = description.group(1).strip()
+        for key, value in fields.items():
+            if len(value) > limits[key]:
+                sys.exit(f"docs/ASO.md {match.group(1)}: {key} is {len(value)} characters; the limit is {limits[key]}.")
+        found[match.group(1)] = fields
+    if not found:
+        sys.exit("docs/ASO.md has no '## <locale> · ' listings.")
     return found
 
 
-def primary_localization(app: str, version_id: str) -> dict:
-    primary = call("GET", f"/apps/{app}")["data"]["attributes"].get("primaryLocale")
-    localizations = call("GET", f"/appStoreVersions/{version_id}/appStoreVersionLocalizations")["data"]
-    return next((l for l in localizations if l["attributes"].get("locale") == primary), localizations[0])
+def version_localization(version_id: str, locale: str, existing: list[dict], whats_new: str) -> dict:
+    """The version's localization for this locale, added if the store page doesn't have it yet."""
+    loc = next((l for l in existing if l["attributes"].get("locale") == locale), None)
+    if loc:
+        return loc
+    loc = call("POST", "/appStoreVersionLocalizations", {"data": {
+        "type": "appStoreVersionLocalizations", "attributes": {"locale": locale, "whatsNew": whats_new},
+        "relationships": {"appStoreVersion": {"data": {"type": "appStoreVersions", "id": version_id}}}}})["data"]
+    print(f"Added the {locale} store page.")
+    existing.append(loc)
+    return loc
 
 
-def set_promotional_text(app: str, text: str):
-    """Promotional text can change at any time, without review."""
+def set_promotional_text(app: str, texts: dict[str, str]):
+    """Promotional text can change at any time, without review: every language the page has."""
     live = ("READY_FOR_SALE", "PREPARE_FOR_SUBMISSION", "WAITING_FOR_REVIEW", "IN_REVIEW", "PENDING_DEVELOPER_RELEASE")
     versions = call("GET", f"/apps/{app}/appStoreVersions", **{"filter[platform]": "IOS", "limit": "10"})["data"]
     for version in versions:
         state = version["attributes"].get("appStoreState")
         if state not in live:
             continue
-        loc = primary_localization(app, version["id"])
-        try:
-            call("PATCH", f"/appStoreVersionLocalizations/{loc['id']}", {"data": {
-                "type": "appStoreVersionLocalizations", "id": loc["id"], "attributes": {"promotionalText": text}}})
-            print(f"Promotional text set on {version['attributes'].get('versionString')} ({state}).")
-        except SystemExit as refused:
-            print(f"Not set on {version['attributes'].get('versionString')} ({state}): {refused}")
+        for loc in call("GET", f"/appStoreVersions/{version['id']}/appStoreVersionLocalizations")["data"]:
+            locale = loc["attributes"].get("locale")
+            if locale not in texts:
+                continue
+            try:
+                call("PATCH", f"/appStoreVersionLocalizations/{loc['id']}", {"data": {
+                    "type": "appStoreVersionLocalizations", "id": loc["id"],
+                    "attributes": {"promotionalText": texts[locale]}}})
+                print(f"Promotional text set on {version['attributes'].get('versionString')} ({state}, {locale}).")
+            except SystemExit as refused:
+                print(f"Not set on {version['attributes'].get('versionString')} ({state}, {locale}): {refused}")
 
 
-def set_name_and_subtitle(app: str, name: str | None, subtitle: str | None):
+def set_names_and_subtitles(app: str, store: dict[str, dict[str, str]]):
     """Name and subtitle live on the App Information that's still editable (the next version's)."""
-    attributes = {k: v for k, v in (("name", name), ("subtitle", subtitle)) if v}
-    if not attributes:
-        return
     infos = call("GET", f"/apps/{app}/appInfos")["data"]
     editable = [i for i in infos if (i["attributes"].get("appStoreState") or i["attributes"].get("state"))
                 not in ("READY_FOR_SALE", "READY_FOR_DISTRIBUTION", "WAITING_FOR_REVIEW", "IN_REVIEW")]
     if not editable:
-        print("Name and subtitle not changed: no editable App Information (a version is in review).")
+        print("Names and subtitles not changed: no editable App Information (a version is in review).")
         return
-    primary = call("GET", f"/apps/{app}")["data"]["attributes"].get("primaryLocale")
-    locs = call("GET", f"/appInfos/{editable[0]['id']}/appInfoLocalizations")["data"]
-    loc = next((l for l in locs if l["attributes"].get("locale") == primary), locs[0])
-    call("PATCH", f"/appInfoLocalizations/{loc['id']}", {"data": {
-        "type": "appInfoLocalizations", "id": loc["id"], "attributes": attributes}})
-    print(f"Name and subtitle set ({loc['attributes'].get('locale')}).")
+    info = editable[0]["id"]
+    locs = call("GET", f"/appInfos/{info}/appInfoLocalizations")["data"]
+    for locale, fields in store.items():
+        attributes = {k: fields[k] for k in ("name", "subtitle") if k in fields}
+        if not attributes:
+            continue
+        loc = next((l for l in locs if l["attributes"].get("locale") == locale), None)
+        if loc:
+            call("PATCH", f"/appInfoLocalizations/{loc['id']}", {"data": {
+                "type": "appInfoLocalizations", "id": loc["id"], "attributes": attributes}})
+        else:
+            call("POST", "/appInfoLocalizations", {"data": {
+                "type": "appInfoLocalizations",
+                "attributes": {"locale": locale, "privacyPolicyUrl": "https://psstapp.fun/privacy", **attributes},
+                "relationships": {"appInfo": {"data": {"type": "appInfos", "id": info}}}}})
+        print(f"Name and subtitle set ({locale}).")
 
 
 def screenshot_files() -> dict[str, list[str]]:
@@ -204,21 +225,21 @@ def replace_screenshots(localization: str, display: str, files: list[str], wait=
 
 def main():
     mode = os.environ.get("MODE", "prepare")
-    store = listing()
+    stores = listings()
     if mode == "promo":
         apps = call("GET", "/apps", **{"filter[bundleId]": os.environ["BUNDLE_ID"]})["data"]
-        if not apps or "promotionalText" not in store:
-            sys.exit("No app, or no promotional text in docs/ASO.md.")
-        set_promotional_text(apps[0]["id"], store["promotionalText"])
+        if not apps:
+            sys.exit("No app with that bundle ID in App Store Connect.")
+        set_promotional_text(apps[0]["id"], {l: f["promotionalText"] for l, f in stores.items() if "promotionalText" in f})
         return
     version, build_number = os.environ["VERSION"].strip(), os.environ["BUILD"].strip()
     submit = mode == "submit"
     whats_new, notes, store_text = section(version)
-    # docs/ASO.md is the listing; a version section's own blocks win.
-    store_text = {**{k: v for k, v in store.items() if k in ("description", "promotionalText", "keywords")}, **store_text}
-    if len(whats_new) > 4000 or len(notes) > 4000 or len(store_text.get("description", "")) > 4000:
+    # A version section's own description / promotional text win over docs/ASO.md's (main language).
+    overrides = store_text
+    if len(whats_new) > 4000 or len(notes) > 4000 or len(overrides.get("description", "")) > 4000:
         sys.exit("What's New, the description and the review notes must each be 4,000 characters or fewer.")
-    if len(store_text.get("promotionalText", "")) > 170:
+    if len(overrides.get("promotionalText", "")) > 170:
         sys.exit("The promotional text must be 170 characters or fewer.")
 
     apps = call("GET", "/apps", **{"filter[bundleId]": os.environ["BUNDLE_ID"]})["data"]
@@ -258,12 +279,17 @@ def main():
         print(f"What's New set ({localization['attributes'].get('locale')}).")
 
     primary = call("GET", f"/apps/{app}")["data"]["attributes"].get("primaryLocale")
+    for locale, fields in stores.items():
+        text = {k: v for k, v in fields.items() if k in ("description", "promotionalText", "keywords")}
+        if locale == primary:
+            text.update(overrides)
+        if text:
+            loc = version_localization(vid, locale, localizations, whats_new)
+            call("PATCH", f"/appStoreVersionLocalizations/{loc['id']}", {"data": {
+                "type": "appStoreVersionLocalizations", "id": loc["id"], "attributes": text}})
+            print(f"Set {' and '.join(sorted(text))} ({locale}).")
+    set_names_and_subtitles(app, stores)
     main_loc = next((l for l in localizations if l["attributes"].get("locale") == primary), localizations[0])
-    set_name_and_subtitle(app, store.get("name"), store.get("subtitle"))
-    if store_text:
-        call("PATCH", f"/appStoreVersionLocalizations/{main_loc['id']}", {"data": {
-            "type": "appStoreVersionLocalizations", "id": main_loc["id"], "attributes": store_text}})
-        print(f"Set {' and '.join(sorted(store_text))} ({main_loc['attributes'].get('locale')}).")
     if os.environ.get("SCREENSHOTS", "upload") != "keep":
         for display, files in screenshot_files().items():
             replace_screenshots(main_loc["id"], display, files)

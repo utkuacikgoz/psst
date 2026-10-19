@@ -92,6 +92,8 @@ final class Purchases {
     func restore() async -> Bool {
         do {
             try await AppStore.sync()
+        } catch StoreKitError.userCancelled {
+            return false  // they closed the Apple Account sign-in: nothing went wrong
         } catch {
             state = .failed("Couldn't reach the App Store. Try again in a moment.")
             await refreshEntitlement()

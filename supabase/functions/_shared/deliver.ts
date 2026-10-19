@@ -24,7 +24,7 @@ export interface DeliverDeps {
     token: string,
     environment: ApnsEnvironment,
     payload: unknown,
-    options: { apnsId: string; expiresAt: number },
+    options: { apnsId: string; expiresAt: number; collapseId: string },
   ): Promise<ApnsResult>;
   nowSeconds(): number;
   /** Waits before the one retry (tests pass a no-op). */
@@ -94,11 +94,13 @@ export async function deliver(eventId: string, deps: DeliverDeps): Promise<PushS
   const outcomes = await Promise.all(
     targets.tokens.map(async ({ token, environment }) => {
       try {
-        let result = await deps.sendPush(token, environment, payload, { apnsId: eventId, expiresAt });
+        // apns-id only matches errors to requests; the collapse ID makes a retry that
+        // APNs had in fact accepted replace the first banner instead of adding a second.
+        const options = { apnsId: eventId, expiresAt, collapseId: eventId };
+        let result = await deps.sendPush(token, environment, payload, options);
         if (isTransient(result)) {
-          // Same apns-id, so APNs never shows it twice.
           await (deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))))(1000);
-          result = await deps.sendPush(token, environment, payload, { apnsId: eventId, expiresAt });
+          result = await deps.sendPush(token, environment, payload, options);
         }
         return { token, outcome: classify(result) };
       } catch {

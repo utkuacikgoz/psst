@@ -55,6 +55,10 @@ final class LiveStore {
     /// Asked once at a happy moment (19 Oct 2026); a new key, so people first asked
     /// after their first Psst get this one chance too.
     static let reviewAskedKey = "psst.live.reviewAsked.happy"
+    /// When this install first ran Psst (1.0.8 or later); the rating waits two days from it.
+    static let firstSeenKey = "psst.live.firstSeen"
+    static let reviewWait: TimeInterval = 2 * 86_400
+    @ObservationIgnored private var firstSeen = Date.distantPast
     static let myNameKey = "psst.live.myName"
     /// The last list of people from the server, shown at launch while it refreshes.
     static let connectionsCacheKey = "psst.live.connectionsCache"
@@ -65,7 +69,14 @@ final class LiveStore {
     /// Your own name as last saved on this phone (ED1). Nil on installs from
     /// before it was kept; Settings then asks you to add it.
     private(set) var myName: String?
-    private(set) var connections: [ConnectionSummary] = [] { didSet { reorder() } }
+    /// Every update goes through here, so streak growth shows however the list
+    /// changed (a poll, your own send, a seen report).
+    private(set) var connections: [ConnectionSummary] = [] {
+        didSet {
+            noteStreaks(from: oldValue, to: connections)
+            reorder()
+        }
+    }
     private(set) var sendStates: [UUID: SendState] = [:]
     /// The effect currently playing on each row, keyed by connection. A new event ID replays it.
     private(set) var effects: [UUID: EffectTrigger] = [:]
@@ -146,6 +157,12 @@ final class LiveStore {
         self.defaults = defaults
         self.now = now
         self.sentDisplayDuration = sentDisplayDuration
+        if let seen = defaults.object(forKey: Self.firstSeenKey) as? Date {
+            firstSeen = seen
+        } else {
+            firstSeen = now()
+            defaults.set(firstSeen, forKey: Self.firstSeenKey)
+        }
         isExistingUser = api.isSignedIn && defaults.bool(forKey: Self.profileKey)
         featureIntroSeen = defaults.bool(forKey: Self.featureIntroKey)
         superHintSeen = defaults.bool(forKey: Self.superHintKey)
@@ -404,7 +421,6 @@ final class LiveStore {
             let changed = latest != connections
             // Unchanged polls leave the list alone, so home doesn't redraw and the cache isn't rewritten.
             if changed {
-                noteStreaks(from: connections, to: latest)
                 connections = latest
                 if let data = try? JSONEncoder().encode(latest) {
                     defaults.set(data, forKey: Self.connectionsCacheKey)
@@ -732,7 +748,9 @@ final class LiveStore {
                     unseenCount: connection.unseenCount, streakDays: connection.streakDays)
             }
             if result.sameMoment == true, let name = connections.first(where: { $0.id == connectionID })?.otherName {
-                arrival = Arrival(id: eventID, connectionID: connectionID, senderName: name, kind: .sameMoment)
+                let moment = Arrival(id: eventID, connectionID: connectionID, senderName: name, kind: .sameMoment)
+                // Never cut off a moment that's on screen (it was already reported seen): this one plays next.
+                if arrival == nil { arrival = moment } else { arrivalQueue.insert(moment, at: 0) }
             }
             sendStates[connectionID] = .sent(eventID: eventID, signal: signal)
             play(EffectTrigger(id: eventID, signal: signal), on: connectionID)
@@ -856,6 +874,7 @@ final class LiveStore {
         let signal: Signal = payload.signal == .superPsst && defaults.object(forKey: "psst.superEffectsEnabled") as? Bool == false ? .psst : payload.signal
         play(EffectTrigger(id: payload.eventID, signal: signal), on: payload.connectionID)
         await refresh()
+        guard !displayed.contains(payload.eventID) else { return }
         if let sender = connections.first(where: { $0.id == payload.connectionID }) {
             var drawing: DoodleStrokes?
             if signal == .doodle, let latest = try? await api.latestDoodle(), latest.eventId == payload.eventID {
@@ -885,13 +904,15 @@ final class LiveStore {
 
     /// The current moment finished (or was tapped): show the next sender, if any.
     func nextArrival() {
-        if let kind = arrival?.kind, kind == .sameMoment || kind == .doodle { noteHappyMoment() }
+        if arrival?.kind == .sameMoment { noteHappyMoment() }
         arrival = arrivalQueue.isEmpty ? nil : arrivalQueue.removeFirst()
     }
 
-    /// The one time Psst asks for a rating: after something that felt good.
+    /// The one time Psst asks for a rating: after something that felt good, and
+    /// never in someone's first days (a newcomer's first moment is often a doodle).
     private func noteHappyMoment() {
-        guard !defaults.bool(forKey: Self.reviewAskedKey) else { return }
+        guard !defaults.bool(forKey: Self.reviewAskedKey),
+              now().timeIntervalSince(firstSeen) >= Self.reviewWait else { return }
         defaults.set(true, forKey: Self.reviewAskedKey)
         reviewDue = !Self.isUITest
     }
@@ -899,6 +920,8 @@ final class LiveStore {
     /// Tapping the arrival sends a Psst back to that person. Tapping a same
     /// moment just closes it: you've both already pssted.
     func psstBack(_ arrival: Arrival) {
+        // Pssting back a doodle is the happy moment; closing, hiding, blocking or reporting one isn't.
+        if arrival.kind == .doodle { noteHappyMoment() }
         nextArrival()
         guard arrival.kind != .sameMoment else { return }
         if let connection = connections.first(where: { $0.id == arrival.connectionID }) {

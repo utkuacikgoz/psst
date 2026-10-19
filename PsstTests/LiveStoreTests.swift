@@ -401,6 +401,11 @@ final class LiveStoreTests: XCTestCase {
         api.sameMoment = true
         clock += 5
         await store.tap(ada)?.value
+        store.nextArrival()
+        XCTAssertFalse(store.reviewDue, "Never in someone's first two days")
+
+        clock += LiveStore.reviewWait
+        await store.tap(ada)?.value
         XCTAssertEqual(store.arrival?.kind, .sameMoment)
         XCTAssertFalse(store.reviewDue, "Not while the moment is on screen")
         store.nextArrival()
@@ -411,6 +416,21 @@ final class LiveStoreTests: XCTestCase {
         await store.tap(ada)?.value
         store.nextArrival()
         XCTAssertFalse(store.reviewDue, "Asked only once")
+    }
+
+    func testClosingOrReportingADoodleDoesNotAskForARating() async {
+        let ada = connection()
+        api.connections = [ada]
+        await store.refresh()
+        clock += LiveStore.reviewWait
+        store.arrival = Arrival(id: UUID(), connectionID: ada.id, senderName: "Ada", kind: .doodle)
+        store.nextArrival()
+        XCTAssertFalse(store.reviewDue, "Closing, blocking or reporting a doodle isn't a happy moment")
+
+        let doodle = Arrival(id: UUID(), connectionID: ada.id, senderName: "Ada", kind: .doodle)
+        store.arrival = doodle
+        store.psstBack(doodle)
+        XCTAssertTrue(store.reviewDue, "Pssting a doodle back is")
     }
 
     func testTapsDuringASendAreIgnored() async {
@@ -732,6 +752,9 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(api.acked, [payload.eventID, payload.eventID])
         XCTAssertEqual(api.sentEventIDs, [.reply(to: payload.eventID), .reply(to: payload.eventID)])
         XCTAssertNotEqual(UUID.reply(to: payload.eventID), payload.eventID)
+        XCTAssertNotEqual(UUID.reply(to: .reply(to: payload.eventID)), payload.eventID,
+                          "A reply to a reply never reuses the original's ID")
+        XCTAssertEqual(UUID.reply(to: payload.eventID), UUID.reply(to: payload.eventID))
     }
 
     func testOfflineNeedsTwoFailuresInARowOrNoNetwork() async {

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 struct ConnectionSummary: Codable, Identifiable, Equatable {
@@ -162,13 +163,16 @@ struct SignalPayload: Equatable {
 
 extension UUID {
     /// A stable ID for replying to `original`, so a repeated notification action
-    /// can't send two replies.
+    /// can't send two replies. One-way, so a reply to a reply never comes back
+    /// round to the original's ID (which the server would drop as a duplicate).
     static func reply(to original: UUID) -> UUID {
-        var bytes = original.uuid
-        bytes.0 ^= 0x5A
-        bytes.1 ^= 0xC3
-        bytes.15 ^= 0x3C
-        return UUID(uuid: bytes)
+        var input = withUnsafeBytes(of: original.uuid) { Data($0) }
+        input.append(contentsOf: Array("psst.reply".utf8))
+        var bytes = Array(SHA256.hash(data: input).prefix(16))
+        bytes[6] = (bytes[6] & 0x0F) | 0x50  // version 5 (name-based)
+        bytes[8] = (bytes[8] & 0x3F) | 0x80  // RFC 4122 variant
+        return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+                           bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
     }
 }
 

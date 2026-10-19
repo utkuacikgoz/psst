@@ -391,21 +391,25 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertNil(store.sendStates[ada.id], "Sent clears after its display time")
     }
 
-    func testRatingIsDueOnceAfterTheFirstAcceptedPsst() async {
+    func testRatingIsDueOnceAfterAHappyMoment() async {
         let ada = connection()
         api.connections = [ada]
-        api.sendError = APIError.offline
+        await store.refresh()
         await store.tap(ada)?.value
-        XCTAssertFalse(store.reviewDue, "A failed send isn't a successful Psst")
+        XCTAssertFalse(store.reviewDue, "An ordinary Psst doesn't ask")
 
-        api.sendError = nil
+        api.sameMoment = true
         clock += 5
         await store.tap(ada)?.value
-        XCTAssertTrue(store.reviewDue)
+        XCTAssertEqual(store.arrival?.kind, .sameMoment)
+        XCTAssertFalse(store.reviewDue, "Not while the moment is on screen")
+        store.nextArrival()
+        XCTAssertTrue(store.reviewDue, "SAME MOMENT closing is a happy moment")
 
         store.reviewDue = false
         clock += 5
         await store.tap(ada)?.value
+        store.nextArrival()
         XCTAssertFalse(store.reviewDue, "Asked only once")
     }
 

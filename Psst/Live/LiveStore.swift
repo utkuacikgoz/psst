@@ -52,7 +52,9 @@ final class LiveStore {
 
     static let coachKey = "psst.live.coachShown"
     static let doodleTipKey = "psst.live.doodleTipShown"
-    static let reviewAskedKey = "psst.live.reviewAsked"
+    /// Asked once at a happy moment (19 Oct 2026); a new key, so people first asked
+    /// after their first Psst get this one chance too.
+    static let reviewAskedKey = "psst.live.reviewAsked.happy"
     static let myNameKey = "psst.live.myName"
     /// The last list of people from the server, shown at launch while it refreshes.
     static let connectionsCacheKey = "psst.live.connectionsCache"
@@ -105,8 +107,9 @@ final class LiveStore {
     var introSeen = false
     /// Set by the widget's Psst+ message (psst://plus); home opens Psst+.
     var plusRequested = false
-    /// Set once, after the first Psst the server accepts; home then shows
-    /// Apple's rating prompt (which Apple may still choose not to show).
+    /// Set once, at the first happy moment (SAME MOMENT closing, a doodle's moment
+    /// closing, or a streak reaching 7 days); home then shows Apple's rating prompt
+    /// (which Apple may still choose not to show).
     var reviewDue = false
     /// True only while the home list is on screen in the foreground. Signals are
     /// acknowledged as seen only then, because only then were they displayed.
@@ -330,7 +333,8 @@ final class LiveStore {
     /// "Hide doodle" (1B): off your widget without pssting back.
     func hideDoodle(_ arrival: Arrival) {
         WidgetBridge.hideDoodle(eventID: arrival.id)
-        nextArrival()
+        // Hiding one isn't a happy moment, so no rating prompt after it.
+        self.arrival = arrivalQueue.isEmpty ? nil : arrivalQueue.removeFirst()
     }
 
     @ObservationIgnored private var publishedDoodle = false
@@ -352,6 +356,7 @@ final class LiveStore {
             let days = connection.streakDays ?? 0
             guard days >= 3, let previous = before[connection.id], days > previous else { continue }
             streakMoments[connection.id] = days
+            if days >= 7 { noteHappyMoment() }
             Task { [weak self] in
                 try? await Task.sleep(for: Self.streakMomentDuration)
                 if self?.streakMoments[connection.id] == days { self?.streakMoments[connection.id] = nil }
@@ -730,10 +735,6 @@ final class LiveStore {
                 arrival = Arrival(id: eventID, connectionID: connectionID, senderName: name, kind: .sameMoment)
             }
             sendStates[connectionID] = .sent(eventID: eventID, signal: signal)
-            if !defaults.bool(forKey: Self.reviewAskedKey) {
-                defaults.set(true, forKey: Self.reviewAskedKey)
-                reviewDue = !Self.isUITest
-            }
             play(EffectTrigger(id: eventID, signal: signal), on: connectionID)
             if let updated = try? await api.listConnections() { connections = updated }
             // Pssting someone back takes their doodle off your widget (5A).
@@ -884,7 +885,15 @@ final class LiveStore {
 
     /// The current moment finished (or was tapped): show the next sender, if any.
     func nextArrival() {
+        if let kind = arrival?.kind, kind == .sameMoment || kind == .doodle { noteHappyMoment() }
         arrival = arrivalQueue.isEmpty ? nil : arrivalQueue.removeFirst()
+    }
+
+    /// The one time Psst asks for a rating: after something that felt good.
+    private func noteHappyMoment() {
+        guard !defaults.bool(forKey: Self.reviewAskedKey) else { return }
+        defaults.set(true, forKey: Self.reviewAskedKey)
+        reviewDue = !Self.isUITest
     }
 
     /// Tapping the arrival sends a Psst back to that person. Tapping a same

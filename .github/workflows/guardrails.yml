@@ -2,6 +2,7 @@ name: Guardrails
 
 # 1. Owner-approved features and designs must not disappear in a merge.
 # 2. Every design change must carry the owner's approval (Design-Approved: trailer).
+# 3. The sitemap's dates follow the pages' last commits.
 # Linux only: seconds, and no macOS minutes.
 on:
   push:
@@ -29,3 +30,12 @@ jobs:
           else
             python3 scripts/check_design_approval.py "${{ github.event.before }}" "${{ github.sha }}"
           fi
+
+  sitemap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - run: python3 scripts/sitemap.py --check

@@ -60,20 +60,25 @@ def call(method: str, path: str, body: dict | None = None, **query) -> dict:
         sys.exit(f"App Store Connect refused {method} {path} ({error.code}) {detail}{hint}")
 
 
-def section(version: str) -> tuple[str, str]:
+def section(version: str) -> tuple[str, str, dict[str, str]]:
     text = open(NOTES, encoding="utf-8").read()
     match = re.search(rf"^## {re.escape(version)} \(.*?(?=^## |\Z)", text, re.M | re.S)
     if not match:
         sys.exit(f"docs/APP_REVIEW_NOTES.md has no '## {version} (' section.")
     body = match.group(0)
 
-    def block(title: str) -> str:
+    def block(title: str, required=True) -> str | None:
         found = re.search(rf"\*\*{re.escape(title)}\*\*\s*```\n(.*?)\n```", body, re.S)
         if not found:
+            if not required:
+                return None
             sys.exit(f"The {version} section has no '{title}' block.")
         return found.group(1).strip()
 
-    return block("What's New in This Version:"), block("Notes for the reviewer:")
+    # Optional: the main language's store description and promotional text.
+    store = {key: found_text for key, title in (("description", "Description:"), ("promotionalText", "Promotional text:"))
+             if (found_text := block(title, required=False))}
+    return block("What's New in This Version:"), block("Notes for the reviewer:"), store
 
 
 def screenshot_files() -> dict[str, list[str]]:
@@ -132,9 +137,11 @@ def replace_screenshots(localization: str, display: str, files: list[str], wait=
 def main():
     version, build_number = os.environ["VERSION"].strip(), os.environ["BUILD"].strip()
     submit = os.environ.get("MODE", "prepare") == "submit"
-    whats_new, notes = section(version)
-    if len(whats_new) > 4000 or len(notes) > 4000:
-        sys.exit("What's New and the review notes must each be 4,000 characters or fewer.")
+    whats_new, notes, store_text = section(version)
+    if len(whats_new) > 4000 or len(notes) > 4000 or len(store_text.get("description", "")) > 4000:
+        sys.exit("What's New, the description and the review notes must each be 4,000 characters or fewer.")
+    if len(store_text.get("promotionalText", "")) > 170:
+        sys.exit("The promotional text must be 170 characters or fewer.")
 
     apps = call("GET", "/apps", **{"filter[bundleId]": os.environ["BUNDLE_ID"]})["data"]
     if not apps:
@@ -172,9 +179,13 @@ def main():
             "type": "appStoreVersionLocalizations", "id": localization["id"], "attributes": {"whatsNew": whats_new}}})
         print(f"What's New set ({localization['attributes'].get('locale')}).")
 
+    primary = call("GET", f"/apps/{app}")["data"]["attributes"].get("primaryLocale")
+    main_loc = next((l for l in localizations if l["attributes"].get("locale") == primary), localizations[0])
+    if store_text:
+        call("PATCH", f"/appStoreVersionLocalizations/{main_loc['id']}", {"data": {
+            "type": "appStoreVersionLocalizations", "id": main_loc["id"], "attributes": store_text}})
+        print(f"Set {' and '.join(sorted(store_text))} ({main_loc['attributes'].get('locale')}).")
     if os.environ.get("SCREENSHOTS", "upload") != "keep":
-        primary = call("GET", f"/apps/{app}")["data"]["attributes"].get("primaryLocale")
-        main_loc = next((l for l in localizations if l["attributes"].get("locale") == primary), localizations[0])
         for display, files in screenshot_files().items():
             replace_screenshots(main_loc["id"], display, files)
         for other in localizations:

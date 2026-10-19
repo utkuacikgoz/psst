@@ -1,0 +1,36 @@
+name: App Store event
+
+# Manual, Linux only. Creates the "Draw someone new" In-App Event (owner pick 4A,
+# 19 Oct 2026) from scripts/app_event.py; "submit" also sends it to App Review.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: draft (create and fill) or submit (also send for review)
+        type: choice
+        options: [draft, submit]
+        default: draft
+      start:
+        description: Start, e.g. 2026-10-22T16:00:00Z (default two days from now)
+        required: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  event:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+      MODE: ${{ inputs.mode }}
+      START: ${{ inputs.start }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: pip install -q pyjwt cryptography
+      - run: python3 scripts/app_event.py

@@ -150,7 +150,12 @@ def main():
     submission = open_ones[0] if open_ones else R.call("POST", "/reviewSubmissions", {"data": {
         "type": "reviewSubmissions", "attributes": {"platform": "IOS"},
         "relationships": {"app": {"data": {"type": "apps", "id": app}}}}})["data"]
+    # Apple allows 2 reviews in flight; a refused submit leaves this one open with its items.
+    items = R.call("GET", f"/reviewSubmissions/{submission['id']}/items", include="appEvent")["data"]
+    added = {((i.get("relationships") or {}).get("appEvent", {}).get("data") or {}).get("id") for i in items}
     for event_id in ready:
+        if event_id in added:
+            continue
         R.call("POST", "/reviewSubmissionItems", {"data": {
             "type": "reviewSubmissionItems", "relationships": {
                 "reviewSubmission": {"data": {"type": "reviewSubmissions", "id": submission["id"]}},

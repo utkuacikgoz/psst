@@ -7,7 +7,6 @@ Images: brand/appstore/event-draw-someone-new-{card-1920x1080,details-1080x1920}
 Prints what it does, never keys. Reads ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8, BUNDLE_ID.
 """
 import datetime
-import hashlib
 import os
 import sys
 import urllib.request
@@ -35,9 +34,9 @@ def upload(localization: str, asset_type: str, path: str):
         headers = {h["name"]: h["value"] for h in op.get("requestHeaders") or []}
         urllib.request.urlopen(urllib.request.Request(op["url"], data=part, method=op["method"], headers=headers),
                                timeout=120).read()
+    # Unlike app screenshots, event images take no checksum.
     R.call("PATCH", f"/appEventScreenshots/{shot['id']}", {"data": {
-        "type": "appEventScreenshots", "id": shot["id"],
-        "attributes": {"uploaded": True, "sourceFileChecksum": hashlib.md5(data).hexdigest()}}})
+        "type": "appEventScreenshots", "id": shot["id"], "attributes": {"uploaded": True}}})
     print(f"Uploaded the {asset_type} image.")
 
 
@@ -81,8 +80,13 @@ def main():
             "relationships": {"appEvent": {"data": {"type": "appEvents", "id": event["id"]}}}}})["data"]
     print("Event name and descriptions set (en-US).")
 
-    have = {s["attributes"].get("appEventAssetType")
-            for s in R.call("GET", f"/appEventLocalizations/{loc['id']}/appEventScreenshots")["data"]}
+    have = set()
+    for shot in R.call("GET", f"/appEventLocalizations/{loc['id']}/appEventScreenshots")["data"]:
+        state = (shot["attributes"].get("assetDeliveryState") or {}).get("state")
+        if state in ("AWAITING_UPLOAD", "FAILED"):
+            R.call("DELETE", f"/appEventScreenshots/{shot['id']}")  # a half-finished upload: start again
+        else:
+            have.add(shot["attributes"].get("appEventAssetType"))
     for asset_type, name in IMAGES.items():
         if asset_type not in have:
             upload(loc["id"], asset_type, os.path.join(ART, name))

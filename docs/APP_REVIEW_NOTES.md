@@ -308,6 +308,40 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 
 **App Privacy:** doodles are covered by the existing **User Content → Other User Content** (linked, not tracking, App Functionality); the privacy manifest now lists it too. The device's time zone is now saved on the account (streak days and the recap's Sunday 6 PM). Apple has no time-zone category and it is far coarser than "Coarse Location", so the safe declaration is **Other Data → App Functionality, linked to the user, not used for tracking**. Weekly recap and Psst links collect nothing else new: the recap is computed from Pssts already stored, and a Psst link stores only the same invite row as an invite code.
 
+## 1.0.8 (next build)
+
+1.0.7 (build 42) was approved on 19 Oct 2026 and is the baseline for rule 3. Submit with the Release to App Store workflow; it also sets the store listings in every language from docs/ASO.md (new name "Psst: Doodle & Miss You Widget", subtitle, keywords, description) and adds the UK English and Mexican Spanish store pages.
+
+**What's New in This Version:**
+
+```
+• Psst now asks for a rating only after a moment worth it, like SAME MOMENT or a 7-day streak
+• Small fixes
+```
+
+**Notes for the reviewer:**
+
+```
+Psst lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
+
+What's new in 1.0.8:
+- The App Store rating prompt (Apple's standard SKStoreReviewController request) now appears once, after a happy moment (a SAME MOMENT, a doodle, or a 7-day streak) instead of after the first Psst.
+- The store page has a new name and description, and UK English and Mexican Spanish store pages. The app itself is unchanged in language (English).
+
+To try it with a real person (our team):
+1. Open the app, enter any name, and choose whether to allow notifications.
+2. On home, tap "I have a code" and enter:  PSSTFIVE
+   (backup code:  PSSTCATS)
+3. Tap Connect. A band for "Psst Team" appears on home.
+4. Tap the band to send a Psst. We'll psst you back within a few minutes during review hours.
+
+Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. On a doodle, ••• offers Hide doodle, Block and Report. Settings → Delete account removes all server data immediately.
+
+Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "Psst+" → Unlock. Pssting, replies and invites are free.
+
+Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
+```
+
 ## 1.0.7 (build 42)
 
 1.0.6 (build 35) is the live version and the baseline for rule 3. Submit with the Release to App Store workflow (version 1.0.7, the newest build, mode prepare to check, then submit); it reads the two blocks below.

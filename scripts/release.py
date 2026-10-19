@@ -61,6 +61,10 @@ def call(method: str, path: str, body: dict | None = None, **query) -> dict:
     except urllib.error.HTTPError as error:
         errors = json.loads(error.read() or b"{}").get("errors", [{}])
         detail = "; ".join(f"{e.get('code')}: {e.get('detail')}" for e in errors)
+        # Apple puts the reasons a resource can't be reviewed in meta.associatedErrors.
+        for e in errors:
+            for path, nested in ((e.get("meta") or {}).get("associatedErrors") or {}).items():
+                detail += "".join(f"; {path}: {n.get('code')}: {n.get('detail')}" for n in nested)
         hint = " (the API key needs the App Manager or Admin role)" if error.code == 403 else ""
         sys.exit(f"App Store Connect refused {method} {path} ({error.code}) {detail}{hint}")
 

@@ -94,7 +94,9 @@ def main():
     if os.environ.get("MODE", "draft") != "submit":
         print("Event ready as a draft. Not submitted (MODE=draft).")
         return
-    submission = R.call("POST", "/reviewSubmissions", {"data": {
+    open_ones = R.call("GET", "/reviewSubmissions", **{"filter[app]": app, "filter[platform]": "IOS",
+                                                       "filter[state]": "READY_FOR_REVIEW"})["data"]
+    submission = open_ones[0] if open_ones else R.call("POST", "/reviewSubmissions", {"data": {
         "type": "reviewSubmissions", "attributes": {"platform": "IOS"},
         "relationships": {"app": {"data": {"type": "apps", "id": app}}}}})["data"]
     R.call("POST", "/reviewSubmissionItems", {"data": {

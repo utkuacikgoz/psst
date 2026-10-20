@@ -81,6 +81,8 @@ def prepare(app: str, spec: dict, existing: dict, territories: list) -> str | No
         print(f"{spec['copy']['name']}: exists ({state}).")
         if state not in EDITABLE:
             return None
+        if state == "READY_FOR_REVIEW":
+            return event["id"]  # already in a waiting submission: Apple allows no edits, only submitting it
         if not event["attributes"].get("deepLink"):
             R.call("PATCH", f"/appEvents/{event['id']}", {"data": {
                 "type": "appEvents", "id": event["id"], "attributes": {"deepLink": DEEP_LINK}}})

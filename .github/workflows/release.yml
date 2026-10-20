@@ -6,6 +6,9 @@ name: Release to App Store
 # Store screenshots with brand/appstore unless told to keep them. "prepare" stops
 # before sending; "submit" sends it to App Review; "promo" only updates the
 # promotional text from docs/ASO.md, which Apple lets change at any time.
+# When the notes hold {REVIEW_CODE} / {BACKUP_CODE}, scripts/review_codes.py makes
+# fresh Psst Team codes in production through the Supabase Management API and
+# fills them in; they're masked and only App Store Connect sees them.
 on:
   workflow_dispatch:
     inputs:
@@ -44,7 +47,10 @@ jobs:
       BUILD: ${{ inputs.build }}
       MODE: ${{ inputs.mode }}
       SCREENSHOTS: ${{ inputs.screenshots }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_PROD || secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
     steps:
       - uses: actions/checkout@v5
       - run: pip install -q pyjwt cryptography
+      - run: python3 scripts/test_review_codes.py
       - run: python3 scripts/release.py

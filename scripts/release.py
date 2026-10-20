@@ -11,6 +11,9 @@ if needed, attaches the build, fills What's New in every localization and the
 review notes, replaces the App Store screenshots with brand/appstore (unless
 SCREENSHOTS=keep), and with MODE=submit sends it for review. Prints what it does,
 never keys. Reads ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 and BUNDLE_ID.
+If the reviewer notes hold {REVIEW_CODE} / {BACKUP_CODE}, fresh codes are made in
+production (scripts/review_codes.py, needs SUPABASE_ACCESS_TOKEN and
+SUPABASE_PROJECT_REF) just before the notes are set, and never printed.
 """
 import hashlib
 import json
@@ -21,8 +24,6 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-
-import jwt
 
 API = "https://api.appstoreconnect.apple.com/v1"
 NOTES = os.path.join(os.path.dirname(__file__), "..", "docs", "APP_REVIEW_NOTES.md")
@@ -40,12 +41,27 @@ def key() -> str:
 
 
 def token() -> str:
+    import jwt  # only needed to talk to Apple (tests of the rest run without it)
     now = int(time.time())
     return jwt.encode({"iss": os.environ["ASC_ISSUER_ID"], "iat": now, "exp": now + 1200, "aud": "appstoreconnect-v1"},
                       key(), algorithm="ES256", headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"})
 
 
 TOKEN = None
+CODE_PLACEHOLDERS = ("{REVIEW_CODE}", "{BACKUP_CODE}")
+
+
+def with_review_codes(notes: str, make=None) -> str:
+    """The notes with fresh review codes in place of {REVIEW_CODE} and {BACKUP_CODE}.
+    Notes without them are returned as they are and the database isn't touched.
+    The result holds live codes: never print it."""
+    if not any(p in notes for p in CODE_PLACEHOLDERS):
+        return notes
+    if make is None:
+        import review_codes
+        make = review_codes.make
+    review, backup = make()
+    return notes.replace("{REVIEW_CODE}", review).replace("{BACKUP_CODE}", backup)
 
 
 def call(method: str, path: str, body: dict | None = None, **query) -> dict:
@@ -310,12 +326,12 @@ def main():
                 print(f"Note: {other['attributes'].get('locale')} has its own screenshots and keeps them.")
 
     detail = call("GET", f"/appStoreVersions/{vid}/appStoreReviewDetail").get("data")
-    if detail:
-        call("PATCH", f"/appStoreReviewDetails/{detail['id']}", {"data": {
-            "type": "appStoreReviewDetails", "id": detail["id"], "attributes": {"notes": notes}}})
-    else:
+    if not detail:
         sys.exit("This version has no App Review contact details yet. Fill them in once in App Store Connect, "
                  "then run again.")
+    # Codes are made only now, when the notes are really set (not for promo, not on an early exit).
+    call("PATCH", f"/appStoreReviewDetails/{detail['id']}", {"data": {
+        "type": "appStoreReviewDetails", "id": detail["id"], "attributes": {"notes": with_review_codes(notes)}}})
     print("Review notes set.")
 
     if not submit:

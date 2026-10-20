@@ -1,5 +1,7 @@
 # App Review: notes and routine
 
+**Every review code written in this file has been revoked (20 Oct 2026).** This repo is public, so from 1.0.8 the Release to App Store workflow makes fresh random codes (scripts/review_codes.py) and puts them only into App Store Connect, in place of `{REVIEW_CODE}` and `{BACKUP_CODE}`.
+
 **Owner decision (25 Sep 2026): option A.** The reviewer gets an invite code from a real account on the owner's phone, and the owner pssts back while the app is in review. No demo account or fake contact is built into the app.
 
 ## Before each submission
@@ -310,7 +312,7 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 
 ## 1.0.8 (next build)
 
-1.0.7 (build 42) was approved on 19 Oct 2026 and is the baseline for rule 3. Submit with the Release to App Store workflow; it also sets the store listings in every language from docs/ASO.md (new name "Psst: Doodle & Miss You Widget", subtitle, keywords, description) and adds the UK English and Mexican Spanish store pages.
+1.0.7 (build 42) was approved on 19 Oct 2026 and is the baseline for rule 3. Submit with the Release to App Store workflow. No codes to make by hand: each run that sets the notes makes two fresh Psst Team codes in production (3 joins each, 30 days), revokes the ones earlier runs made, and fills them in for `{REVIEW_CODE}` and `{BACKUP_CODE}`. They are never printed; to see them, open the notes in App Store Connect. The workflow also sets the store listings in every language from docs/ASO.md (new name "Psst: Doodle & Miss You Widget", subtitle, keywords, description) and adds the UK English and Mexican Spanish store pages.
 
 **What's New in This Version:**
 
@@ -330,8 +332,8 @@ What's new in 1.0.8:
 
 To try it with a real person (our team):
 1. Open the app, enter any name, and choose whether to allow notifications.
-2. On home, tap "I have a code" and enter:  PSSTFIVE
-   (backup code:  PSSTCATS)
+2. On home, tap "I have a code" and enter:  {REVIEW_CODE}
+   (backup code:  {BACKUP_CODE})
 3. Tap Connect. A band for "Psst Team" appears on home.
 4. Tap the band to send a Psst. We'll psst you back within a few minutes during review hours.
 

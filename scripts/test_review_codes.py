@@ -46,7 +46,8 @@ class ReviewCodeTests(unittest.TestCase):
         with mock.patch.dict(os.environ, env), mock.patch.object(review_codes, "sql", fake_sql), \
                 mock.patch("builtins.print") as printed:
             filled = release.with_review_codes(TEMPLATE)
-        self.assertEqual(len(queries), 1, "revoke and insert in one statement")
+        self.assertIn("insert into public.invites", queries[0], "revoke and insert in one statement")
+        self.assertTrue(all(q.lstrip().startswith("select") for q in queries[1:]), "anything after only reads")
         self.assertNotIn("{REVIEW_CODE}", filled)
         self.assertNotIn("{BACKUP_CODE}", filled)
         review, backup = filled.split("Enter:  ")[1][:8], filled.split("backup code:  ")[1][:8]

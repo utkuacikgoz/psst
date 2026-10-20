@@ -16,7 +16,10 @@ import urllib.request
 
 # Same alphabet as the database's invite codes (no look-alikes).
 ALPHABET = "ABCDEFGHJKMNPQRSTVWXYZ23456789"
-USES = 3       # one reviewer, maybe a second, and a spare
+USES = 3  # one reviewer, maybe a second, and a spare
+# The fixed codes App Review used before 1.0.8 (revoked); they point at the team account.
+FIXED = ", ".join(f"'{c}'" for c in ("PSSTFIVE", "PSSTCATS", "PSSTHEY2", "PSSTYAY3", "PSSTJOIN", "PSSTNOW1",
+                                     "PSSTWAVE", "PSSTHERE", "PSSTTEAM", "PSSTBACK"))
 DAYS = 30
 
 
@@ -53,7 +56,16 @@ def make() -> tuple[str, str]:
     # revokes earlier review codes (never the two inserted here). Review codes are the only
     # code-kind invites with exactly USES joins and a life over 8 days (the app's are 7 days).
     rows = sql(f"""
-        with team as (select id from public.profiles where lower(btrim(display_name)) = 'psst team' order by created_at limit 1),
+        with team as (
+            -- The account behind the review codes: the latest earlier review code's inviter, else
+            -- the owner of the old fixed codes (kept 30 days after revoking), else by name.
+            select coalesce(
+                (select inviter_id from public.invites
+                 where kind = 'code' and max_uses = {USES} and expires_at > created_at + interval '8 days'
+                 order by created_at desc limit 1),
+                (select inviter_id from public.invites where code in ({FIXED}) order by created_at desc limit 1),
+                (select id from public.profiles where lower(btrim(display_name)) = 'psst team' order by created_at limit 1)
+            ) as id),
         revoked as (
             update public.invites set revoked_at = now()
             where inviter_id = (select id from team) and kind = 'code' and revoked_at is null
@@ -62,6 +74,7 @@ def make() -> tuple[str, str]:
         insert into public.invites (code, inviter_id, expires_at, max_uses)
         select v.code, team.id, now() + interval '{DAYS} days', {USES}
         from team, (values ('{review}'), ('{backup}')) as v(code)
+        where team.id is not null
         returning id""")
     if not isinstance(rows, list) or len(rows) != 2:
         # Counts and shapes only (never names or codes), so the log says what went wrong.
@@ -70,5 +83,9 @@ def make() -> tuple[str, str]:
                     "count(*) filter (where display_name ilike '%psst%') as similar from public.profiles")
         sys.exit(f"No review codes were made: the insert answered with a {shape}; "
                  f"profiles named Psst Team: {found}.")
-    print(f"Made 2 review codes for Psst Team ({USES} joins each, {DAYS} days); earlier ones revoked.")
+    named = sql(f"select lower(btrim(p.display_name)) = 'psst team' as named from public.invites i "
+                f"join public.profiles p on p.id = i.inviter_id where i.code = '{review}'")
+    print(f"Made 2 review codes for the team account ({USES} joins each, {DAYS} days); earlier ones revoked.")
+    if not (named and named[0].get("named")):
+        print("Note: the team account isn't named exactly \"Psst Team\", which the reviewer notes promise.")
     return review, backup

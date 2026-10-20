@@ -310,15 +310,18 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 
 **App Privacy:** doodles are covered by the existing **User Content → Other User Content** (linked, not tracking, App Functionality); the privacy manifest now lists it too. The device's time zone is now saved on the account (streak days and the recap's Sunday 6 PM). Apple has no time-zone category and it is far coarser than "Coarse Location", so the safe declaration is **Other Data → App Functionality, linked to the user, not used for tracking**. Weekly recap and Psst links collect nothing else new: the recap is computed from Pssts already stored, and a Psst link stores only the same invite row as an invite code.
 
-## 1.0.8 (next build)
+## 1.0.8 (build 46)
 
 1.0.7 (build 42) was approved on 19 Oct 2026 and is the baseline for rule 3. Submit with the Release to App Store workflow. No codes to make by hand: each run that sets the notes makes two fresh Psst Team codes in production (3 joins each, 30 days), revokes the ones earlier runs made, and fills them in for `{REVIEW_CODE}` and `{BACKUP_CODE}`. They are never printed; to see them, open the notes in App Store Connect. The workflow also sets the store listings in every language from docs/ASO.md (new name "Psst: Doodle & Miss You Widget", subtitle, keywords, description) and adds the UK English and Mexican Spanish store pages.
 
 **What's New in This Version:**
 
 ```
-• Psst now asks for a rating only after a moment worth it, like SAME MOMENT or a 7-day streak
-• Small fixes
+• Your #1 person on your Home Screen, free: when they last pssted you and your streak
+• Got a code? Redeem it for Psst+ right in the app
+• Chose “Not now” for notifications? Pssts now arrive quietly instead of not at all
+• Long names stay whole, clearer small text and a tidier invite sheet
+• Fixes: replies to replies, streak moments and SAME MOMENT
 ```
 
 **Notes for the reviewer:**
@@ -327,7 +330,11 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 Psst lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
 
 What's new in 1.0.8:
-- The App Store rating prompt (Apple's standard SKStoreReviewController request) now appears once, after a happy moment (a SAME MOMENT, a doodle, or a 7-day streak) instead of after the first Psst.
+- The small Home Screen widget is now free (your first person, when they last pssted you, the streak). The three-person and Lock Screen widgets stay in Psst+.
+- Psst+ has "Redeem a code" under Restore purchase (Apple's offer code sheet).
+- "Not now" on the notification step turns on quiet (provisional) delivery; after the first Psst link someone shares, the app asks once more.
+- The name step says "By continuing you agree to the Terms" with a link.
+- The App Store rating prompt (Apple's standard request) appears once, after a happy moment (a SAME MOMENT, pssting back a doodle, or a 7-day streak), never in the first two days.
 - The store page has a new name and description, and UK English and Mexican Spanish store pages. The app itself is unchanged in language (English).
 
 To try it with a real person (our team):
@@ -337,9 +344,9 @@ To try it with a real person (our team):
 3. Tap Connect. A band for "Psst Team" appears on home.
 4. Tap the band to send a Psst. We'll psst you back within a few minutes during review hours.
 
-Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. On a doodle, ••• offers Hide doodle, Block and Report. Settings → Delete account removes all server data immediately.
+Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. On a doodle, ••• offers Hide doodle, Block and Report. Reports are reviewed within 24 hours; a report keeps a copy of the reported doodle for 90 days so it can be reviewed after the block. Settings → Delete account removes the account and its data immediately (reports stay, without the account, until their 90 days are up).
 
-Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "Psst+" → Unlock. Pssting, replies and invites are free.
+Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "Psst+" → Unlock, or "Redeem a code". Pssting, replies, invites, doodles and the small widget are free.
 
 Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
 ```

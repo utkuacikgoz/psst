@@ -74,7 +74,10 @@ def make() -> tuple[str, str]:
                  where kind = 'code' and max_uses = {USES} and expires_at > created_at + interval '8 days'
                  order by created_at desc limit 1),
                 (select inviter_id from public.invites where code in ({FIXED}) order by created_at desc limit 1),
-                (select id from public.profiles where lower(btrim(display_name)) = 'psst team' order by created_at limit 1)
+                (select id from public.profiles where lower(btrim(display_name)) = 'psst team' order by created_at limit 1),
+                -- The only profile with "psst" in its name, made before launch week: the team account.
+                (select min(id::text)::uuid from public.profiles where display_name ilike '%psst%'
+                 having count(*) = 1 and max(created_at) < '2026-10-01')
             ) as id),
         revoked as (
             update public.invites set revoked_at = now()

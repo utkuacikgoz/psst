@@ -23,6 +23,14 @@ FIXED = ", ".join(f"'{c}'" for c in ("PSSTFIVE", "PSSTCATS", "PSSTHEY2", "PSSTYA
 DAYS = 30
 
 
+def name_match(name: str) -> str:
+    """SQL matching a display name, ignoring case and outer spaces ("false" for none)."""
+    name = name.strip().lower()
+    if not name:
+        return "false"
+    return "lower(btrim(display_name)) = '" + name.replace("'", "''") + "'"
+
+
 def code() -> str:
     return "".join(secrets.choice(ALPHABET) for _ in range(8))
 
@@ -60,6 +68,8 @@ def make() -> tuple[str, str]:
             -- The account behind the review codes: the latest earlier review code's inviter, else
             -- the owner of the old fixed codes (kept 30 days after revoking), else by name.
             select coalesce(
+                (select id from public.profiles where {name_match(os.environ.get("REVIEW_ACCOUNT", ""))}
+                 order by created_at limit 1),
                 (select inviter_id from public.invites
                  where kind = 'code' and max_uses = {USES} and expires_at > created_at + interval '8 days'
                  order by created_at desc limit 1),

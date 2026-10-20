@@ -28,6 +28,9 @@ on:
         type: choice
         options: [upload, keep]
         default: upload
+      review_account:
+        description: Display name of the account App Review connects to (only when no earlier review code points at it)
+        required: false
 
 concurrency:
   group: release
@@ -49,6 +52,7 @@ jobs:
       SCREENSHOTS: ${{ inputs.screenshots }}
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_PROD || secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+      REVIEW_ACCOUNT: ${{ inputs.review_account }}
     steps:
       - uses: actions/checkout@v5
       - run: pip install -q pyjwt cryptography

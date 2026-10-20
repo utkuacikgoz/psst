@@ -53,7 +53,7 @@ def make() -> tuple[str, str]:
     # revokes earlier review codes (never the two inserted here). Review codes are the only
     # code-kind invites with exactly USES joins and a life over 8 days (the app's are 7 days).
     rows = sql(f"""
-        with team as (select id from public.profiles where display_name = 'Psst Team' order by created_at limit 1),
+        with team as (select id from public.profiles where lower(btrim(display_name)) = 'psst team' order by created_at limit 1),
         revoked as (
             update public.invites set revoked_at = now()
             where inviter_id = (select id from team) and kind = 'code' and revoked_at is null
@@ -63,7 +63,12 @@ def make() -> tuple[str, str]:
         select v.code, team.id, now() + interval '{DAYS} days', {USES}
         from team, (values ('{review}'), ('{backup}')) as v(code)
         returning id""")
-    if len(rows) != 2:
-        sys.exit("No 'Psst Team' profile in production, so no review codes were made.")
+    if not isinstance(rows, list) or len(rows) != 2:
+        # Counts and shapes only (never names or codes), so the log says what went wrong.
+        shape = f"{type(rows).__name__} of {len(rows)}" if isinstance(rows, (list, dict)) else type(rows).__name__
+        found = sql("select count(*) filter (where lower(btrim(display_name)) = 'psst team') as exact, "
+                    "count(*) filter (where display_name ilike '%psst%') as similar from public.profiles")
+        sys.exit(f"No review codes were made: the insert answered with a {shape}; "
+                 f"profiles named Psst Team: {found}.")
     print(f"Made 2 review codes for Psst Team ({USES} joins each, {DAYS} days); earlier ones revoked.")
     return review, backup

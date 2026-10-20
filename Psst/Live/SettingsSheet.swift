@@ -382,6 +382,9 @@ private struct YouBand: View {
                     .padding(.horizontal, Tokens.Space.l)
                     .padding(.vertical, Tokens.Space.s)
                     .background(Capsule().fill(Color.white.opacity(0.22)))
+                    // Same capsule, a 44 pt tap area around it (11A).
+                    .frame(minHeight: Tokens.minTouch)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .padding(.top, Tokens.Space.xs)

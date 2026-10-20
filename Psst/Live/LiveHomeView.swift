@@ -350,6 +350,7 @@ struct LiveHomeView: View {
         .onDisappear { store.isHomeVisible = false }
         .onChange(of: anySheet) { updateVisibility() }
         .onChange(of: scenePhase) { updateVisibility() }
+        .onChange(of: store.sendStates) { old, new in announceSends(from: old, to: new) }
         // After the first accepted Psst, once its "sent" has shown and nothing
         // else is on screen. Apple decides whether the prompt actually appears.
         .task(id: store.reviewDue && store.arrival == nil && !anySheet && scenePhase == .active) {
@@ -367,10 +368,12 @@ struct LiveHomeView: View {
         }
         // Keep the home-screen widget's people, colours and Psst+ state current.
         .task(id: widgetSignature) {
+            // Home's colours, so nobody changes colour between home and the widget (11A).
+            let colours = bandColors
             WidgetBridge.publish(
-                WidgetBridge.people(from: store.orderedConnections) { personalization.colorHex(for: $0, name: $1) },
+                WidgetBridge.people(from: store.orderedConnections) { colours[$0] ?? personalization.colorHex(for: $0, name: $1) },
                 unlocked: purchases.isUnlocked,
-                everyone: WidgetBridge.everyone(from: store.orderedConnections) { personalization.colorHex(for: $0, name: $1) })
+                everyone: WidgetBridge.everyone(from: store.orderedConnections) { colours[$0] ?? personalization.colorHex(for: $0, name: $1) })
         }
         .onChange(of: store.pendingInviteCode) { _, code in
             if code != nil { showingInvite = true }
@@ -514,7 +517,7 @@ struct LiveHomeView: View {
 
     private var widgetSignature: String {
         let people = store.orderedConnections
-            .map { "\($0.id)|\($0.otherName)|\(personalization.colorHex(for: $0.id, name: $0.otherName))" }
+            .map { "\($0.id)|\($0.otherName)|\(personalization.colorHex(for: $0.id, name: $0.otherName))|\($0.lastFromMe == false ? $0.lastCreatedAt?.timeIntervalSince1970 ?? 0 : 0)|\($0.streakDays ?? 0)" }
         return people.joined(separator: ",") + "|\(purchases.isUnlocked)"
     }
 
@@ -555,7 +558,13 @@ struct LiveHomeView: View {
     }
 
     private func updateNotificationStatus() async {
-        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        var settings = await UNUserNotificationCenter.current().notificationSettings()
+        // Chose "Not now" before quiet delivery existed (6A): Pssts arrive quietly from now on.
+        if settings.authorizationStatus == .notDetermined,
+           UserDefaults.standard.bool(forKey: LiveStore.notificationChoiceKey) {
+            await NotificationPermission.quietly()
+            settings = await UNUserNotificationCenter.current().notificationSettings()
+        }
         notificationsOff = settings.authorizationStatus == .denied
         await store.reportNotificationStatus(enabled: settings.authorizationStatus == .authorized
                                              || settings.authorizationStatus == .provisional)
@@ -574,6 +583,28 @@ struct LiveHomeView: View {
             .tracking(Tokens.Band.wordmarkTracking)
             .foregroundStyle(Color.onCanvas)
             .accessibilityAddTraits(.isHeader)
+            // Pull to refresh has no VoiceOver gesture since the cat replaced .refreshable;
+            // one Refresh here instead of on every band (11A).
+            .accessibilityAction(named: "Refresh") { Task { await store.refresh() } }
+    }
+
+    /// VoiceOver hears how a send went, not just a changed value on the band (11A).
+    private func announceSends(from old: [UUID: SendState], to new: [UUID: SendState]) {
+        for (id, state) in new where old[id] != state {
+            guard let name = store.connections.first(where: { $0.id == id })?.otherName else { continue }
+            let message: String
+            switch state {
+            case .sending:
+                continue
+            case .sent(_, let signal):
+                message = "\(signal.title) sent to \(name)"
+            case .failed(_, _, .rateLimited):
+                message = "Paused for \(name), so nobody gets flooded"
+            case .failed:
+                message = "Didn't make it to \(name)"
+            }
+            AccessibilityNotification.Announcement(message).post()
+        }
     }
 
     /// Splits the scroll area between the people and the + band, but never below
@@ -638,6 +669,19 @@ struct LiveHomeView: View {
         }
         if let notice = store.notice {
             NoticeView(symbol: "info.circle", text: notice, actionTitle: "OK") { store.notice = nil }
+        }
+        // 9A (owner pick, 20 Oct 2026): a doodle the server turned down never vanishes silently.
+        if let id = store.failedDoodle, let person = store.connections.first(where: { $0.id == id }) {
+            NoticeView(symbol: "scribble", text: "Couldn't send that drawing to \(person.otherName). Draw another?",
+                       actionTitle: "Draw",
+                       action: {
+                           store.failedDoodle = nil
+                           doodlePerson = person
+                       },
+                       onDismiss: { store.failedDoodle = nil })
+                .onAppear {
+                    AccessibilityNotification.Announcement("Couldn't send that drawing to \(person.otherName).").post()
+                }
         }
     }
 
@@ -783,8 +827,6 @@ struct LiveHomeView: View {
             }
             .accessibilityAction(named: "Super Psst") { superPerson = connection }
             .accessibilityAction(named: "Doodle") { doodlePerson = connection }
-            // Pull to refresh has no VoiceOver gesture since the cat replaced .refreshable.
-            .accessibilityAction(named: "Refresh") { Task { await store.refresh() } }
             .accessibilityAction(named: "Manage \(connection.otherName)") { managing = connection }
             .accessibilityAction(named: "Move up") { withAnimation { store.move(connection.id, by: -1) } }
             .accessibilityAction(named: "Move down") { withAnimation { store.move(connection.id, by: 1) } }
@@ -874,7 +916,7 @@ struct LiveHomeView: View {
         case .notSent(let signal): "Retries \(signal.title)."
         case .paused: "Paused after several taps, so nobody gets flooded."
         case .sending: "Sending."
-        default: "Sends a Psst. Touch and hold for Super Psst."
+        default: "Sends a Psst. Actions: Super Psst, Doodle."
         }
     }
 }
@@ -931,7 +973,10 @@ struct CoachOverlay: View {
                     .accessibilityHidden(true)
                 Text("Tap a band to psst")
                     .font(.psst(.title2, weight: .black))
-                Text("Hold for Super Psst")
+                // 5A (owner pick, 20 Oct 2026): the cat is Super Psst; holding opens Doodle and more.
+                Text("Tap the cat for Super Psst")
+                    .font(.psst(.body, weight: .medium))
+                Text("Hold a band to doodle")
                     .font(.psst(.body, weight: .medium))
                 Text("Tap anywhere to start")
                     .font(.psst(.footnote, weight: .semibold))
@@ -948,7 +993,7 @@ struct CoachOverlay: View {
         .buttonStyle(.plain)
         .transition(.opacity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Tip: tap a band to send a Psst. Hold for Super Psst, colours, moving or managing people.")
+        .accessibilityLabel("Tip: tap a band to send a Psst. Tap the cat for Super Psst. Hold a band to doodle, change colours, move or manage people.")
         .accessibilityHint("Dismisses the tip.")
         .accessibilityAddTraits([.isButton, .isModal])
         .task {

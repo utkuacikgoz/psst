@@ -78,5 +78,17 @@
       "source": "/p/:code",
       "destination": "/api/psst?code=:code"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/redeem/:code",
+      "destination": "https://apps.apple.com/redeem?ctx=offercodes&id=6815764359&code=:code",
+      "permanent": false
+    },
+    {
+      "source": "/redeem",
+      "destination": "https://apps.apple.com/redeem?ctx=offercodes&id=6815764359",
+      "permanent": false
+    }
   ]
 }

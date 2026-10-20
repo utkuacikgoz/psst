@@ -24,6 +24,10 @@ struct InviteSheet: View {
 
     // Psst someone new (5A)
     @State private var psstShare: PsstShare?
+    /// A link made but not yet shared: tapping again shares the same one (no new link, no invite used up).
+    @State private var unsentPsst: PsstShare?
+    @State private var unsentDoodle: PsstShare?
+    @State private var askingNotifications = false
     @State private var creatingPsst = false
     @State private var psstError: String?
     /// After a Psst link is made: it waits for them until this date (3A).
@@ -44,7 +48,8 @@ struct InviteSheet: View {
     @State private var enterError: String?
     @FocusState private var codeFocused: Bool
 
-    @ScaledMetric(relativeTo: .largeTitle) private var bandTitleSize: CGFloat = 36
+    /// One size under home's band names, so each title fits one line on any iPhone (owner pick 1A, 20 Oct 2026).
+    @ScaledMetric(relativeTo: .largeTitle) private var bandTitleSize: CGFloat = 30
     @ScaledMetric(relativeTo: .largeTitle) private var codeSize: CGFloat = 40
 
     var body: some View {
@@ -52,12 +57,24 @@ struct InviteSheet: View {
             header
             if dynamicTypeSize.isAccessibilitySize {
                 ScrollView { content }
+            } else if mode == .choose {
+                // Four bands fill the sheet when they fit and scroll when they don't (small phones, larger text).
+                ViewThatFits(in: .vertical) {
+                    content
+                    ScrollView { content }
+                }
             } else { content }
         }
         .foregroundStyle(Color.onCanvas)
         .background(Color.psstCanvas.ignoresSafeArea())
         .presentationBackground(Color.psstCanvas)
-        .sheet(item: $psstShare) { ShareSheet(items: $0.items) }
+        .sheet(item: $psstShare) { share in
+            ShareSheet(items: share.items) { completed in shared(share, completed: completed) }
+        }
+        .sheet(isPresented: $askingNotifications) {
+            NotificationAskCard { askingNotifications = false }
+                .presentationDetents([.medium])
+        }
         .fullScreenCover(isPresented: $drawingInvite, onDismiss: { if inviteDoodle != nil { createDoodle() } }) {
             DoodleSheet(title: "For someone new", sendTitle: "SEND AS A LINK", color: Color(hex: 0xAC3E68)) { strokes in
                 inviteDoodle = strokes
@@ -112,15 +129,20 @@ struct InviteSheet: View {
                 .frame(maxWidth: .infinity).padding(.top, Tokens.Space.s)
             // 5A (owner pick, 14 Oct): psst someone who isn't on Psst; the Psst is the invite.
             chooserBand(title: "Psst someone new",
-                        subtitle: psstError ?? (creatingPsst ? "Getting your Psst ready…" : "Not on Psst yet? Your Psst is the invite."),
+                        subtitle: creatingPsst ? "Getting your Psst ready…" : "Not on Psst yet? Your Psst is the invite.",
                         color: Color(hex: 0xAC3E68), tag: "NEW") { createPsst() }
+            if let psstError { errorLine(psstError) }
             chooserBand(title: "Draw someone new",
-                        subtitle: doodleError ?? (creatingDoodle ? "Getting your doodle ready…"
-                            : "Draw them something ✎ They see it when they join."),
+                        subtitle: creatingDoodle ? "Getting your doodle ready…"
+                            : "Draw them something ✎ They see it when they join.",
                         color: Color(hex: 0xC2185B), tag: "NEW") {
-                // A drawing whose link failed is sent again rather than drawn again.
-                if inviteDoodle != nil { createDoodle() } else { drawingInvite = true }
+                // A drawing whose link failed is sent again rather than drawn again; one
+                // whose share was cancelled is offered again rather than lost.
+                if let unsentDoodle {
+                    psstShare = unsentDoodle.again()
+                } else if inviteDoodle != nil { createDoodle() } else { drawingInvite = true }
             }
+            if let doodleError { errorLine(doodleError) }
             // 3A (owner pick, 18 Oct 2026): say the Psst is waiting, and until when.
             if let psstWaitingUntil {
                 Text("Your \(waitingIsDoodle ? "doodle" : "Psst") is waiting for them · expires \(psstWaitingUntil.formatted(.dateTime.month(.abbreviated).day()))")
@@ -160,13 +182,15 @@ struct InviteSheet: View {
                 }
                 Text(title.uppercased())
                     .bandTitle(title, size: bandTitleSize, tracking: Tokens.Band.titleTracking)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.8)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
                     .font(.psst(.subheadline, weight: .medium))
             }
             .multilineTextAlignment(.center)
             .padding(Tokens.Space.xl)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 120, maxHeight: .infinity)
             .background(color)
             .contentShape(Rectangle())
         }
@@ -175,6 +199,19 @@ struct InviteSheet: View {
         .accessibilityLabel(title)
         .accessibilityHint(subtitle)
         .accessibilityAddTraits(.isButton)
+    }
+
+    /// An error under its band, on its own line (1A), never in place of the band's subtitle.
+    private func errorLine(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(.psst(.subheadline, weight: .semibold))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Tokens.Space.m)
+            .padding(.vertical, Tokens.Space.s)
+            .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+            .padding(.horizontal, Tokens.Space.l)
+            .padding(.vertical, Tokens.Space.s)
+            .onAppear { AccessibilityNotification.Announcement(message).post() }
     }
 
     // MARK: Share
@@ -248,14 +285,18 @@ struct InviteSheet: View {
     /// Makes a one-person link holding your Psst, then opens the share sheet (5A).
     private func createPsst() {
         guard !creatingPsst else { return }
+        if let unsentPsst, (unsentPsst.expiresAt ?? .distantPast) > Date() {
+            psstShare = unsentPsst.again()
+            return
+        }
         creatingPsst = true
         psstError = nil
         Task {
             do {
                 let invite = try await store.api.createPsstInvite()
-                psstShare = PsstShare(items: [PsstShare.message, invite.link])
-                psstWaitingUntil = invite.expiresAt
-                waitingIsDoodle = false
+                let share = PsstShare(items: [PsstShare.message, invite.link], expiresAt: invite.expiresAt)
+                unsentPsst = share
+                psstShare = share
             } catch APIError.server(_, "too_many_invites") {
                 psstError = "That's a lot of invites today. Try again tomorrow."
             } catch APIError.offline {
@@ -264,6 +305,21 @@ struct InviteSheet: View {
                 psstError = "Couldn't get your Psst ready. Try again."
             }
             creatingPsst = false
+        }
+    }
+
+    /// "Waiting for them" only once the link really went somewhere (11A). The first
+    /// time, Psst also asks about notifications if iOS hasn't had a yes or no (6A).
+    private func shared(_ share: PsstShare, completed: Bool) {
+        guard completed else { return }
+        psstWaitingUntil = share.expiresAt
+        waitingIsDoodle = share.isDoodle
+        if share.isDoodle { unsentDoodle = nil } else { unsentPsst = nil }
+        Task {
+            guard await NotificationPermission.shouldAskAgain() else { return }
+            // Let the share sheet finish closing first.
+            try? await Task.sleep(for: .milliseconds(700))
+            askingNotifications = true
         }
     }
 
@@ -276,9 +332,9 @@ struct InviteSheet: View {
             do {
                 let invite = try await store.api.createDoodleInvite(strokes: strokes)
                 inviteDoodle = nil
-                psstShare = PsstShare(items: [PsstShare.doodleMessage, invite.link])
-                psstWaitingUntil = invite.expiresAt
-                waitingIsDoodle = true
+                let share = PsstShare(items: [PsstShare.doodleMessage, invite.link], expiresAt: invite.expiresAt, isDoodle: true)
+                unsentDoodle = share
+                psstShare = share
             } catch APIError.server(_, "too_many_invites") {
                 doodleError = "That's a lot of invites today. Try again tomorrow."
             } catch APIError.server(_, "invalid_doodle") {
@@ -451,6 +507,11 @@ struct InviteSheet: View {
 struct PsstShare: Identifiable {
     let id = UUID()
     let items: [Any]
+    var expiresAt: Date? = nil
+    var isDoodle = false
+
+    /// The same link, shared again (a new identity so the sheet opens again).
+    func again() -> PsstShare { PsstShare(items: items, expiresAt: expiresAt, isDoodle: isDoodle) }
 
     static let message = "I pssted you. Open it to see, and psst me back."
     static let doodleMessage = "I drew you something. Open it to see, and psst me back."
@@ -465,10 +526,69 @@ struct PsstShare: Identifiable {
 /// The system share sheet (Messages, WhatsApp, anything).
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
+    /// True when the person actually sent or saved it, false when they cancelled.
+    var onComplete: ((Bool) -> Void)? = nil
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        let onComplete = onComplete
+        controller.completionWithItemsHandler = { _, completed, _, _ in
+            Task { @MainActor in onComplete?(completed) }
+        }
+        return controller
     }
 
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+/// 6A (owner pick, 20 Oct 2026): asked once, after the first Psst link you share,
+/// if notifications are still quiet or never answered.
+struct NotificationAskCard: View {
+    let onDone: () -> Void
+    @State private var isAsking = false
+
+    var body: some View {
+        VStack(spacing: Tokens.Space.l) {
+            MoodCat(mood: .awake)
+                .frame(width: 44, height: 40)
+                .padding(Tokens.Space.m)
+                .background(Color.psstCanvas, in: Circle())
+                .accessibilityHidden(true)
+            Text("Hear it when they psst back?")
+                .font(.psst(.title2, weight: .black))
+                .foregroundStyle(Color.psstCanvas)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            Text("Turn on notifications and you'll know the moment they join and psst you.")
+                .font(.psst(.subheadline, weight: .medium))
+                .foregroundStyle(Color.ink)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                guard !isAsking else { return }
+                isAsking = true
+                Task {
+                    _ = await NotificationPermission.ask()
+                    onDone()
+                }
+            } label: {
+                Text("TURN ON")
+                    .font(.psst(.body, weight: .black))
+                    .tracking(Tokens.Band.labelTracking)
+                    .foregroundStyle(Color.onCanvas)
+                    .frame(maxWidth: .infinity, minHeight: Tokens.minTouch + Tokens.Space.s)
+                    .background(Color.psstCanvas, in: RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .disabled(isAsking)
+            Button("Not now", action: onDone)
+                .font(.psst(.body, weight: .semibold))
+                .foregroundStyle(Color.inkSecondary)
+                .frame(minHeight: Tokens.minTouch)
+        }
+        .padding(Tokens.Space.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .presentationBackground(Color.white)
+    }
 }

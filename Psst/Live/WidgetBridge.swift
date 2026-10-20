@@ -3,7 +3,8 @@ import Security
 import WidgetKit
 
 /// Hands the widget (PsstWidget) what it shows: the first people in home's
-/// order, with their colours, and whether Psst+ is unlocked. It's written to the
+/// order, with their colours, when each last pssted you and the streak (the
+/// free small widget, 7A), and whether Psst+ is unlocked. It's written to the
 /// shared App Group and only when it changes.
 @MainActor
 enum WidgetBridge {
@@ -11,6 +12,19 @@ enum WidgetBridge {
         let id: UUID
         let name: String
         let color: UInt32
+        /// When they last pssted you (7A); nil if never, or not known yet.
+        var lastPsstedYou: Date? = nil
+        /// Days in a row you've both pssted (3A); the widget shows the flame from 3.
+        var streakDays: Int? = nil
+
+        /// The list only carries the latest Psst between you, so once you psst
+        /// back it no longer says when they last pssted you: keep the time from before.
+        func remembering(_ known: [UUID: Date]) -> Person {
+            guard let earlier = known[id], lastPsstedYou.map({ $0 < earlier }) ?? true else { return self }
+            var person = self
+            person.lastPsstedYou = earlier
+            return person
+        }
     }
 
     static let peopleKey = "psst.widget.people"
@@ -25,13 +39,21 @@ enum WidgetBridge {
     }
 
     static func people(from connections: [ConnectionSummary], colorHex: (UUID, String) -> UInt32) -> [Person] {
-        connections.prefix(3).map { Person(id: $0.id, name: $0.otherName, color: colorHex($0.id, $0.otherName)) }
+        connections.prefix(3).map { person($0, colorHex: colorHex) }
+    }
+
+    private static func person(_ connection: ConnectionSummary, colorHex: (UUID, String) -> UInt32) -> Person {
+        Person(id: connection.id, name: connection.otherName, color: colorHex(connection.id, connection.otherName),
+               lastPsstedYou: connection.lastFromMe == false ? connection.lastCreatedAt : nil,
+               streakDays: connection.streakDays)
     }
 
     /// Writes to the shared App Group, or to `store` in tests.
     static func publish(_ people: [Person], unlocked: Bool, everyone: [Person]? = nil, to store: UserDefaults? = nil) {
-        guard let defaults = store ?? Self.defaults, let data = try? JSONEncoder().encode(people) else { return }
-        let all = everyone.flatMap { try? JSONEncoder().encode($0) }
+        guard let defaults = store ?? Self.defaults else { return }
+        let known = lastPsstedYou(in: defaults)
+        guard let data = try? JSONEncoder().encode(people.map { $0.remembering(known) }) else { return }
+        let all = everyone.flatMap { try? JSONEncoder().encode($0.map { $0.remembering(known) }) }
         let allChanged = all != nil && all != defaults.data(forKey: everyoneKey)
         let newToken = WidgetLink.makeToken(in: defaults)
         guard data != defaults.data(forKey: peopleKey) || unlocked != defaults.bool(forKey: unlockedKey) || allChanged
@@ -41,6 +63,19 @@ enum WidgetBridge {
         if let all { defaults.set(all, forKey: everyoneKey) }
         WidgetCenter.shared.reloadAllTimelines()
         if #available(iOS 18.0, *) { ControlCenter.shared.reloadAllControls() }
+    }
+
+    /// When each person last pssted you, from what was published before.
+    private static func lastPsstedYou(in defaults: UserDefaults) -> [UUID: Date] {
+        var known: [UUID: Date] = [:]
+        for key in [peopleKey, everyoneKey] {
+            let stored = defaults.data(forKey: key).flatMap { try? JSONDecoder().decode([Person].self, from: $0) } ?? []
+            for person in stored {
+                guard let date = person.lastPsstedYou else { continue }
+                known[person.id] = max(known[person.id] ?? date, date)
+            }
+        }
+        return known
     }
 
     /// The newest unanswered doodle for the widget (2A, 4A: shown with or without
@@ -73,7 +108,7 @@ enum WidgetBridge {
     }
 
     static func everyone(from connections: [ConnectionSummary], colorHex: (UUID, String) -> UInt32) -> [Person] {
-        connections.map { Person(id: $0.id, name: $0.otherName, color: colorHex($0.id, $0.otherName)) }
+        connections.map { person($0, colorHex: colorHex) }
     }
 }
 

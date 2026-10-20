@@ -84,9 +84,30 @@ struct NameStepView: View {
         .background(Color.psstCanvas.ignoresSafeArea())
         // Rides just above the keyboard.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            PrimaryButton(title: "Continue", isBusy: isSaving, isEnabled: !trimmed.isEmpty, action: save)
+            VStack(spacing: 0) {
+                termsLine
+                    .padding(.horizontal, Tokens.Space.xl)
+                    .padding(.vertical, Tokens.Space.m)
+                PrimaryButton(title: "Continue", isBusy: isSaving, isEnabled: !trimmed.isEmpty, action: save)
+            }
+            .background(Color.psstCanvas)
         }
         .onAppear { focused = true }
+    }
+
+    /// 4A (owner pick, 20 Oct 2026): agreeing to the Terms before Psst starts
+    /// (doodles are content people send each other; App Review guideline 1.2).
+    private var termsLine: some View {
+        var terms = AttributedString("Terms")
+        terms.link = AppConfig.termsURL
+        terms.underlineStyle = .single
+        return (Text("By continuing you agree to the ") + Text(terms) + Text(". No bullying, no nasty doodles."))
+            .font(.psst(.footnote, weight: .medium))
+            .foregroundStyle(Color.onCanvasSecondary)
+            .tint(Color.onCanvas)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func save() {
@@ -307,7 +328,11 @@ struct NotificationStepView: View {
 
                 VStack(spacing: 0) {
                     PrimaryButton(title: "Yes, notify me", isBusy: isAsking, isEnabled: true, action: allow)
-                    Button { store.finishNotificationChoice() } label: {
+                    Button {
+                        // 6A (owner pick, 20 Oct 2026): Pssts still arrive, quietly, with no prompt.
+                        Task { await NotificationPermission.quietly() }
+                        store.finishNotificationChoice()
+                    } label: {
                         Text("Not now")
                             .font(.psst(.body, weight: .semibold))
                             .frame(maxWidth: .infinity, minHeight: Tokens.Band.barMinHeight)
@@ -407,5 +432,25 @@ enum NotificationPermission {
             .requestAuthorization(options: [.alert, .sound])) ?? false
         if granted { UIApplication.shared.registerForRemoteNotifications() }
         return granted
+    }
+
+    static let askedAgainKey = "psst.live.notificationAskedAgain"
+
+    /// "Not now" (6A): no prompt; Pssts land quietly in Notification Center, where
+    /// iOS offers Keep / Turn off.
+    @MainActor static func quietly() async {
+        let granted = (try? await UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .sound, .provisional])) ?? false
+        if granted { UIApplication.shared.registerForRemoteNotifications() }
+    }
+
+    /// True once ever: after the first Psst link you share, if iOS hasn't had a
+    /// yes or no from you yet (quiet or never asked).
+    @MainActor static func shouldAskAgain(defaults: UserDefaults = .standard) async -> Bool {
+        guard !defaults.bool(forKey: askedAgainKey) else { return false }
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        guard status == .provisional || status == .notDetermined else { return false }
+        defaults.set(true, forKey: askedAgainKey)
+        return true
     }
 }

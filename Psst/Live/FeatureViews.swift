@@ -335,7 +335,7 @@ struct FeatureIntroSheet: View {
                         .tracking(Tokens.Band.titleTracking)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
-                    item("Make one count", "Touch and hold someone for Super Psst. One a day, unlimited with Psst+.", symbol: "sparkles")
+                    item("Make one count", "Tap the cat on a band for Super Psst. One a day, unlimited with Psst+.", symbol: "sparkles")
                     item("Your activity", "Who you psst most, and who pssts you, in Settings. Only you see it.", symbol: "chart.bar.fill")
                     item("Know when", "Each band shows your latest exchange and when it was.", symbol: "clock.fill")
                 }
@@ -517,7 +517,7 @@ struct ActivityView: View {
         .padding(.horizontal, Tokens.Space.l)
         .padding(.vertical, Tokens.Space.m)
         .frame(maxWidth: .infinity, minHeight: 106)
-        .background(Color(hex: personalization.colorHex(for: row.connectionId, name: row.otherName)))
+        .background(Color(hex: personalization.homeColorHex(for: row.connectionId, name: row.otherName, among: store.orderedConnections)))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Number \(rank), \(row.otherName), \(count(row))")
     }
@@ -631,7 +631,7 @@ struct SuperPsstSheet: View {
         .sheet(isPresented: $showingPlus, onDismiss: { Task { await load() } }) { PsstPlusSheet() }
     }
 
-    private var bandHex: UInt32 { personalization.colorHex(for: connection.id, name: connection.otherName) }
+    private var bandHex: UInt32 { personalization.homeColorHex(for: connection.id, name: connection.otherName, among: store.orderedConnections) }
     private var name: String { connection.otherName }
 
     // MARK: Middle
@@ -889,15 +889,21 @@ struct SuperPsstSheet: View {
 
     private func band(_ title: String, label: String, enabled: Bool = true, sweeping: Bool = false,
                       action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        // Paused (3A, owner pick 20 Oct 2026): an outlined button at full strength reads
+        // as waiting and stays readable (the faded white one was about 2:1).
+        let outlined = !enabled && !sweeping
+        return Button(action: action) {
             Text(title)
                 .font(.psst(.title3, weight: .black))
                 .tracking(Tokens.Band.labelTracking)
-                .foregroundStyle(Color(hex: bandHex))
+                .foregroundStyle(outlined ? Color.white : Color(hex: bandHex))
                 .modifier(SendingShimmer(active: sweeping))
                 .padding(.horizontal, Tokens.Space.l)
                 .frame(maxWidth: .infinity, minHeight: 58)
-                .background(Color.surface.opacity(enabled || sweeping ? 1 : 0.4), in: RoundedRectangle(cornerRadius: 16))
+                .background(outlined ? Color.clear : Color.surface, in: RoundedRectangle(cornerRadius: 16))
+                .overlay {
+                    if outlined { RoundedRectangle(cornerRadius: 16).strokeBorder(Color.white, lineWidth: 2) }
+                }
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1079,7 +1085,7 @@ struct WeeklyRecapView: View {
     }
 
     private func colour(_ id: UUID, _ name: String) -> Color {
-        Color(hex: personalization.colorHex(for: id, name: name))
+        Color(hex: personalization.homeColorHex(for: id, name: name, among: store.orderedConnections))
     }
 
     private func load() async {

@@ -744,6 +744,32 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertNil(store.arrival?.total)
     }
 
+    func testWidgetKeepsWhenTheyLastPsstedYouAndTheStreak() throws {
+        let suite = "WidgetTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let id = UUID(), other = UUID()
+        let pssted = Date(timeIntervalSince1970: 1_800_000_000)
+        let received = ConnectionSummary(connectionId: id, otherId: other, otherName: "Mia", lastEventId: UUID(), lastFromMe: false,
+                                         lastEffect: "psst", lastCreatedAt: pssted, lastSeenAt: nil, unseenCount: 1, streakDays: 6)
+        let shown = WidgetBridge.people(from: [received]) { _, _ in 0x5F61AE }
+        XCTAssertEqual(shown.first?.lastPsstedYou, pssted)
+        XCTAssertEqual(shown.first?.streakDays, 6)
+        WidgetBridge.publish(shown, unlocked: false, everyone: WidgetBridge.everyone(from: [received]) { _, _ in 0x5F61AE }, to: defaults)
+
+        // You psst back: the list now only says you sent last, but the widget keeps their time.
+        let answered = ConnectionSummary(connectionId: id, otherId: other, otherName: "Mia", lastEventId: UUID(), lastFromMe: true,
+                                         lastEffect: "psst", lastCreatedAt: pssted.addingTimeInterval(60), lastSeenAt: nil,
+                                         unseenCount: 0, streakDays: 6)
+        let after = WidgetBridge.people(from: [answered]) { _, _ in 0x5F61AE }
+        XCTAssertNil(after.first?.lastPsstedYou)
+        WidgetBridge.publish(after, unlocked: false, to: defaults)
+        let stored = try JSONDecoder().decode([WidgetBridge.Person].self,
+                                              from: XCTUnwrap(defaults.data(forKey: WidgetBridge.peopleKey)))
+        XCTAssertEqual(stored.first?.lastPsstedYou, pssted)
+        XCTAssertEqual(stored.first?.streakDays, 6)
+    }
+
     func testSendBackIsIdempotentAndAcksTheOriginal() async {
         let payload = SignalPayload(eventID: UUID(), connectionID: UUID(), signal: .psst)
         let first = await store.sendBack(payload)

@@ -226,6 +226,12 @@ final class Personalization {
         return result
     }
 
+    /// The colour home shows this person in now, so the Super Psst card, activity,
+    /// the recap and the widget never show them in another one (11A, 20 Oct 2026).
+    func homeColorHex(for id: UUID, name: String, among people: [ConnectionSummary]) -> UInt32 {
+        bandColors(for: people.map { ($0.id, $0.otherName) })[id] ?? colorHex(for: id, name: name)
+    }
+
     func setColor(_ hex: UInt32?, for id: UUID) {
         colors[id] = hex
         defaults.set(Dictionary(uniqueKeysWithValues: colors.map { ($0.key.uuidString, Int($0.value)) }),

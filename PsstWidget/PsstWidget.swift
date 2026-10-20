@@ -2,10 +2,11 @@ import CoreText
 import SwiftUI
 import WidgetKit
 
-/// The widgets (Psst+). Home screen: your first people as colour bands. Lock
-/// Screen: your first person. Tapping a person opens Psst and sends them a Psst,
-/// just like tapping their band at home. The app writes the list to the shared
-/// App Group (see WidgetBridge).
+/// The widgets. Home screen: your first people as colour bands; the small one
+/// (your #1 person) is free since 7A, the medium one is Psst+. Lock Screen (Psst+):
+/// your first person. Tapping a person opens Psst and sends them a Psst, just like
+/// tapping their band at home. The app writes the list to the shared App Group
+/// (see WidgetBridge). Names and doodles are hidden on a locked phone (11A).
 @main
 struct PsstWidgetBundle: WidgetBundle {
     init() {
@@ -53,7 +54,7 @@ struct FavouriteView: View {
                 .widgetURL(URL(string: "psst://plus"))
         } else if let person = entry.people.first {
             label(big: family == .accessoryCircular ? initials(person.name) : person.name.uppercased(),
-                  small: "Tap to psst")
+                  small: "Tap to psst", sensitive: true)
                 .widgetURL(WidgetPerson.link(to: person.id))
                 .accessibilityLabel("Send \(person.name) a Psst")
         } else {
@@ -66,12 +67,14 @@ struct FavouriteView: View {
         String(name.split(separator: " ").prefix(2).compactMap(\.first)).uppercased()
     }
 
-    @ViewBuilder private func label(big: String, small: String) -> some View {
+    /// `sensitive`: a person's name, hidden on a locked phone (11A).
+    @ViewBuilder private func label(big: String, small: String, sensitive: Bool = false) -> some View {
         if family == .accessoryCircular {
             Text(big)
                 .font(.custom("InterTight-Black", size: big.count > 2 ? 15 : 24))
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
+                .privacySensitive(sensitive)
                 .padding(4)
         } else {
             VStack(alignment: .leading, spacing: 0) {
@@ -79,6 +82,7 @@ struct FavouriteView: View {
                     .font(.custom("InterTight-Black", size: 22))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
+                    .privacySensitive(sensitive)
                 Text(small)
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
@@ -108,6 +112,10 @@ struct WidgetPerson: Codable, Hashable {
     let id: UUID
     let name: String
     let color: UInt32
+    /// When they last pssted you (7A); nil if never, or not known yet.
+    var lastPsstedYou: Date? = nil
+    /// Days in a row you've both pssted; the flame shows from 3, like home.
+    var streakDays: Int? = nil
 
     /// Sends this person a Psst, with this install's link token (8A, see WidgetLink).
     static func link(to id: UUID) -> URL {
@@ -118,7 +126,7 @@ struct WidgetPerson: Codable, Hashable {
 }
 
 struct Entry: TimelineEntry {
-    let date = Date()
+    var date = Date()
     let people: [WidgetPerson]
     let unlocked: Bool
     /// The newest doodle sent to you that you haven't answered (free, 4A).
@@ -166,8 +174,13 @@ struct Provider: TimelineProvider {
         return Entry(people: people, unlocked: defaults?.bool(forKey: "psst.widget.unlocked") ?? false, doodle: doodle)
     }
 
+    /// Three people (11A), so the medium widget's gallery preview shows three bands.
     func placeholder(in context: Context) -> Entry {
-        Entry(people: [WidgetPerson(id: UUID(), name: "Mia", color: 0x5F61AE)], unlocked: true)
+        Entry(people: [
+            WidgetPerson(id: UUID(), name: "Mia", color: 0x5F61AE, lastPsstedYou: Date().addingTimeInterval(-2 * 3600), streakDays: 6),
+            WidgetPerson(id: UUID(), name: "Kim", color: 0x187F69),
+            WidgetPerson(id: UUID(), name: "Ada", color: 0xB34F2B),
+        ], unlocked: true)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) {
@@ -182,7 +195,15 @@ struct Provider: TimelineProvider {
             // nil: couldn't ask (keep what the app saved); .some(nil): no doodle now.
             let fetched: PsstSender.FetchedDoodle??
             do { fetched = .some(try await PsstSender.latestDoodle()) } catch { fetched = nil }
-            completion(Timeline(entries: [read(doodle: fetched)], policy: .after(Date().addingTimeInterval(30 * 60))))
+            // One entry every 5 minutes until the next check, so "pssted you 2h ago" keeps up.
+            let entry = read(doodle: fetched)
+            let now = Date()
+            let entries = stride(from: 0, to: 30, by: 5).map { minutes -> Entry in
+                var later = entry
+                later.date = now.addingTimeInterval(Double(minutes) * 60)
+                return later
+            }
+            completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(30 * 60))))
         }
     }
 }
@@ -199,12 +220,13 @@ struct PeopleView: View {
         if let doodle = entry.doodle, family == .systemSmall || family == .systemMedium {
             // 3B: a doodle someone drew for you, as a polaroid, until you psst them back.
             polaroid(doodle).widgetURL(URL(string: "psst://home"))
-        } else if !entry.unlocked {
+        } else if !entry.unlocked && family != .systemSmall {
+            // 7A: the small widget is free; three people stay Psst+.
             message("Psst+ puts your people here", url: "psst://plus")
         } else if shown.isEmpty {
             message("Invite someone to psst", url: "psst://home")
         } else if family == .systemSmall, let person = shown.first {
-            band(person).widgetURL(url(for: person))
+            firstPerson(person).widgetURL(url(for: person))
         } else {
             VStack(spacing: 0) {
                 ForEach(shown, id: \.self) { person in
@@ -224,6 +246,7 @@ struct PeopleView: View {
             .tracking(-1)
             .lineLimit(1)
             .minimumScaleFactor(0.5)
+            .privacySensitive()
             .foregroundStyle(.white)
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -231,10 +254,58 @@ struct PeopleView: View {
             .accessibilityLabel("Send \(person.name) a Psst")
     }
 
+    /// 7A (owner pick, 20 Oct 2026): your #1 person, free. Their band in home's
+    /// colour, when they last pssted you, and the streak flame from 3 days, like home.
+    private func firstPerson(_ person: WidgetPerson) -> some View {
+        let streak = person.streakDays ?? 0
+        let status = line(for: person)
+        return VStack(spacing: 2) {
+            Text(person.name.uppercased())
+                .font(.custom("InterTight-Black", size: 30))
+                .tracking(-1)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .privacySensitive()
+            Text(status)
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .bottomLeading) {
+            if streak >= 3 {
+                HStack(spacing: 3) {
+                    Image(systemName: "flame.fill")
+                    Text("\(streak)").monospacedDigit()
+                }
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Color.white)
+                .padding(12)
+            }
+        }
+        .background(Color(hex: person.color))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Send \(person.name) a Psst")
+        .accessibilityValue(streak >= 3 ? status + ", \(streak) days in a row" : status)
+    }
+
+    /// "pssted you 2h ago" (their last Psst to you), or "Tap to psst" if they never have.
+    private func line(for person: WidgetPerson) -> String {
+        guard let date = person.lastPsstedYou else { return "Tap to psst" }
+        let elapsed = max(0, entry.date.timeIntervalSince(date))
+        if elapsed < 60 { return "pssted you just now" }
+        if elapsed < 3600 { return "pssted you \(Int(elapsed / 60))m ago" }
+        if elapsed < 24 * 3600 { return "pssted you \(Int(elapsed / 3600))h ago" }
+        return "pssted you \(Int(elapsed / (24 * 3600)))d ago"
+    }
+
     private func polaroid(_ doodle: WidgetDoodle) -> some View {
         VStack(spacing: 4) {
             WidgetDoodleShape(strokes: doodle.strokes)
                 .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                .privacySensitive()
                 .padding(10)
                 .aspectRatio(1, contentMode: .fit)
                 .background(Color(hex: doodle.color), in: RoundedRectangle(cornerRadius: 6))
@@ -242,6 +313,7 @@ struct PeopleView: View {
                 .font(.custom("InterTight-Black", size: 12))
                 .foregroundStyle(Color(hex: 0x241B2C))
                 .lineLimit(1)
+                .privacySensitive()
         }
         .padding(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
         .background(Color(hex: 0xFBF6EA), in: RoundedRectangle(cornerRadius: 10))

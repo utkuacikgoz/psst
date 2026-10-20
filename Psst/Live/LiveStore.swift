@@ -107,6 +107,8 @@ final class LiveStore {
     private(set) var connectionsLoadFailed = false
     /// A short, factual message for the home screen (e.g. a connection that ended).
     var notice: String?
+    /// The person a doodle couldn't reach (9A): home says so and offers a redraw.
+    var failedDoodle: UUID?
     /// Set from an invite link (https://psstapp.fun/invite/CODE or psst://invite/CODE); the home screen opens the invite sheet with it.
     var pendingInviteCode: String?
     /// A Psst link to share again, from its day-5 reminder (3A).
@@ -774,6 +776,7 @@ final class LiveStore {
             // The same strokes would fail again; never offer a retry that can't work.
             doodleStrokes[eventID] = nil
             sendStates[connectionID] = nil
+            failedDoodle = connectionID
         } catch APIError.server(429, _) {
             noteReachable()
             pausedUntil[connectionID] = now().addingTimeInterval(Self.pauseDuration)
@@ -985,6 +988,8 @@ final class LiveStore {
         arrivalQueue = []
         pendingAcks = [:]
         displayed = []
+        failedDoodle = nil
+        defaults.removeObject(forKey: "psst.plus.word")
         pausedUntil = [:]
         connections = []
         sendStates = [:]

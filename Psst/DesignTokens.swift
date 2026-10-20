@@ -70,10 +70,9 @@ extension Color {
     static let onCanvasSecondary = Color(UIColor { traits in
         traits.accessibilityContrast == .high ? .white : UIColor.white.withAlphaComponent(0.82)
     })
-    /// Softer white for small labels on bands. Solid white with Increase Contrast.
-    static let onBandSoft = Color(UIColor { traits in
-        traits.accessibilityContrast == .high ? .white : UIColor.white.withAlphaComponent(0.9)
-    })
+    /// Small labels on bands. Solid white since owner pick 3A (20 Oct 2026): 90% white
+    /// measured 4.1–4.5:1 on the gold, blue, green and rust bands, under the 4.5:1 guideline.
+    static let onBandSoft = Color.white
 
     /// Raised person surface and sheets.
     static let surface = Color.white
@@ -113,11 +112,51 @@ extension Color {
 extension Text {
     /// Names and headlines in Inter Tight Black (DESIGN.md). Oversized titles wrap
     /// at the requested text size instead of shrinking away the accessibility setting.
+    /// A single word too wide for its band (owner pick 2A, 20 Oct 2026) shrinks to
+    /// as little as 75% to stay whole, rather than breaking mid-word ("CHRISTOPHE / R").
     func bandTitle(_ text: String, size: CGFloat, tracking: CGFloat) -> some View {
-        font(.psst(size: size, weight: .black))
-            .tracking(tracking)
+        BandTitleText(text: self, word: text, size: size, tracking: tracking)
+    }
+}
+
+private struct BandTitleText: View {
+    let text: Text
+    let word: String
+    let size: CGFloat
+    let tracking: CGFloat
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    static let smallestScale: CGFloat = 0.75
+
+    private var styled: Text { text.font(.psst(size: size, weight: .black)).tracking(tracking) }
+
+    private var wrapping: some View {
+        styled
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// The word's width at full size, so the shrunk version can say how narrow it can go.
+    private var naturalWidth: CGFloat {
+        let font = UIFont(name: PsstFont.name(for: .black), size: size) ?? .systemFont(ofSize: size, weight: .black)
+        let width = (word.uppercased() as NSString).size(withAttributes: [.font: font, .kern: tracking]).width
+        return ceil(width)
+    }
+
+    var body: some View {
+        if word.contains(where: \.isWhitespace) || dynamicTypeSize.isAccessibilitySize {
+            wrapping
+        } else {
+            ViewThatFits(in: .horizontal) {
+                styled.lineLimit(1)
+                styled
+                    .lineLimit(1)
+                    .minimumScaleFactor(Self.smallestScale)
+                    .frame(idealWidth: naturalWidth * Self.smallestScale)
+                wrapping
+            }
+            .multilineTextAlignment(.center)
+        }
     }
 }
 

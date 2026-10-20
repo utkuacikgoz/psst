@@ -10,6 +10,7 @@ struct PsstPlusSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var restoreMessage: String?
     @State private var restoring = false
+    @State private var redeeming = false
 
     var body: some View {
         NavigationStack {
@@ -58,7 +59,7 @@ struct PsstPlusSheet: View {
                     Section {
                         perk("Unlimited Super Pssts", symbol: "sparkles", tint: Color.inviteGold)
                         perk("Your whisper sound", symbol: "speaker.wave.2.fill", tint: Color(hex: 0x187F69))
-                        perk("Home Screen and Lock Screen widgets", symbol: "rectangle.grid.1x2.fill", tint: Color(hex: 0x5F61AE))
+                        perk("Three-person and Lock Screen widgets", symbol: "rectangle.grid.1x2.fill", tint: Color(hex: 0x5F61AE))
                     }
                     Section {
                         Text("Also: band colours and app icons")
@@ -77,6 +78,7 @@ struct PsstPlusSheet: View {
         }
         .tint(Color.psstCanvas)
         .preferredColorScheme(.light)
+        .offerCodeRedemption(isPresented: $redeeming) { _ in }
     }
 
     private func perk(_ title: String, symbol: String, tint: Color) -> some View {
@@ -129,6 +131,12 @@ struct PsstPlusSheet: View {
             }
             .frame(maxWidth: .infinity)
             .disabled(restoring)
+            // 8A (owner pick, 20 Oct 2026): Apple's own code sheet (BUILDHOP50 and friends).
+            // A redeemed Psst+ arrives through the purchase updates like any other.
+            if !purchases.isUnlocked {
+                Button("Redeem a code") { redeeming = true }
+                    .frame(maxWidth: .infinity)
+            }
         } footer: {
             VStack(alignment: .leading, spacing: Tokens.Space.s) {
                 switch purchases.state {
@@ -226,6 +234,8 @@ private struct SoundSection: View {
                         play(sound.file)
                     } label: {
                         Image(systemName: "play.circle.fill").font(.title2)
+                            .frame(minWidth: Tokens.minTouch, minHeight: Tokens.minTouch)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
                     .accessibilityLabel("Play \(sound.title)")
@@ -247,10 +257,14 @@ private struct SoundSection: View {
             Text(failed ? "That didn't save. Check you're online and try again."
                         : "How Pssts sound on this iPhone. Silent mode and Focus still apply.")
         }
+        // Back to the usual session, which follows the ringer switch.
+        .onDisappear { try? AVAudioSession.sharedInstance().setCategory(.soloAmbient) }
     }
 
     private func play(_ file: String) {
         guard let url = Bundle.main.url(forResource: file, withExtension: nil) else { return }
+        // You asked to hear it: play with the ringer switch off too (11A).
+        try? AVAudioSession.sharedInstance().setCategory(.playback, options: [.mixWithOthers])
         player = try? AVAudioPlayer(contentsOf: url)
         player?.play()
     }
@@ -277,9 +291,17 @@ private struct WordHero: View {
     let unlocked: Bool
 
     @Environment(LiveStore.self) private var store
-    @State private var chosen = "boop"
+    @State private var chosen: String
     @State private var failed = false
     @ScaledMetric(relativeTo: .largeTitle) private var wordSize: CGFloat = 56
+
+    /// Your word as last seen on this phone, shown straight away instead of the "boop" sample (11A).
+    static let savedKey = "psst.plus.word"
+
+    init(unlocked: Bool) {
+        self.unlocked = unlocked
+        _chosen = State(initialValue: unlocked ? (UserDefaults.standard.string(forKey: Self.savedKey) ?? "psst") : "boop")
+    }
 
     private let columns = [GridItem(.adaptive(minimum: 92), spacing: Tokens.Space.s)]
 
@@ -328,7 +350,11 @@ private struct WordHero: View {
         .frame(maxWidth: .infinity)
         .task {
             guard unlocked else { return }
-            chosen = PsstWord.shown(try? await store.api.myPsstWord()) ?? "psst"
+            // Offline keeps the saved word rather than falling back to "psst".
+            do {
+                chosen = PsstWord.shown(try await store.api.myPsstWord()) ?? "psst"
+                UserDefaults.standard.set(chosen, forKey: Self.savedKey)
+            } catch {}
         }
     }
 
@@ -362,6 +388,7 @@ private struct WordHero: View {
         Task {
             do {
                 try await store.api.setPsstWord(word == "psst" ? nil : word)
+                UserDefaults.standard.set(word, forKey: Self.savedKey)
             } catch {
                 chosen = previous
                 failed = true

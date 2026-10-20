@@ -773,6 +773,78 @@ class BackendTests(unittest.TestCase):
         with self.fails("invalid_user", 422):
             emre.rpc("report_user", emre.user_id)
 
+    def test_report_keeps_the_doodle_before_blocking(self):
+        ada, emre, sam = new_user("Ada"), new_user("Emre"), new_user("Sam")
+        conn = connect(ada, emre)
+        rude, later = json.dumps([[[0.1, 0.1], [0.9, 0.9]]]), json.dumps([[[0.5, 0.5]]])
+        reported_event = uuid.uuid4()
+        ada.rpc("send_signal", reported_event, conn, "doodle", rude)
+        ada.rpc("send_signal", uuid.uuid4(), conn, "doodle", later)
+        ada.rpc("send_signal", uuid.uuid4(), conn, "psst")
+        # The app's ••• on a doodle can name it; it's kept even though blocking deletes it.
+        emre.rpc("report_user", ada.user_id, reported_event)
+        (event_id, evidence, name), = admin(
+            "select event_id, evidence, reported_name from public.reports where reported_id = %s", ada.user_id)
+        self.assertEqual((event_id, name), (reported_event, "Ada"))
+        self.assertEqual((evidence["effect"], evidence["doodle"]), ("doodle", json.loads(rude)))
+        self.assertIn("created_at", evidence)
+        self.assertEqual(admin("select count(*) from public.signal_events where connection_id = %s", conn), [(0,)],
+                         "the block still deletes the Pssts themselves")
+
+        # The shipped app sends only the person: their latest doodle to the reporter is kept.
+        # Someone else's event, or one the reporter sent, never becomes the evidence.
+        kim = new_user("Kim")
+        ada_kim, sam_kim = connect(ada, kim), connect(sam, kim)
+        latest, own, others = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        ada.rpc("send_signal", uuid.uuid4(), ada_kim, "doodle", rude)
+        ada.rpc("send_signal", latest, ada_kim, "doodle", later)
+        ada.rpc("send_signal", uuid.uuid4(), ada_kim, "psst")
+        kim.rpc("send_signal", own, ada_kim, "doodle", rude)
+        sam.rpc("send_signal", others, sam_kim, "doodle", rude)
+        kim.rpc("report_user", ada.user_id, others)
+        self.assertEqual(admin("select event_id, evidence->'doodle' from public.reports where reporter_id = %s",
+                               kim.user_id), [(latest, json.loads(later))])
+        sam.rpc("report_user", kim.user_id, own)  # Kim's doodle went to Ada, not to Sam
+        self.assertEqual(admin("select event_id from public.reports where reporter_id = %s", sam.user_id), [(None,)])
+
+        # Nothing to keep: no doodle within 30 days.
+        zed = new_user("Zed")
+        ada_zed = connect(ada, zed)
+        ada.rpc("send_signal", old := uuid.uuid4(), ada_zed, "doodle", rude)
+        admin("update public.signal_events set created_at = now() - interval '31 days' where id = %s", old)
+        zed.rpc("report_user", ada.user_id)
+        self.assertEqual(admin("select event_id, evidence, reported_name from public.reports where reporter_id = %s",
+                               zed.user_id), [(None, None, "Ada")])
+
+        # Nobody can read or touch reports from the app, including the reported person.
+        for caller in (emre, ada, Api("anon")):
+            with self.assertRaises(errors.InsufficientPrivilege):
+                caller.rows("select * from public.reports")
+            with self.assertRaises(errors.InsufficientPrivilege):
+                caller.rows("update public.reports set notified_at = now()")
+            with self.assertRaises(errors.InsufficientPrivilege):
+                caller.rows("delete from public.reports")
+        with self.assertRaises(psycopg.Error):
+            Api("anon").rpc("report_user", ada.user_id)
+
+    def test_report_survives_account_deletion_for_ninety_days(self):
+        ada, emre = new_user("Ada"), new_user("Emre")
+        conn = connect(ada, emre)
+        ada.rpc("send_signal", uuid.uuid4(), conn, "doodle", json.dumps([[[0.2, 0.2]]]))
+        emre.rpc("report_user", ada.user_id)
+        report = admin("select id from public.reports where reported_id = %s", ada.user_id)[0][0]
+        admin("delete from auth.users where id = %s", ada.user_id)
+        admin("delete from auth.users where id = %s", emre.user_id)
+        self.assertEqual(admin("select reporter_id, reported_id, reported_name, evidence->'doodle' "
+                               "from public.reports where id = %s", report),
+                         [(None, None, "Ada", [[[0.2, 0.2]]])])
+        admin("update public.reports set created_at = now() - interval '89 days' where id = %s", report)
+        admin("select private.purge_expired()")
+        self.assertEqual(admin("select count(*) from public.reports where id = %s", report), [(1,)])
+        admin("update public.reports set created_at = now() - interval '91 days' where id = %s", report)
+        admin("select private.purge_expired()")
+        self.assertEqual(admin("select count(*) from public.reports where id = %s", report), [(0,)])
+
     def test_remove_connection(self):
         ada, emre, sam = new_user("Ada"), new_user("Emre"), new_user("Sam")
         conn = connect(ada, emre)

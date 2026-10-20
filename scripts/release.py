@@ -341,8 +341,13 @@ def main():
     open_states = "READY_FOR_REVIEW,WAITING_FOR_REVIEW,IN_REVIEW,UNRESOLVED_ISSUES"
     existing = call("GET", "/reviewSubmissions", **{"filter[app]": app, "filter[platform]": "IOS",
                                                     "filter[state]": open_states})["data"]
-    if any(s["attributes"].get("state") in ("WAITING_FOR_REVIEW", "IN_REVIEW") for s in existing):
-        sys.exit("Something is already waiting for or in review. Nothing submitted.")
+    # Apple allows two submissions in flight (e.g. In-App Events in one, the version in
+    # another) and says so itself when that's full, so only a version already sent stops here.
+    if any(s["attributes"].get("state") in ("WAITING_FOR_REVIEW", "IN_REVIEW") and any(
+            (i.get("relationships") or {}).get("appStoreVersion", {}).get("data")
+            for i in call("GET", f"/reviewSubmissions/{s['id']}/items", include="appStoreVersion")["data"])
+           for s in existing):
+        sys.exit("A version is already waiting for or in review. Nothing submitted.")
     submission = next((s for s in existing if s["attributes"].get("state") == "READY_FOR_REVIEW"), None)
     if not submission:
         submission = call("POST", "/reviewSubmissions", {"data": {

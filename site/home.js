@@ -29,3 +29,59 @@
   }).observe(cta);
   if (phone.addEventListener) phone.addEventListener("change", update);
 })();
+
+// Try a psst (owner picks 1A 2A 3A, 7 Nov 2026): tap the hero's first band and it
+// whispers, says sent · seen, lands on Zoe's phone, then asks you to do it for real.
+// Nothing is sent anywhere.
+(function () {
+  var root = document.getElementById("try");
+  if (!root) return;
+  var band = root.querySelector(".try-band");
+  var ln = root.querySelector(".try-ln");
+  var hint = root.querySelector(".try-hint");
+  var line = root.querySelector(".try-line");
+  var get = root.querySelector(".try-get");
+  var again = root.querySelector(".try-again");
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var sound = null;
+  var busy = false;
+
+  function restart(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
+  band.addEventListener("click", function () {
+    if (busy) return;
+    busy = true;
+    band.setAttribute("aria-disabled", "true");
+    hint.hidden = true;
+    try {
+      sound = sound || new Audio("/sounds/psst.wav");
+      sound.currentTime = 0;
+      var played = sound.play();
+      if (played && played.catch) played.catch(function () {});
+    } catch (e) {}
+    ln.textContent = "Sending…";
+    if (!reduce) restart(band, "sweep");
+    setTimeout(function () {
+      ln.textContent = "Sent just now · seen ✓";
+      if (!reduce) restart(band, "bump");
+      setTimeout(function () { root.classList.add("landed"); }, reduce ? 0 : 500);
+      setTimeout(function () {
+        line.textContent = "Now psst someone real.";
+        root.classList.add("done");
+        get.removeAttribute("tabindex");
+        again.hidden = false;
+      }, reduce ? 100 : 1300);
+    }, reduce ? 150 : 700);
+  });
+
+  again.addEventListener("click", function () {
+    busy = false;
+    band.removeAttribute("aria-disabled");
+    root.classList.remove("landed", "done");
+    ln.textContent = "Tap to psst";
+    hint.hidden = false;
+    get.setAttribute("tabindex", "-1");
+    again.hidden = true;
+    band.focus();
+  });
+})();

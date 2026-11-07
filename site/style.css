@@ -245,3 +245,40 @@ main footer { border-top: 2px solid var(--line); margin-top: 56px; padding-top: 
 .plus-card .also { margin-top: 24px; font-weight: 700; }
 @media (max-width: 480px) { .wchips { grid-template-columns: repeat(3, 1fr); } .wchips li { font-size: 15.5px; } }
 @media (max-width: 820px) { .band .mock { order: 2; } }
+
+/* Try a psst (owner picks 1A 2A 3A, 7 Nov 2026): the hero's first band can be tapped.
+   It whispers, sweeps, says sent · seen, Zoe's phone gets it, then "Now psst someone real." */
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.try { position: relative; justify-self: center; display: grid; justify-items: center; gap: 22px; }
+.try-band { border: 0; margin: 0; font: inherit; color: #fff; cursor: pointer; width: 100%; overflow: hidden; -webkit-tap-highlight-color: transparent; transition: filter .08s; }
+.try-band:active { filter: brightness(.92); }
+.try-band:focus-visible { outline: 4px solid var(--yellow); outline-offset: -4px; }
+.try-band .nm { display: block; }
+.try-band .ln { display: flex; }
+.try-hint { margin-top: 12px; font: 800 12px/1 var(--display); letter-spacing: .1em; text-transform: uppercase; background: rgba(0,0,0,.22); padding: 7px 12px; border-radius: 99px; animation: try-nudge 2.4s ease-in-out infinite; }
+@keyframes try-nudge { 0%, 70%, 100% { transform: scale(1); } 80% { transform: scale(1.08); } 90% { transform: scale(.98); } }
+.try-band::before { content: ""; position: absolute; inset: 0; transform: translateX(-110%); pointer-events: none; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.35) 50%, transparent 70%); }
+.try-band.sweep::before { animation: try-sweep .7s ease-in-out; }
+@keyframes try-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.try-band.bump .nm { animation: try-bump .8s; }
+@keyframes try-bump { 0% { transform: scale(1); } 16% { transform: scale(1.06); } 40% { transform: scale(1); } 58% { transform: scale(1.1); } 100% { transform: scale(1); } }
+.mock.peer { position: absolute; left: -14%; bottom: 230px; width: 150px; padding: 6px; border-radius: 30px; opacity: 0; transform: rotate(-6deg) translateY(24px); transition: opacity .3s, transform .4s cubic-bezier(.2, .8, .3, 1.2); pointer-events: none; }
+.mock.peer .scr { height: 290px; border-radius: 24px; }
+.mock.peer .arr .from { font-size: 10px; }
+.mock.peer .arr .who { font-size: 40px; margin: 4px 0 6px; }
+.mock.peer .arr .word { font-size: 28px; }
+.mock.peer .back { height: 50px; font-size: 11px; }
+.try.landed .mock.peer { opacity: 1; transform: rotate(-6deg) translateY(0); }
+.try-end { display: grid; justify-items: center; gap: 10px; text-align: center; visibility: hidden; opacity: 0; transition: opacity .3s; }
+.try.done .try-end { visibility: visible; opacity: 1; }
+.try-line { margin: 0; font: 900 clamp(24px, 3vw, 30px)/1.1 var(--display); letter-spacing: -.02em; color: var(--purple); max-width: none; }
+.try-get { background: var(--purple); color: #fff; font: 900 15px var(--display); letter-spacing: .04em; padding: 13px 22px; border-radius: 99px; text-decoration: none; }
+.try-again { background: none; border: 0; color: var(--muted); font: 600 14px var(--display); text-decoration: underline; cursor: pointer; min-height: 44px; padding: 0 12px; }
+@media (max-width: 820px) {
+  .mock.peer { left: -2px; bottom: 215px; width: 128px; }
+  .mock.peer .scr { height: 250px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .try-hint, .try-band.sweep::before, .try-band.bump .nm { animation: none; }
+  .mock.peer, .try-end { transition: none; }
+}

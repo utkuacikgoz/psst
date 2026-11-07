@@ -203,3 +203,8 @@ Owner picks 1A 2A 3A 4A 5A 6A 7A 8A 9A 10C 11A 12A on the Psst 1.0.8 Audit page.
 - 10C: "Yo" stays in the store listing.
 - 11A: VoiceOver hears sends ("Psst sent to Mia", "Didn't make it to Mia", paused) and invite errors; Refresh is on the wordmark, not every band; a person has home's colour on the Super Psst card, activity, the recap and the widget; "waiting for them" shows only after the link was really shared, and tapping again reuses the same link; Edit name and the sound Play button have 44 pt tap areas; sound previews play with the ringer off; the Psst+ word shows your saved word straight away.
 - 12A: reports keep their evidence and alert the owner; App Review codes are made per release and never written in the repo.
+
+### Try a psst on psstapp.fun — owner picks 1A 2A 3A, 7 Nov 2026
+
+The hero's drawn phone is tappable (1A): its first band, ZOE, reads "Tap to psst" with a gently pulsing TAP ME pill. A tap plays the app's whisper, sweeps the band, says "Sent just now · seen ✓" with the double bump, and a second, smaller phone tilts in beside it showing the arrival, FROM YOU · psst · PSST BACK, in Zoe's blue (2A). Then "Now psst someone real." appears under the phones with a purple GET PSST button and an Again link (3A). Nothing is sent anywhere. Reduce Motion: no sweep, bump or pulse.
+

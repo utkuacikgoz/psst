@@ -19,10 +19,20 @@ PAGES = [("/", "site/index.html"), ("/support", "site/support.html"),
          ("/couples-widget", "site/couples-widget.html"), ("/yo-app", "site/yo-app.html")]
 
 
+def today() -> str:
+    return subprocess.run(["date", "-u", "+%F"], capture_output=True, text=True).stdout.strip()
+
+
 def last_commit_day(path: str) -> str:
+    # A page changed but not committed yet is dated today, so the sitemap written
+    # before the commit is still right after it (no second "sitemap" commit).
+    changed = subprocess.run(["git", "status", "--porcelain", "--", path], cwd=ROOT,
+                             capture_output=True, text=True, check=True).stdout.strip()
+    if changed:
+        return today()
     day = subprocess.run(["git", "log", "-1", "--format=%cs", "--", path], cwd=ROOT,
                          capture_output=True, text=True, check=True).stdout.strip()
-    return day or subprocess.run(["date", "-u", "+%F"], capture_output=True, text=True).stdout.strip()
+    return day or today()
 
 
 def sitemap() -> str:

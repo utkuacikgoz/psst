@@ -370,9 +370,13 @@ struct InviteSheet: View {
 
     // MARK: Enter
 
-    /// The code from pasted text: an invite link (…/invite/K7QX4MPA), a shared
+    /// The code from pasted text: an invite or Psst link (…/invite/K7QX4MPA), a shared
     /// message ("… (code K7QX 4MPA)") or the code itself, spaces and all.
     static func inviteCode(in text: String) -> String {
+        // A Psst link (…/p/K7QX4MPA) too, as the name step's Paste reads it.
+        if let linked = InviteLink.code(linkedIn: text) {
+            return String(linked.filter { $0.isASCII }.prefix(16))
+        }
         var source = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if let range = source.range(of: "/invite/") {
             source = String(source[range.upperBound...].prefix { $0 != "?" && $0 != "#" && $0 != "/" })

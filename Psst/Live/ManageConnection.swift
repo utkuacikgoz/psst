@@ -6,6 +6,8 @@ struct ConnectionAction: Identifiable {
 
     let kind: Kind
     let connection: ConnectionSummary
+    /// The doodle a report comes from (its ••• menu), kept as evidence; nil elsewhere.
+    var eventID: UUID? = nil
 
     var id: String { "\(kind)-\(connection.id)" }
     private var name: String { connection.otherName }
@@ -120,7 +122,7 @@ private struct ManageConnectionModifier: ViewModifier {
                 switch action.kind {
                 case .remove: try await store.remove(action.connection)
                 case .block: try await store.block(action.connection)
-                case .report: try await store.report(action.connection)
+                case .report: try await store.report(action.connection, eventID: action.eventID)
                 }
                 onDone()
             } catch {

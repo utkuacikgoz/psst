@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 
 /// What a person row may truthfully say. Mirrors DESIGN.md "Send feedback must be truthful".
 enum LiveRowStatus: Equatable {
@@ -159,6 +160,12 @@ final class LiveStore {
         self.defaults = defaults
         self.now = now
         self.sentDisplayDuration = sentDisplayDuration
+        readSavedState()
+    }
+
+    /// What this phone remembers. Read at launch, and again in start() if Psst was
+    /// launched before the first unlock, when none of it could be read yet.
+    private func readSavedState() {
         if let seen = defaults.object(forKey: Self.firstSeenKey) as? Date {
             firstSeen = seen
         } else {
@@ -201,6 +208,17 @@ final class LiveStore {
     // MARK: Onboarding
 
     func start() async {
+        // Launched before the first unlock after a restart (iOS may launch Psst early
+        // for a push or to prewarm it), the keychain and saved settings can't be read:
+        // finding no session then doesn't mean signed out. Wait, then read them again.
+        if !UIApplication.shared.isProtectedDataAvailable {
+            for await _ in NotificationCenter.default.notifications(named: UIApplication.protectedDataDidBecomeAvailableNotification) {
+                break
+            }
+            guard !Task.isCancelled else { return }
+            api.reloadSession()
+            readSavedState()
+        }
         guard api.isSignedIn, defaults.bool(forKey: Self.profileKey) else {
             phase = .needsName
             return
@@ -435,6 +453,7 @@ final class LiveStore {
             // What someone sent you first; housekeeping after.
             await showUnseenIfVisible()
             await retryDeviceToken()
+            await registerWidgetToken()
             await reportTimeZone()
             await loadRecapStatus()
             // A new doodle changes the list (its last Psst), so an unchanged poll
@@ -447,6 +466,8 @@ final class LiveStore {
             connectionsLoadFailed = true
             noteUnreachable()
         } catch APIError.signedOut {
+            // Before the first unlock the keychain can't be read: that isn't signed out.
+            guard UIApplication.shared.isProtectedDataAvailable else { connectionsLoadFailed = true; return }
             resetLocalAccount()
         } catch {
             connectionsLoadFailed = true
@@ -807,9 +828,10 @@ final class LiveStore {
         if WidgetBridge.showsDoodle(from: connection.id) { await publishDoodle() }
     }
 
-    /// Reporting also blocks, on the server.
-    func report(_ connection: ConnectionSummary) async throws {
-        try await api.reportUser(connection.otherId)
+    /// Reporting also blocks, on the server. `eventID`: the doodle reported from its
+    /// ••• menu, kept with the report as evidence (12A); nil from a band or Settings.
+    func report(_ connection: ConnectionSummary, eventID: UUID? = nil) async throws {
+        try await api.reportUser(connection.otherId, eventID: eventID)
         connections.removeAll { $0.id == connection.id }
         sendStates[connection.id] = nil
         if WidgetBridge.showsDoodle(from: connection.id) { await publishDoodle() }
@@ -869,6 +891,18 @@ final class LiveStore {
         registeringToken = false
         // A newer APNs token may have arrived while this request was suspended.
         if generation == accountGeneration, pendingDeviceToken != token { await retryDeviceToken() }
+    }
+
+    // MARK: Widget read pass
+
+    @ObservationIgnored private var triedWidgetToken = false
+
+    /// Registers the widget's read token once per launch (and again for a new
+    /// account) until the server has it; WidgetReadToken remembers success.
+    private func registerWidgetToken() async {
+        guard !triedWidgetToken, defaults.bool(forKey: Self.profileKey), let account = api.accountID else { return }
+        triedWidgetToken = true
+        await WidgetReadToken.register(for: account, api: api)
     }
 
     /// The person opened a notification: it was displayed, so it counts as seen.
@@ -1000,10 +1034,12 @@ final class LiveStore {
         tokenFailures = 0
         tokenRetryAt = .distantPast
         accountGeneration += 1
+        triedWidgetToken = false
         connectionsLoadFailed = false
         phase = .needsName
         // No names left behind on the Home Screen or Lock Screen.
         WidgetBridge.publish([], unlocked: false, everyone: [])
         WidgetBridge.publishDoodle(nil)
+        WidgetReadToken.clear()
     }
 }

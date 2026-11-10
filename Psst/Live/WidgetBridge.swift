@@ -150,3 +150,55 @@ enum WidgetLink {
         }
     }
 }
+
+/// The widget's read pass (1.0.9): a random token only this install's app and widget
+/// know, registered for your account, so the widget can read widget_state (its doodle,
+/// streaks and when each person last pssted you) while the app is closed, without
+/// ever needing your session.
+@MainActor
+enum WidgetReadToken {
+    static let tokenKey = "psst.widget.readToken"
+    /// The account the server has the token for; nil until it's registered.
+    static let accountKey = "psst.widget.readToken.account"
+
+    /// 32 random bytes as base64url without padding: 43 characters.
+    static func make() -> String? {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { return nil }
+        return Data(bytes).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    /// Makes the token if there isn't one (or it belongs to another account) and
+    /// registers it, unless the server already has it. A failure is tried again
+    /// on a later launch.
+    static func register(for account: UUID, api: PsstAPI, in store: UserDefaults? = nil) async {
+        guard let defaults = store ?? WidgetBridge.defaults else { return }
+        let registeredFor = defaults.string(forKey: accountKey)
+        if registeredFor == account.uuidString, defaults.string(forKey: tokenKey) != nil { return }
+        if registeredFor != nil || defaults.string(forKey: tokenKey) == nil {
+            guard let fresh = make() else { return }
+            defaults.set(fresh, forKey: tokenKey)
+            defaults.removeObject(forKey: accountKey)
+        }
+        guard let token = defaults.string(forKey: tokenKey) else { return }
+        do {
+            try await api.registerWidgetToken(token)
+        } catch {
+            return
+        }
+        // Signed out, or a new token, while it was on its way: leave it for next time.
+        guard api.accountID == account, defaults.string(forKey: tokenKey) == token else { return }
+        defaults.set(account.uuidString, forKey: accountKey)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// Signed out or account deleted: the widget goes back to what the app saves.
+    static func clear(in store: UserDefaults? = nil) {
+        guard let defaults = store ?? WidgetBridge.defaults else { return }
+        defaults.removeObject(forKey: tokenKey)
+        defaults.removeObject(forKey: accountKey)
+    }
+}

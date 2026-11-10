@@ -123,6 +123,16 @@ struct WidgetPerson: Codable, Hashable {
         let token = group.flatMap(UserDefaults.init(suiteName:))?.string(forKey: "psst.widget.linkToken") ?? ""
         return URL(string: "psst://psst/\(id.uuidString)?t=\(token)")!
     }
+
+    /// With the server's numbers from widget_state: the later of the two "pssted you"
+    /// times, and the streak as it is now.
+    func updated(from state: PsstSender.WidgetState) -> WidgetPerson {
+        guard let server = state.people?.first(where: { $0.connectionId == id }) else { return self }
+        var person = self
+        if let received = server.lastReceivedAt { person.lastPsstedYou = max(lastPsstedYou ?? received, received) }
+        if let streak = server.streakDays { person.streakDays = streak }
+        return person
+    }
 }
 
 struct Entry: TimelineEntry {
@@ -154,11 +164,13 @@ struct Provider: TimelineProvider {
         let doodle: [[[Double]]]
     }
 
-    private func read(doodle fetched: PsstSender.FetchedDoodle?? = nil) -> Entry {
-        let people = defaults?.data(forKey: "psst.widget.people")
+    private func read(doodle fetched: PsstSender.FetchedDoodle?? = nil, state: PsstSender.WidgetState? = nil) -> Entry {
+        let saved = defaults?.data(forKey: "psst.widget.people")
             .flatMap { try? JSONDecoder().decode([WidgetPerson].self, from: $0) } ?? []
         let everyone = defaults?.data(forKey: "psst.widget.everyone")
-            .flatMap { try? JSONDecoder().decode([WidgetPerson].self, from: $0) } ?? people
+            .flatMap { try? JSONDecoder().decode([WidgetPerson].self, from: $0) } ?? saved
+        // Newer times and streaks from the server, when the widget could ask it.
+        let people = state.map { state in saved.map { $0.updated(from: state) } } ?? saved
         // What the app saved, unless the widget just asked the server itself.
         let stored = defaults?.data(forKey: "psst.widget.doodle").flatMap { try? JSONDecoder().decode(StoredDoodle.self, from: $0) }
         let hidden = defaults?.string(forKey: "psst.widget.doodle.hidden").flatMap(UUID.init(uuidString:))
@@ -193,10 +205,16 @@ struct Provider: TimelineProvider {
         guard fetchesDoodle else { return completion(Timeline(entries: [read()], policy: .never)) }
         Task {
             // nil: couldn't ask (keep what the app saved); .some(nil): no doodle now.
+            // The read pass (widget_state) first; without one, the saved session as before.
             let fetched: PsstSender.FetchedDoodle??
-            do { fetched = .some(try await PsstSender.latestDoodle()) } catch { fetched = nil }
+            let state = try? await PsstSender.widgetState()
+            if let state {
+                fetched = .some(state.doodle)
+            } else {
+                do { fetched = .some(try await PsstSender.latestDoodle()) } catch { fetched = nil }
+            }
             // One entry every 5 minutes until the next check, so "pssted you 2h ago" keeps up.
-            let entry = read(doodle: fetched)
+            let entry = read(doodle: fetched, state: state)
             let now = Date()
             let entries = stride(from: 0, to: 30, by: 5).map { minutes -> Entry in
                 var later = entry

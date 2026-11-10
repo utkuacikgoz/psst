@@ -106,6 +106,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             guard let store = self.store, let payload = SignalPayload(userInfo: userInfo) else { return }
             switch action {
             case Self.sendBackAction:
+                // Runs in the background: ask iOS for time, so a session refresh this
+                // reply needs isn't stopped between the server's answer and saving it.
+                let time = BackgroundTime(name: "Psst back")
+                defer { time.end() }
                 if !(await store.sendBack(payload)) {
                     await Self.postSendBackFailure(to: senderName, signal: payload.signal)
                 }
@@ -124,5 +128,25 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         content.body = "Your \(signal.title) to \(name) didn't get through. Open Psst to try again."
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         try? await UNUserNotificationCenter.current().add(request)
+    }
+}
+
+/// Background time for work a notification action starts (beginBackgroundTask),
+/// ended when it's done or when iOS says time is up.
+@MainActor
+private final class BackgroundTime {
+    private var id = UIBackgroundTaskIdentifier.invalid
+
+    init(name: String) {
+        id = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
+            // iOS calls this on the main thread.
+            MainActor.assumeIsolated { () -> Void in self?.end() }
+        }
+    }
+
+    func end() {
+        guard id != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(id)
+        id = .invalid
     }
 }

@@ -162,7 +162,7 @@ final class UITestAPI: PsstAPI {
     func removeConnection(_ id: UUID) async throws { names[id] = nil }
     func blockUser(_ id: UUID) async throws { names[id] = nil }
     func unblockUser(_ id: UUID) async throws {}
-    func reportUser(_ id: UUID) async throws { names[id] = nil }
+    func reportUser(_ id: UUID, eventID: UUID?) async throws { names[id] = nil }
     func listBlocked() async throws -> [BlockedPerson] {
         blockedCalls += 1
         if scenario == .settingsFailure, blockedCalls == 1 { throw APIError.offline }
@@ -178,6 +178,7 @@ final class UITestAPI: PsstAPI {
     func setNotificationSound(_ file: String) async throws {}
     func setNotificationStatus(_ enabled: Bool) async throws {}
     func registerDeviceToken(_ token: String, environment: String) async throws {}
+    func registerWidgetToken(_ token: String) async throws {}
     func deleteAccount() async throws { isSignedIn = false }
     func signOutLocally() { isSignedIn = false }
 }

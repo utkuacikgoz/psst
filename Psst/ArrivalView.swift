@@ -67,6 +67,7 @@ struct ArrivalView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
     @Environment(\.accessibilitySwitchControlEnabled) private var switchControl
+    @Environment(\.scenePhase) private var scenePhase
     @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = 88
     @ScaledMetric(relativeTo: .title2) private var replySize: CGFloat = 22
     @ScaledMetric(relativeTo: .largeTitle) private var psstSize: CGFloat = Tokens.Band.titleSize
@@ -146,10 +147,11 @@ struct ArrivalView: View {
                 PsstHaptics.play(arrival.kind == .superPsst && superEffectsEnabled ? .superPsst : .psst)
             }
         }
-        // Closes on its own, but never while the doodle's ••• menu is open; the
-        // wait starts again when it closes.
-        .task(id: AutoClose(arrival: arrival.id, paused: showingOptions)) {
-            guard !staysOpen, !showingOptions else { return }
+        // Closes on its own, but never while the doodle's ••• menu is open or Psst
+        // isn't on screen (so a moment nobody saw doesn't close itself); the wait
+        // starts again after.
+        .task(id: AutoClose(arrival: arrival.id, paused: showingOptions || scenePhase != .active)) {
+            guard !staysOpen, !showingOptions, scenePhase == .active else { return }
             try? await Task.sleep(for: holdTime + .milliseconds(reduceMotion ? 0 : 150))
             guard !Task.isCancelled else { return }
             onDone()

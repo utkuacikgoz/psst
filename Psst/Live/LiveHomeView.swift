@@ -317,7 +317,7 @@ struct LiveHomeView: View {
                             },
                             onHideDoodle: { withAnimation { store.hideDoodle(arrival) } },
                             onBlock: sender(of: arrival).map { person -> () -> Void in { confirm(.block, person) } },
-                            onReport: sender(of: arrival).map { person -> () -> Void in { confirm(.report, person) } })
+                            onReport: sender(of: arrival).map { person -> () -> Void in { confirm(.report, person, eventID: arrival.id) } })
             }
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: store.arrival)
@@ -423,9 +423,9 @@ struct LiveHomeView: View {
 
     /// Block or Report from a doodle's ••• menu (1B): the moment closes and the
     /// same confirm as holding the band asks first.
-    private func confirm(_ kind: ConnectionAction.Kind, _ person: ConnectionSummary) {
+    private func confirm(_ kind: ConnectionAction.Kind, _ person: ConnectionSummary, eventID: UUID? = nil) {
         withAnimation { store.nextArrival() }
-        confirming = ConnectionAction(kind: kind, connection: person)
+        confirming = ConnectionAction(kind: kind, connection: person, eventID: eventID)
     }
 
     private func closePresentations() {

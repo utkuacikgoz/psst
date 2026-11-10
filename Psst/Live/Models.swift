@@ -202,11 +202,17 @@ enum InviteLink {
     /// A code from pasted text: a whole message with a psstapp.fun link in it, a
     /// bare link, or just the code ("K7QX-4MPA"). nil when it doesn't look like one.
     static func code(inPasted text: String) -> String? {
+        if let code = code(linkedIn: text) { return code }
+        let bare = text.uppercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
+        return (6...16).contains(bare.count) && text.count <= 24 ? bare : nil
+    }
+
+    /// The code from the first Psst link (/invite/, /p/ or psst://invite/) in some text.
+    static func code(linkedIn text: String) -> String? {
         for word in text.split(whereSeparator: \.isWhitespace) {
             if let url = URL(string: String(word)), let code = code(from: url) { return code }
         }
-        let bare = text.uppercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
-        return (6...16).contains(bare.count) && text.count <= 24 ? bare : nil
+        return nil
     }
 }
 

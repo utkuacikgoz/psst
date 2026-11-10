@@ -99,7 +99,8 @@ final class FakeAPI: PsstAPI {
         unblockedIDs.append(id)
         if let unblockError { throw unblockError }
     }
-    func reportUser(_ id: UUID) async throws {}
+    var reports: [(user: UUID, event: UUID?)] = []
+    func reportUser(_ id: UUID, eventID: UUID?) async throws { reports.append((id, eventID)) }
     func listBlocked() async throws -> [BlockedPerson] { if let blockedListError { throw blockedListError }; return blockedPeople }
     func listOpenInvites() async throws -> [OpenInvite] { if let invitesListError { throw invitesListError }; return openInvites }
     func revokeInvite(code: String) async throws {
@@ -114,6 +115,13 @@ final class FakeAPI: PsstAPI {
         registeredTokens.append(token)
         if holdTokens { await withCheckedContinuation { heldTokens.append($0) } }
         if let tokenError { throw tokenError }
+    }
+    var accountID: UUID?
+    var widgetTokens: [String] = []
+    var widgetTokenError: Error?
+    func registerWidgetToken(_ token: String) async throws {
+        widgetTokens.append(token)
+        if let widgetTokenError { throw widgetTokenError }
     }
     func deleteAccount() async throws { isSignedIn = false }
     func signOutLocally() { isSignedIn = false }
@@ -885,6 +893,20 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertEqual(store.phase, .needsName)
         XCTAssertTrue(store.connections.isEmpty)
     }
+
+    /// 12A: a report from a doodle's ••• menu says which doodle; from a band it doesn't.
+    func testReportFromADoodleKeepsWhichDoodle() async throws {
+        let doodler = connection(name: "Mia")
+        let other = connection(name: "Kim")
+        api.connections = [doodler, other]
+        await store.refresh()
+        let doodle = UUID()
+        try await store.report(doodler, eventID: doodle)
+        try await store.report(other)
+        XCTAssertEqual(api.reports.map(\.user), [doodler.otherId, other.otherId])
+        XCTAssertEqual(api.reports.map(\.event), [doodle, nil])
+        XCTAssertTrue(store.connections.isEmpty)
+    }
 }
 
 @MainActor
@@ -1063,5 +1085,42 @@ final class WidgetTests: XCTestCase {
         let newer = LatestDoodle(eventId: UUID(), connectionId: mia, senderName: "Mia", createdAt: Date(), doodle: [[[0.2, 0.2]]])
         WidgetBridge.publishDoodle(newer, to: defaults)
         XCTAssertTrue(WidgetBridge.showsDoodle(from: mia, in: defaults))
+    }
+
+    /// 1.0.9 read pass: a 43-character token, registered once per account and tried
+    /// again until the server has it.
+    func testWidgetReadTokenIsRegisteredOncePerAccount() async throws {
+        let suite = "WidgetReadTokenTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let api = FakeAPI()
+        let account = UUID()
+        api.accountID = account
+
+        api.widgetTokenError = APIError.offline
+        await WidgetReadToken.register(for: account, api: api, in: defaults)
+        let token = try XCTUnwrap(defaults.string(forKey: WidgetReadToken.tokenKey))
+        XCTAssertEqual(token.count, 43)
+        XCTAssertNil(token.rangeOfCharacter(from: CharacterSet(charactersIn: "+/=")), "base64url, unpadded")
+        XCTAssertNil(defaults.string(forKey: WidgetReadToken.accountKey), "not registered yet")
+
+        api.widgetTokenError = nil
+        await WidgetReadToken.register(for: account, api: api, in: defaults)
+        XCTAssertEqual(api.widgetTokens, [token, token], "the same token is tried again")
+        XCTAssertEqual(defaults.string(forKey: WidgetReadToken.accountKey), account.uuidString)
+
+        await WidgetReadToken.register(for: account, api: api, in: defaults)
+        XCTAssertEqual(api.widgetTokens.count, 2, "not sent again once the server has it")
+
+        let next = UUID()
+        api.accountID = next
+        await WidgetReadToken.register(for: next, api: api, in: defaults)
+        XCTAssertEqual(api.widgetTokens.count, 3)
+        XCTAssertNotEqual(api.widgetTokens.last, token, "a new account gets a new token")
+        XCTAssertEqual(defaults.string(forKey: WidgetReadToken.accountKey), next.uuidString)
+
+        WidgetReadToken.clear(in: defaults)
+        XCTAssertNil(defaults.string(forKey: WidgetReadToken.tokenKey))
+        XCTAssertNil(defaults.string(forKey: WidgetReadToken.accountKey))
     }
 }

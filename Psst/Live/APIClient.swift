@@ -41,7 +41,8 @@ protocol PsstAPI: AnyObject {
     func removeConnection(_ id: UUID) async throws
     func blockUser(_ id: UUID) async throws
     func unblockUser(_ id: UUID) async throws
-    func reportUser(_ id: UUID) async throws
+    /// `eventID`: the doodle (or other Psst) being reported, kept as evidence (12A).
+    func reportUser(_ id: UUID, eventID: UUID?) async throws
     func listBlocked() async throws -> [BlockedPerson]
     func listOpenInvites() async throws -> [OpenInvite]
     func inviteProgress() async throws -> InviteProgress?
@@ -49,6 +50,8 @@ protocol PsstAPI: AnyObject {
     func setNotificationSound(_ file: String) async throws
     func setNotificationStatus(_ enabled: Bool) async throws
     func registerDeviceToken(_ token: String, environment: String) async throws
+    /// The widget's read pass (WidgetReadToken): lets it read widget_state without your session.
+    func registerWidgetToken(_ token: String) async throws
     func appRequirements() async throws -> AppRequirements
     func reportAppVersion(_ version: String, build: Int) async throws
     func setTimeZone(_ identifier: String) async throws
@@ -57,10 +60,16 @@ protocol PsstAPI: AnyObject {
     func setWeeklyRecap(_ enabled: Bool) async throws
     func deleteAccount() async throws
     func signOutLocally()
+    /// Reads the saved session again: before the first unlock after a restart the
+    /// keychain can't be read, so a launch then finds none (see LiveStore.start).
+    func reloadSession()
 }
 
 extension PsstAPI {
     var accountID: UUID? { nil }
+    func reportUser(_ id: UUID) async throws { try await reportUser(id, eventID: nil) }
+    func registerWidgetToken(_ token: String) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
+    func reloadSession() {}
     func activity(monthStart: Date) async throws -> [ActivitySummary] { throw APIError.server(status: 503, code: "feature_unavailable") }
     func superAllowance() async throws -> SuperAllowance { throw APIError.server(status: 503, code: "feature_unavailable") }
     func setSuperEffects(_ enabled: Bool) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
@@ -109,6 +118,13 @@ final class APIClient: PsstAPI {
 
     var isSignedIn: Bool { session != nil }
     var accountID: UUID? { session?.userID }
+
+    func reloadSession() {
+        guard session == nil else { return }
+        store.moveToSharedGroupIfNeeded()
+        session = store.load()
+    }
+
     func activity(monthStart: Date) async throws -> [ActivitySummary] {
         try await rpc("personal_activity_all", ["p_month_start": monthStart.ISO8601Format()])
     }
@@ -144,6 +160,8 @@ final class APIClient: PsstAPI {
     private var refreshing: Task<AuthSession, Error>?
 
     private func refreshIfNeeded(force: Bool = false) async throws -> AuthSession {
+        // None in memory can mean the keychain was still locked when the app started.
+        if session == nil { session = store.load() }
         guard let current = session else { throw APIError.signedOut }
         guard force || current.expiresAt.timeIntervalSinceNow < 60 else { return current }
         if let refreshing { return try await refreshing.value }
@@ -187,6 +205,17 @@ final class APIClient: PsstAPI {
             if let stored = newerStoredSession(than: current) {
                 session = stored
                 return stored
+            }
+            // The widget may have its reply but not have saved it yet: look once more.
+            // If it's still the same, keep the session and try again later rather than
+            // lose the account (1.0.9 audit). Other dead sessions still sign out.
+            if code == "refresh_token_already_used" {
+                try? await Task.sleep(for: .seconds(1))
+                if let stored = newerStoredSession(than: current) {
+                    session = stored
+                    return stored
+                }
+                throw APIError.offline
             }
             signOutLocally()
             throw APIError.signedOut
@@ -296,8 +325,10 @@ final class APIClient: PsstAPI {
         try await rpcVoid("block_user", ["p_user_id": id.uuidString])
     }
 
-    func reportUser(_ id: UUID) async throws {
-        try await rpcVoid("report_user", ["p_user_id": id.uuidString])
+    func reportUser(_ id: UUID, eventID: UUID?) async throws {
+        var params = ["p_user_id": id.uuidString]
+        if let eventID { params["p_event_id"] = eventID.uuidString }
+        try await rpcVoid("report_user", params)
     }
 
     func unblockUser(_ id: UUID) async throws {
@@ -330,6 +361,10 @@ final class APIClient: PsstAPI {
 
     func registerDeviceToken(_ token: String, environment: String) async throws {
         try await rpcVoid("register_device_token", ["p_token": token, "p_environment": environment])
+    }
+
+    func registerWidgetToken(_ token: String) async throws {
+        try await rpcVoid("register_widget_token", ["p_token": token])
     }
 
     /// Readable before sign-in (anon key only), so onboarding can ask for an update too.
@@ -435,6 +470,11 @@ final class APIClient: PsstAPI {
     /// PostgREST errors carry the code in "message"; functions use "error"; auth uses "error_code".
     nonisolated static func errorCode(from data: Data) -> String {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return "unknown" }
+        // Older Auth servers say "invalid_grant" for any bad refresh token, with the reason in the description.
+        if object["error_code"] == nil, object["error"] as? String == "invalid_grant",
+           (object["error_description"] as? String)?.localizedCaseInsensitiveContains("already used") == true {
+            return "refresh_token_already_used"
+        }
         for key in ["error_code", "error", "message", "msg"] {
             if let value = object[key] as? String, !value.isEmpty { return value }
         }
@@ -536,8 +576,18 @@ struct KeychainSessionStore: SessionStore {
         }
     }
 
+    /// The shared copy first (the one save writes and the widget reads), then any.
     func load() -> AuthSession? {
-        var lookup = query
+        if let sharedGroup {
+            var shared = query
+            shared[kSecAttrAccessGroup as String] = sharedGroup
+            if let session = load(matching: shared) { return session }
+        }
+        return load(matching: query)
+    }
+
+    private func load(matching match: [String: Any]) -> AuthSession? {
+        var lookup = match
         lookup[kSecReturnData as String] = true
         lookup[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: AnyObject?
@@ -547,17 +597,29 @@ struct KeychainSessionStore: SessionStore {
         return try? JSONDecoder().decode(AuthSession.self, from: data)
     }
 
+    /// Updates the saved session in place: deleting it first would leave a moment
+    /// (or, if the app is stopped there, for good) with no session at all.
     func save(_ session: AuthSession?) {
-        SecItemDelete(query as CFDictionary)
-        guard let session, let data = try? JSONEncoder().encode(session) else { return }
-        var item = query
+        guard let session else {
+            SecItemDelete(query as CFDictionary)
+            return
+        }
+        guard let data = try? JSONEncoder().encode(session) else { return }
+        if let sharedGroup {
+            var shared = query
+            shared[kSecAttrAccessGroup as String] = sharedGroup
+            if upsert(shared, data: data) { return }
+        }
+        upsert(query, data: data)
+    }
+
+    @discardableResult
+    private func upsert(_ match: [String: Any], data: Data) -> Bool {
+        let status = SecItemUpdate(match as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        guard status == errSecItemNotFound else { return status == errSecSuccess }
+        var item = match
         item[kSecValueData as String] = data
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        if let sharedGroup {
-            var shared = item
-            shared[kSecAttrAccessGroup as String] = sharedGroup
-            if SecItemAdd(shared as CFDictionary, nil) == errSecSuccess { return }
-        }
-        SecItemAdd(item as CFDictionary, nil)
+        return SecItemAdd(item as CFDictionary, nil) == errSecSuccess
     }
 }

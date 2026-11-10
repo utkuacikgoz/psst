@@ -160,6 +160,86 @@ enum PsstSender {
         return try JSONDecoder().decode(FetchedDoodle?.self, from: data)
     }
 
+    /// What widget_state says for this install's read token (1.0.9): the newest
+    /// unanswered doodle, and when each person last pssted you and your streak.
+    struct WidgetState: Decodable {
+        struct Person: Decodable {
+            let connectionId: UUID
+            let lastReceivedAt: Date?
+            let streakDays: Int?
+
+            enum CodingKeys: String, CodingKey {
+                case connectionId = "connection_id", lastReceivedAt = "last_received_at", streakDays = "streak_days"
+            }
+        }
+
+        let doodle: FetchedDoodle?
+        let people: [Person]?
+    }
+
+    /// The read token the app registered for this account (WidgetReadToken in the app).
+    private static var readToken: String? {
+        guard let group = info["PSSTAppGroup"] as? String, let defaults = UserDefaults(suiteName: group),
+              defaults.string(forKey: "psst.widget.readToken.account") != nil,
+              let token = defaults.string(forKey: "psst.widget.readToken"), !token.isEmpty else { return nil }
+        return token
+    }
+
+    /// Reads widget_state with the read token and the public key only: no session,
+    /// so nothing here can rotate or lose it. Throws when there's no token, the
+    /// server doesn't know it, or it can't ask; the caller then does as before.
+    static func widgetState() async throws -> WidgetState {
+        guard let baseURL, let token = readToken else { throw PsstSendError.signedOut }
+        var request = URLRequest(url: baseURL.appendingPathComponent("rest/v1/rpc/widget_state"))
+        request.timeoutInterval = 10
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["p_token": token])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw PsstSendError.failed }
+        guard let state = try decoder.decode(WidgetState?.self, from: data) else { throw PsstSendError.signedOut }
+        return state
+    }
+
+    private static let decoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let string = try decoder.singleValueContainer().decode(String.self)
+            if let date = parseTimestamp(string) { return date }
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                    debugDescription: "Unrecognized date \(string)"))
+        }
+        return decoder
+    }()
+
+    /// Postgres timestamps: "2026-09-24T06:10:12.123456+00:00", with 0–6 fractional
+    /// digits. Mirrors APIClient.parseTimestamp in the app.
+    static func parseTimestamp(_ string: String) -> Date? {
+        var normalized = string.replacingOccurrences(of: " ", with: "T")
+        if let dot = normalized.firstIndex(of: ".") {
+            let fractionStart = normalized.index(after: dot)
+            let fractionEnd = normalized[fractionStart...].firstIndex { !$0.isNumber } ?? normalized.endIndex
+            var digits = String(normalized[fractionStart..<fractionEnd])
+            digits = String((digits + "000").prefix(3))
+            normalized.replaceSubrange(fractionStart..<fractionEnd, with: digits)
+        }
+        if let date = withFraction.date(from: normalized) { return date }
+        return plain.date(from: normalized)
+    }
+
+    private nonisolated(unsafe) static let withFraction: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+    private nonisolated(unsafe) static let plain: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
     static func send(to connection: UUID) async throws {
         guard let baseURL, var session = load() else { throw PsstSendError.signedOut }
         if session.expiresAt.timeIntervalSinceNow < 60 { session = try await refresh(session, baseURL: baseURL) }
@@ -187,8 +267,9 @@ enum PsstSender {
         return (response as? HTTPURLResponse)?.statusCode ?? 0
     }
 
-    /// Refreshes and saves the session for the app to pick up. Never deletes it: if the
-    /// app rotated the token meanwhile, the app's newer session is already stored.
+    /// Refreshes and saves the session for the app to pick up, straight away and in
+    /// place. Never deletes it: if the app rotated the token meanwhile, the app's newer
+    /// session is already stored, and is used instead.
     private static func refresh(_ session: Session, baseURL: URL) async throws -> Session {
         var components = URLComponents(url: baseURL.appendingPathComponent("auth/v1/token"), resolvingAgainstBaseURL: false)
         components?.queryItems = [URLQueryItem(name: "grant_type", value: "refresh_token")]
@@ -201,7 +282,12 @@ enum PsstSender {
         request.httpBody = try JSONSerialization.data(withJSONObject: ["refresh_token": session.refreshToken])
         let (data, response) = try await URLSession.shared.data(for: request)
         guard (response as? HTTPURLResponse)?.statusCode == 200,
-              let auth = try? JSONDecoder().decode(AuthResponse.self, from: data) else { throw PsstSendError.failed }
+              let auth = try? JSONDecoder().decode(AuthResponse.self, from: data) else {
+            // The app may have rotated the token meanwhile: its newer session is stored.
+            if let stored = load(), stored.refreshToken != session.refreshToken,
+               stored.expiresAt.timeIntervalSinceNow > 60 { return stored }
+            throw PsstSendError.failed
+        }
         let fresh = Session(accessToken: auth.access_token, refreshToken: auth.refresh_token, userID: auth.user.id,
                             expiresAt: Date().addingTimeInterval(auth.expires_in))
         save(fresh)

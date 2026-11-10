@@ -44,6 +44,14 @@
   var again = root.querySelector(".try-again");
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var sound = null;
+  var tried = false;
+  // Anonymous counts in Vercel Web Analytics, as the privacy policy says: a tap, and an
+  // App Store tap after it. No cookies, nothing about the visitor.
+  function count(name) {
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    try { window.va("event", { name: name }); } catch (e) {}
+  }
+  get.addEventListener("click", function () { if (tried) count("Try a psst: App Store"); });
   var busy = false;
 
   function restart(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
@@ -51,6 +59,7 @@
   band.addEventListener("click", function () {
     if (busy) return;
     busy = true;
+    if (!tried) { tried = true; count("Try a psst"); }
     band.setAttribute("aria-disabled", "true");
     hint.hidden = true;
     try {

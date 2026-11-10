@@ -1,9 +1,10 @@
-"""Read-only: lists the in-app purchases and their offer codes (custom codes such as
-BUILDHOP50), with whether each is active, its price/discount and remaining redemptions,
-so a new code can be checked without redeeming it. Never changes anything; prints no keys.
+"""Read-only: counts the in-app purchases' offer codes (custom codes such as the one in
+the store-check input, and one-time code batches) with how many are active and when they
+expire, and, given CODE, says whether that code exists (with its active/expiry/redemption
+limit), so a new code can be checked without redeeming it. The Actions log is public, so
+no code is ever printed, only counts. Never changes anything; prints no keys.
 Reads ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8, BUNDLE_ID and optional CODE.
 """
-import json
 import os
 
 import release as R
@@ -17,30 +18,45 @@ def get(path, **query):
         return {"data": [], "included": []}
 
 
+def summary(codes):
+    """Counts only: how many, how many active, and the expiry dates (never a code)."""
+    active = sum(1 for c in codes if c["attributes"].get("active"))
+    expiries = sorted({str(c["attributes"].get("expirationDate")) for c in codes})
+    return f"{len(codes)} ({active} active; expires {', '.join(expiries) if codes else '-'})"
+
+
 def main():
     want = (os.environ.get("CODE") or "").strip().upper()
     app = R.call("GET", "/apps", **{"filter[bundleId]": os.environ["BUNDLE_ID"]})["data"][0]["id"]
     iaps = get(f"/apps/{app}/inAppPurchasesV2", limit="50")["data"]
-    found = False
+    found = []
     for iap in iaps:
         a = iap["attributes"]
         print(f"In-app purchase {a.get('productId')} ({a.get('inAppPurchaseType')}, {a.get('state')})")
         offers = get(f"/v2/inAppPurchases/{iap['id']}/offerCodes", limit="50")
-        for offer in offers["data"]:
+        for number, offer in enumerate(offers["data"], 1):
             o = offer["attributes"]
-            print(f"  offer '{o.get('name')}': active={o.get('active')} " +
-                  json.dumps({k: v for k, v in o.items() if k not in ('name', 'active')}, default=str)[:300])
-            for rel in ("customCodes", "oneTimeUseCodes"):
-                codes = get(f"/v1/inAppPurchaseOfferCodes/{offer['id']}/{rel}", limit="200")["data"]
-                for code in codes:
-                    c = code["attributes"]
-                    label = c.get("customCode") or f"{c.get('numberOfCodes')} one-time codes"
-                    match = bool(want) and str(c.get("customCode", "")).upper() == want
-                    found |= match
-                    print(f"    {rel[:-1]}: {label} active={c.get('active')} "
-                          f"redemptions={c.get('numberOfCodes')} expires={c.get('expirationDate')}{'  <== ' + want if match else ''}")
+            custom = get(f"/v1/inAppPurchaseOfferCodes/{offer['id']}/customCodes", limit="200")["data"]
+            batches = get(f"/v1/inAppPurchaseOfferCodes/{offer['id']}/oneTimeUseCodes", limit="200")["data"]
+            names = {str(c["attributes"].get("customCode", "")).upper() for c in custom}
+            # An offer's reference name can be the code itself: don't print it then.
+            name = o.get("name")
+            label = f"'{name}'" if name and str(name).upper() not in names else f"#{number}"
+            one_time = sum(int(b["attributes"].get("numberOfCodes") or 0) for b in batches)
+            print(f"  offer {label}: active={o.get('active')} mode={o.get('offerMode')} "
+                  f"duration={o.get('duration')} periods={o.get('numberOfPeriods')}")
+            print(f"    custom codes: {summary(custom)}")
+            print(f"    one-time code batches: {summary(batches)}, {one_time} codes in all")
+            for c in custom:
+                attributes = c["attributes"]
+                if want and str(attributes.get("customCode", "")).strip().upper() == want:
+                    found.append((a.get("productId"), label, attributes))
     if want:
-        print(f"{want}: {'found' if found else 'NOT found on any in-app purchase'}.")
+        if not found:
+            print("The code: NOT found on any in-app purchase.")
+        for product, label, c in found:
+            print(f"The code: found on {product}, offer {label}: active={c.get('active')} "
+                  f"expires={c.get('expirationDate')} redemption limit={c.get('numberOfCodes')}")
 
 
 if __name__ == "__main__":

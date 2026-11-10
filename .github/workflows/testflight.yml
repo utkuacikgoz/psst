@@ -24,6 +24,9 @@ concurrency:
   group: testflight
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   upload:
     runs-on: macos-15
@@ -41,7 +44,7 @@ jobs:
       SUPABASE_PROJECT_REF: ${{ inputs.target == 'production' && secrets.SUPABASE_PROJECT_REF_PROD || secrets.SUPABASE_PROJECT_REF }}
       BUILD_NUMBER: ${{ github.run_number }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Select Xcode 26
         run: scripts/select_xcode.sh
@@ -75,7 +78,7 @@ jobs:
       # here with Apple's own answer instead of as a signing error later.
       - name: Check the App Store Connect key
         run: |
-          python3 -m venv "$RUNNER_TEMP/asc" && "$RUNNER_TEMP/asc/bin/pip" install -q pyjwt cryptography
+          python3 -m venv "$RUNNER_TEMP/asc" && "$RUNNER_TEMP/asc/bin/pip" install -q pyjwt==2.15.1 cryptography==50.0.2
           "$RUNNER_TEMP/asc/bin/python" - <<'EOF'
           import json, os, time, urllib.error, urllib.request
           import jwt

@@ -24,13 +24,16 @@ concurrency:
   group: ios-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   unit-tests:
     if: github.event_name != 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - run: scripts/select_xcode.sh
       - name: Unit tests
         run: |
@@ -50,22 +53,25 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - run: scripts/select_xcode.sh
       - name: Capture
+        env:
+          TESTS: ${{ inputs.tests }}
+          TEXT_SIZE: ${{ inputs.text_size }}
         run: |
           set -o pipefail
           UDID=$(python3 scripts/pick_simulators.py large)
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
-          [ "${{ inputs.text_size }}" = largest ] && size=accessibility-extra-extra-extra-large || size=large
+          [ "$TEXT_SIZE" = largest ] && size=accessibility-extra-extra-extra-large || size=large
           xcrun simctl ui "$UDID" content_size "$size"
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 \
             --wifiBars 3 --cellularMode active --cellularBars 4 --operatorName ""
           status=0
-          TEST_RUNNER_PSST_SIZE_LABEL="${{ inputs.text_size }}" xcodebuild test \
+          TEST_RUNNER_PSST_SIZE_LABEL="$TEXT_SIZE" xcodebuild test \
             -project Psst.xcodeproj -scheme Psst -destination "id=$UDID" \
-            -only-testing:"${{ inputs.tests }}" \
+            -only-testing:"$TESTS" \
             -resultBundlePath results.xcresult CODE_SIGNING_ALLOWED=NO 2>&1 | tee xcodebuild.log || status=1
           [ "${PIPESTATUS[0]}" = 0 ] || status=1
           # Surface each failing assertion as an annotation (readable without the log).

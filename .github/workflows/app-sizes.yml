@@ -9,6 +9,9 @@ on:
         description: How many recent builds
         default: "12"
 
+permissions:
+  contents: read
+
 jobs:
   sizes:
     runs-on: ubuntu-latest
@@ -21,6 +24,6 @@ jobs:
       BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
       BUILDS: ${{ inputs.builds }}
     steps:
-      - uses: actions/checkout@v5
-      - run: pip install -q pyjwt cryptography
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - run: pip install -q pyjwt==2.15.1 cryptography==50.0.2
       - run: python3 scripts/app_sizes.py

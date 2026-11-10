@@ -59,6 +59,23 @@ class ReviewCodeTests(unittest.TestCase):
         self.assertEqual(output[:2], [f"::add-mask::{review}", f"::add-mask::{backup}"], "masked before anything else")
         self.assertFalse(any(review in line for line in output[2:]), "never printed unmasked")
 
+    def test_earlier_review_codes_pick_the_account_before_any_name(self):
+        queries = []
+
+        def fake_sql(query):
+            queries.append(query)
+            return [{"id": "1"}, {"id": "2"}]
+
+        env = {"SUPABASE_ACCESS_TOKEN": "t", "SUPABASE_PROJECT_REF": "r", "REVIEW_ACCOUNT": " Psst Team "}
+        with mock.patch.dict(os.environ, env), mock.patch.object(review_codes, "sql", fake_sql), \
+                mock.patch("builtins.print"):
+            review_codes.make()
+        team = queries[0].split("revoked as")[0]
+        order = [team.index("max_uses = 3 and expires_at"), team.index("code in ('PSSTFIVE'"),
+                 team.index("= 'psst team' having count(*) = 1"), team.index("ilike '%psst%'")]
+        self.assertEqual(order, sorted(order), "earlier codes, fixed codes, then unique names")
+        self.assertEqual(team.count("having count(*) = 1"), 3, "a name only counts when exactly one profile has it")
+
     def test_missing_profile_or_secrets_stop_the_release(self):
         with mock.patch.dict(os.environ, {"SUPABASE_ACCESS_TOKEN": "t", "SUPABASE_PROJECT_REF": "r"}), \
                 mock.patch.object(review_codes, "sql", return_value=[]), mock.patch("builtins.print"):

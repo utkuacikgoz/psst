@@ -1,7 +1,7 @@
 name: App Store check
 
-# Manual, Linux only, read-only: lists the in-app purchases and their offer codes
-# (e.g. BUILDHOP50) so a new code can be checked without redeeming it, or (what:
+# Manual, Linux only, read-only: counts the in-app purchases' offer codes (never
+# prints a code: the log is public) and says whether a given code exists, or (what:
 # review) what's waiting for or in App Review.
 on:
   workflow_dispatch:
@@ -15,6 +15,9 @@ on:
         options: [codes, review]
         default: codes
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -25,8 +28,21 @@ jobs:
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
       BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
-      CODE: ${{ inputs.code }}
     steps:
-      - uses: actions/checkout@v5
-      - run: pip install -q pyjwt cryptography
+      # First, before any step prints its env: hide the code being looked for (as
+      # typed and upper-cased). Read from the event file, not from env or an
+      # expression, so neither this step's header nor its script holds the code.
+      - name: Hide the code
+        run: |
+          python3 -c '
+          import json, os
+          code = json.load(open(os.environ["GITHUB_EVENT_PATH"])).get("inputs", {}).get("code") or ""
+          for value in {code, code.strip(), code.strip().upper()}:
+              if value.strip():
+                  print("::add-mask::" + value)
+          '
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - run: pip install -q pyjwt==2.15.1 cryptography==50.0.2
       - run: python3 scripts/${{ inputs.what == 'review' && 'review_status.py' || 'check_offer_codes.py' }}
+        env:
+          CODE: ${{ inputs.code }}

@@ -66,15 +66,17 @@ def make() -> tuple[str, str]:
     rows = sql(f"""
         with team as (
             -- The account behind the review codes: the latest earlier review code's inviter, else
-            -- the owner of the old fixed codes (kept 30 days after revoking), else by name.
+            -- the owner of the old fixed codes (kept 30 days after revoking), else by name, and
+            -- only when exactly one profile has that name (a shared name could be a stranger).
             select coalesce(
-                (select id from public.profiles where {name_match(os.environ.get("REVIEW_ACCOUNT", ""))}
-                 order by created_at limit 1),
                 (select inviter_id from public.invites
                  where kind = 'code' and max_uses = {USES} and expires_at > created_at + interval '8 days'
                  order by created_at desc limit 1),
                 (select inviter_id from public.invites where code in ({FIXED}) order by created_at desc limit 1),
-                (select id from public.profiles where lower(btrim(display_name)) = 'psst team' order by created_at limit 1),
+                (select min(id::text)::uuid from public.profiles
+                 where {name_match(os.environ.get("REVIEW_ACCOUNT", ""))} having count(*) = 1),
+                (select min(id::text)::uuid from public.profiles
+                 where lower(btrim(display_name)) = 'psst team' having count(*) = 1),
                 -- The only profile with "psst" in its name, made before launch week: the team account.
                 (select min(id::text)::uuid from public.profiles where display_name ilike '%psst%'
                  having count(*) = 1 and max(created_at) < '2026-10-01')

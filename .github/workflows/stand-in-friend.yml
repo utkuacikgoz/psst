@@ -20,16 +20,33 @@ on:
         options: [production, development]
         default: production
 
+permissions:
+  contents: read
+
 jobs:
   friend:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.target == 'production' && 'production' || 'development' }}
     timeout-minutes: 35
     env:
       SUPABASE_ACCESS_TOKEN: ${{ inputs.target == 'production' && secrets.SUPABASE_ACCESS_TOKEN_PROD || secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: ${{ inputs.target == 'production' && secrets.SUPABASE_PROJECT_REF_PROD || secrets.SUPABASE_PROJECT_REF }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: supabase/setup-cli@v1
+      # First, before any step prints its env: hide the invite code (as typed, and
+      # trimmed/upper-cased as the script uses it). Read from the event file, not
+      # from env or an expression, so neither this step's header nor its script
+      # text holds the code; later steps' env headers then show ***.
+      - name: Hide the invite code
+        run: |
+          python3 -c '
+          import json, os
+          code = json.load(open(os.environ["GITHUB_EVENT_PATH"])).get("inputs", {}).get("code") or ""
+          for value in {code, code.strip(), code.strip().upper()}:
+              if value.strip():
+                  print("::add-mask::" + value)
+          '
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
         with:
           version: latest
       - name: Connect and psst back

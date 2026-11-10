@@ -31,6 +31,9 @@ concurrency:
   group: deploy-backend-${{ inputs.target }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   tests:
     uses: ./.github/workflows/backend.yml
@@ -48,7 +51,7 @@ jobs:
       PROD_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
       PROD_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Check that every secret is set
         env:
@@ -76,7 +79,7 @@ jobs:
           fi
           exit $missing
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
         with:
           version: latest
 
@@ -115,7 +118,7 @@ jobs:
           IAP_KEY_P8: ${{ secrets.IAP_KEY_P8 }}
         run: |
           python3 -m venv "$RUNNER_TEMP/purchases"
-          "$RUNNER_TEMP/purchases/bin/pip" install -q pyjwt cryptography
+          "$RUNNER_TEMP/purchases/bin/pip" install -q pyjwt==2.15.1 cryptography==50.0.2
           "$RUNNER_TEMP/purchases/bin/python" scripts/configure_purchase_verification.py "$RUNNER_TEMP/purchases.env"
           if [ -z "$IAP_KEY_ID" ] || [ -z "$IAP_ISSUER_ID" ] || [ -z "$IAP_KEY_P8" ]; then
             supabase secrets unset APP_STORE_KEY_ID APP_STORE_ISSUER_ID APP_STORE_PRIVATE_KEY --project-ref "$SUPABASE_PROJECT_REF" --yes > /dev/null || true

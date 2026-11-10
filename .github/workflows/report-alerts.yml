@@ -2,15 +2,20 @@ name: Report alerts
 
 # Hourly, Linux only (owner pick 12A): tells the owner about new reports by
 # opening one GitHub issue per run. This repo is public, so the issue holds only
-# report ids, times and whether a doodle was kept: no names, no drawings. The
-# details are read in Supabase. Reports are marked notified only after the issue
-# exists, so a failed run alerts again next hour instead of never.
+# the count and a query keyed on the batch's notified_at time: no report ids, no
+# report times, no names, no drawings (a reported person mustn't be able to tell).
+# The details are read in Supabase. Reports are marked notified only after the
+# issue exists, so a failed run alerts again next hour instead of never.
+# Heartbeat: GitHub pauses scheduled workflows after 60 days without repository
+# activity, which would silence these alerts. Once main's last commit is 50 days
+# old, the heartbeat job opens one issue asking for a push.
 on:
   schedule:
     - cron: "23 * * * *"
   workflow_dispatch:
 
 permissions:
+  contents: read
   issues: write
 
 concurrency:
@@ -26,7 +31,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_PROD || secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
     steps:
-      - uses: actions/github-script@v8
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           script: |
             const { SUPABASE_ACCESS_TOKEN: token, SUPABASE_PROJECT_REF: ref } = process.env;
@@ -45,9 +50,10 @@ jobs:
               return res.json();
             };
 
+            // One batch time for every row, formatted by Postgres (UTC, microseconds) so the
+            // query in the issue matches the stored notified_at exactly.
             const rows = await sql(`
-              select id, to_char(created_at at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as at,
-                     evidence is not null as kept
+              select id, to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as batch
               from public.reports where notified_at is null
               order by created_at limit 100`);
             if (!rows.length) {
@@ -56,24 +62,53 @@ jobs:
             }
             const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
             const ids = rows.map((r) => r.id).filter((id) => uuid.test(id));
+            const batch = rows[0].batch;
+            if (!ids.length || ids.length !== rows.length) throw new Error("Unexpected report ids from Supabase.");
+            if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}Z$/.test(batch) || rows.some((r) => r.batch !== batch)) {
+              throw new Error("Unexpected batch time from Supabase.");
+            }
             const list = ids.map((id) => `'${id}'`).join(", ");
             const n = ids.length;
-            if (!n) throw new Error("Unexpected report ids from Supabase.");
             const { owner, repo } = context.repo;
             const body = [
-              `${n} new report(s), review in Supabase (SQL Editor) within 24 hours: docs/REPORTS.md.`,
+              `${n} new report(s) · review in Supabase within 24 hours (docs/REPORTS.md)`,
               "",
               "```sql",
-              `select * from public.reports where id in (${list});`,
+              `select * from public.reports where notified_at = '${batch}';`,
               "```",
-              "",
-              ...rows.filter((r) => uuid.test(r.id))
-                .map((r) => `- \`${r.id}\` · ${r.at} UTC · ${r.kept ? "doodle kept as evidence" : "no doodle"}`),
-              "",
-              "Close this issue once reviewed.",
             ].join("\n");
             const issue = await github.rest.issues.create({
               owner, repo, title: `${n} new report(s) to review`, body, assignees: [owner],
             }).catch(() => github.rest.issues.create({ owner, repo, title: `${n} new report(s) to review`, body }));
-            await sql(`update public.reports set notified_at = now() where id in (${list}) and notified_at is null`);
+            await sql(`update public.reports set notified_at = '${batch}'::timestamptz
+                       where id in (${list}) and notified_at is null`);
+            const [{ marked }] = await sql(`select count(*)::int as marked from public.reports where notified_at = '${batch}'::timestamptz`);
+            if (marked !== n) core.warning(`The issue's query finds ${marked} report(s), not ${n}.`);
             core.notice(`Opened #${issue.data.number} for ${n} new report(s).`);
+
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const title = "Scheduled jobs will pause soon: push any commit";
+            const { data: main } = await github.rest.repos.getBranch({ owner, repo, branch: "main" });
+            const last = new Date(main.commit.commit.committer.date);
+            const days = (Date.now() - last) / (24 * 60 * 60 * 1000);
+            if (days < 50) {
+              core.info(`Last commit on main is ${Math.floor(days)} days old.`);
+              return;
+            }
+            // Once per quiet spell: any issue with this title opened since that commit counts.
+            const issues = await github.paginate(github.rest.issues.listForRepo,
+              { owner, repo, state: "all", since: last.toISOString(), per_page: 100 });
+            if (issues.some((i) => !i.pull_request && i.title === title && new Date(i.created_at) > last)) return;
+            const body = `The last commit on main was ${Math.floor(days)} days ago. GitHub pauses scheduled ` +
+              "workflows (report alerts, numbers, cleanup) after 60 days without repository activity. " +
+              "Push any commit to keep them running.";
+            await github.rest.issues.create({ owner, repo, title, body, assignees: [owner] })
+              .catch(() => github.rest.issues.create({ owner, repo, title, body }));
+            core.notice(`Opened "${title}".`);

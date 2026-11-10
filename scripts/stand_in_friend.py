@@ -59,7 +59,7 @@ try:
     status, body = rpc(token, "accept_invite", p_code=CODE)
     connection = body.get("connection_id") if isinstance(body, dict) else None
     if not connection:
-        sys.exit(f"Couldn't accept {CODE} ({status}): {body}. Make a new code in the app and run again.")
+        sys.exit(f"Couldn't accept the invite code ({status}): {body}. Make a new code in the app and run again.")
     print(f"{NAME} connected. Staying for {MINUTES} minutes.", flush=True)
 
     deadline = time.time() + MINUTES * 60

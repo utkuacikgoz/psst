@@ -13,6 +13,7 @@ Supabase's auth schema) followed by every migration in order.
 import json
 import os
 import pathlib
+import secrets
 import unittest
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -64,10 +65,17 @@ class Api:
             conn.commit()
 
     def rpc(self, fn, *args):
+        """Like PostgREST: a function that set response.status >= 400 is a refusal.
+        Its transaction still commits (that's why such functions don't raise)."""
         placeholders = ", ".join(["%s"] * len(args))
         with self._cursor() as cur:
             cur.execute(f"select public.{fn}({placeholders})", args)
-            return cur.fetchone()[0]
+            result = cur.fetchone()[0]
+            cur.execute("select current_setting('response.status', true)")
+            status = cur.fetchone()[0]
+        if status and int(status) >= 400:
+            raise Refusal(int(status), result)
+        return result
 
     def rows(self, sql, *args):
         with self._cursor() as cur:
@@ -93,8 +101,22 @@ def connect(a, b):
     return b.rpc("accept_invite", code)["connection_id"]
 
 
+class Refusal(Exception):
+    """A refusal returned with response.status: the HTTP status and body PostgREST sends."""
+
+    def __init__(self, status, body):
+        super().__init__(f"{status} {body}")
+        self.status, self.body = status, body
+
+
+def error_message(error):
+    """The code the app sees, from a raised PTxxx error or a returned refusal."""
+    return error.body["message"] if isinstance(error, Refusal) else error.diag.message_primary
+
+
 class ErrorCode:
-    """Asserts a PostgREST-style error: SQLSTATE PTxxx with a message."""
+    """Asserts a PostgREST-style error: SQLSTATE PTxxx with a message, or a refusal
+    returned with that HTTP status and the same body."""
 
     def __init__(self, test, message, status):
         self.test, self.message, self.status = test, message, status
@@ -104,6 +126,11 @@ class ErrorCode:
 
     def __exit__(self, kind, value, tb):
         self.test.assertIsNotNone(value, f"expected {self.message}")
+        if isinstance(value, Refusal):
+            self.test.assertEqual(value.status, self.status, str(value))
+            self.test.assertEqual(value.body, {"code": f"PT{self.status}", "details": None, "hint": None,
+                                               "message": self.message})
+            return True
         self.test.assertIsInstance(value, psycopg.Error)
         self.test.assertEqual(value.diag.sqlstate, f"PT{self.status}", str(value))
         self.test.assertEqual(value.diag.message_primary, self.message)
@@ -269,8 +296,8 @@ class BackendTests(unittest.TestCase):
         def join(friend):
             try:
                 return friend.rpc("accept_invite", code)["status"]
-            except psycopg.Error as error:
-                return error.diag.message_primary
+            except (psycopg.Error, Refusal) as error:
+                return error_message(error)
 
         with ThreadPoolExecutor(max_workers=8) as pool:
             results = list(pool.map(join, friends))
@@ -734,6 +761,195 @@ class BackendTests(unittest.TestCase):
         service.rpc("remove_device_tokens", [token])
         self.assertEqual(service.rpc("joined_push_targets", connection)["tokens"], [])
 
+    def test_invite_guessing_is_limited_per_hour(self):
+        ada, sam, kim = new_user("Ada"), new_user("Sam"), new_user("Kim")
+        good = ada.rpc("create_invite")["code"]
+        # Looking at a code that works isn't a miss.
+        for _ in range(25):
+            self.assertEqual(sam.rpc("preview_invite", good)["status"], "pending")
+        # Misses count from both preview and accept, and accept's count is kept
+        # even though it refuses (that's why it returns its refusal instead of raising).
+        for i in range(10):
+            self.assertEqual(sam.rpc("preview_invite", f"NOPE{i:04d}")["status"], "invalid")
+            with self.fails("invite_invalid", 404):
+                sam.rpc("accept_invite", f"MISS{i:04d}")
+        self.assertEqual(admin("select failures from private.invite_attempts where key = %s", str(sam.user_id)), [(20,)])
+        with self.fails("too_many_attempts", 429):
+            sam.rpc("preview_invite", good)
+        with self.fails("too_many_attempts", 429):
+            sam.rpc("accept_invite", good)
+        self.assertEqual(sam.rows("select * from public.connections"), [], "blocked even for a good code")
+        # Someone else isn't affected.
+        self.assertEqual(kim.rpc("accept_invite", good)["status"], "accepted")
+        # Used up, cancelled and expired codes are misses too.
+        used = ada.rpc("create_psst_invite")["code"]
+        kim2 = new_user("Kim2")
+        new_user("Zed").rpc("accept_invite", used)
+        with self.fails("invite_used", 409):
+            kim2.rpc("accept_invite", used)
+        self.assertEqual(kim2.rpc("preview_invite", used)["status"], "used")
+        self.assertEqual(admin("select failures from private.invite_attempts where key = %s", str(kim2.user_id)), [(2,)])
+        # The next hour starts again, and the purge drops old counts.
+        admin("update private.invite_attempts set window_start = window_start - interval '1 hour' where key = %s",
+              str(sam.user_id))
+        self.assertEqual(sam.rpc("accept_invite", good)["status"], "accepted")
+        admin("update private.invite_attempts set window_start = now() - interval '25 hours' where key = %s",
+              str(sam.user_id))
+        admin("select private.purge_expired()")
+        self.assertEqual(admin("select count(*) from private.invite_attempts where key = %s", str(sam.user_id)), [(0,)])
+        with self.assertRaises(errors.InsufficientPrivilege):
+            sam.rows("select * from private.invite_attempts")
+
+    def test_invite_codes_use_every_letter_evenly(self):
+        alphabet = "ABCDEFGHJKMNPQRSTVWXYZ23456789"
+        codes = [r[0] for r in admin("select private.new_invite_code() from generate_series(1, 7500)")]
+        self.assertTrue(all(len(c) == 8 and set(c) <= set(alphabet) for c in codes))
+        letters = "".join(codes)
+        expected = len(letters) / 30
+        chi2 = sum((letters.count(ch) - expected) ** 2 / expected for ch in alphabet)
+        # 29 degrees of freedom: about 29 for a fair draw; the old uuid-byte draw gave over 1,000 here.
+        self.assertLess(chi2, 75, f"chi-square {chi2:.1f}")
+
+    # Widget ----------------------------------------------------------------
+
+    def test_widget_token_reads_the_doodle_and_people(self):
+        ada, emre, sam = new_user("Ada"), new_user("Emre"), new_user("Sam")
+        ae, as_ = connect(ada, emre), connect(ada, sam)
+        anon = Api("anon")
+        emre_token, ada_token = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+        emre.rpc("register_widget_token", emre_token)
+        ada.rpc("register_widget_token", ada_token)
+        self.assertEqual(admin("select count(*) from private.widget_tokens where token_hash = convert_to(%s, 'UTF8')",
+                               emre_token), [(0,)], "only the hash is stored")
+
+        self.assertEqual(anon.rpc("widget_state", emre_token),
+                         {"doodle": None, "people": [{"connection_id": ae, "last_received_at": None, "streak_days": 0}]})
+
+        heart = json.dumps([[[0.2, 0.3], [0.5, 0.8]]])
+        ada.rpc("send_signal", uuid.uuid4(), ae, "doodle", heart)
+        state = anon.rpc("widget_state", emre_token)
+        latest = emre.rpc("latest_doodle")
+        self.assertEqual(state["doodle"], latest, "exactly what latest_doodle gives the app")
+        self.assertEqual(set(latest), {"event_id", "connection_id", "sender_name", "created_at", "doodle"})
+        self.assertEqual(state["people"], [{"connection_id": ae, "last_received_at": latest["created_at"], "streak_days": 0}])
+
+        # Ada's side: her own sends don't count as received; Emre's reply does, and
+        # a day both pssted is a streak (list_connections' number).
+        people = {p["connection_id"]: p for p in anon.rpc("widget_state", ada_token)["people"]}
+        self.assertEqual(set(people), {ae, as_})
+        self.assertIsNone(people[ae]["last_received_at"])
+        emre.rpc("send_signal", uuid.uuid4(), ae, "psst")
+        state = anon.rpc("widget_state", ada_token)
+        people = {p["connection_id"]: p for p in state["people"]}
+        received = admin("select to_jsonb(max(created_at)) from public.signal_events where sender_id = %s", emre.user_id)[0][0]
+        self.assertEqual(people[ae]["last_received_at"], received)
+        streak = ada.rows("select streak_days from public.list_connections() where connection_id = %s", ae)[0][0]
+        self.assertEqual((people[ae]["streak_days"], streak), (1, 1))
+        self.assertEqual((people[as_]["last_received_at"], people[as_]["streak_days"]), (None, 0))
+        self.assertIsNone(state["doodle"])
+        self.assertIsNone(anon.rpc("widget_state", emre_token)["doodle"], "answered doodles leave the widget")
+
+        # Unknown, malformed and missing tokens read nothing, with no detail.
+        for token in (secrets.token_urlsafe(32), "short", "x" * 129, None):
+            self.assertIsNone(anon.rpc("widget_state", token))
+        # A token is only ever its own account's: it can't be claimed by someone else.
+        with self.fails("invalid_token", 422):
+            sam.rpc("register_widget_token", ada_token)
+        self.assertEqual(set(p["connection_id"] for p in anon.rpc("widget_state", ada_token)["people"]), {ae, as_})
+        for bad in ("short", "x" * 129):
+            with self.fails("invalid_token", 422):
+                sam.rpc("register_widget_token", bad)
+        with self.assertRaises(errors.InsufficientPrivilege):
+            anon.rpc("register_widget_token", secrets.token_urlsafe(32))
+        with self.fails("not_authenticated", 401):
+            Api("authenticated").rpc("register_widget_token", secrets.token_urlsafe(32))
+        with self.assertRaises(errors.InsufficientPrivilege):
+            emre.rows("select * from private.widget_tokens")
+
+        # Registering again replaces the old token.
+        newer = secrets.token_urlsafe(48)
+        emre.rpc("register_widget_token", newer)
+        self.assertIsNone(anon.rpc("widget_state", emre_token))
+        self.assertEqual(anon.rpc("widget_state", newer)["people"][0]["connection_id"], ae)
+
+        # Blocking takes the person (and their doodle) off the widget.
+        ada.rpc("send_signal", uuid.uuid4(), ae, "doodle", heart)
+        self.assertIsNotNone(anon.rpc("widget_state", newer)["doodle"])
+        emre.rpc("block_user", ada.user_id)
+        self.assertEqual(anon.rpc("widget_state", newer), {"doodle": None, "people": []})
+
+        # Deleting the account ends its token.
+        admin("delete from auth.users where id = %s", emre.user_id)
+        self.assertIsNone(anon.rpc("widget_state", newer))
+        self.assertEqual(admin("select count(*) from private.widget_tokens where user_id = %s", emre.user_id), [(0,)])
+
+    # Names -----------------------------------------------------------------
+
+    def test_display_names_are_cleaned(self):
+        ada = new_user("Ada")
+
+        def saved(raw):
+            ada.rpc("set_display_name", raw)
+            return admin("select display_name from public.profiles where id = %s", ada.user_id)[0][0]
+
+        self.assertEqual(saved("  Ada‮​ \n\t Love⁦lace\u0007 "), "Ada Lovelace")
+        self.assertEqual(saved("Kim Lee"), "Kim Lee")
+        self.assertEqual(saved("﻿Mia 　Rose‏"), "Mia Rose")
+        family = "\U0001F468‍\U0001F469‍\U0001F467 Kim"
+        self.assertEqual(saved(family), family, "joiners inside emoji stay")
+        self.assertEqual(saved("‍Kim‍‍ ‌Lee"), "Kim Lee")
+        self.assertEqual(saved("می‌خواهم"), "می‌خواهم",
+                         "a non-joiner inside a Persian word stays")
+        self.assertEqual(saved("A" * 40 + "​" * 10), "A" * 40, "invisible padding doesn't count")
+        for bad in ("​⁦ㅤ", " \n ", "‮", "B" * 41, ""):
+            with self.fails("invalid_name", 422):
+                ada.rpc("set_display_name", bad)
+        self.assertEqual(admin("select display_name from public.profiles where id = %s", ada.user_id)[0][0], "A" * 40)
+
+    # Measurement -----------------------------------------------------------
+
+    def test_invited_or_organic_survives_the_invite_purge(self):
+        def today():
+            admin("select private.snapshot_metrics(current_date)")
+            return admin("""select invited_new_accounts, organic_new_accounts, code_invites_created,
+                                   psst_invites_created from private.metrics_daily where day = current_date""")[0]
+
+        before = today()
+        ada, sam = new_user("Ada"), new_user("Sam")                 # organic
+        emre, kim = new_user("Emre"), new_user("Kim")               # invited: a code, a Psst link
+        emre.rpc("accept_invite", ada.rpc("create_invite")["code"])
+        kim.rpc("accept_invite", ada.rpc("create_psst_invite")["code"])
+        old = new_user("Old")                                       # joined with an invite days after
+        admin("update public.profiles set created_at = now() - interval '3 days' where id = %s", old.user_id)
+        old.rpc("accept_invite", sam.rpc("create_invite")["code"])
+        after = today()
+        self.assertEqual([a - b for a, b in zip(after, before)], [2, 2, 2, 1])
+
+        origins = dict((str(r[0]), r[1:]) for r in admin(
+            "select user_id, invited, invite_kind from private.account_origins where user_id = any(%s)",
+            [emre.user_id, kim.user_id, old.user_id, ada.user_id]))
+        self.assertEqual(origins, {str(emre.user_id): (True, "code"), str(kim.user_id): (True, "psst"),
+                                   str(old.user_id): (False, None)})
+        # Only the first join counts.
+        emre.rpc("accept_invite", sam.rpc("create_psst_invite")["code"])
+        self.assertEqual(admin("select invite_kind from private.account_origins where user_id = %s", emre.user_id),
+                         [("code",)])
+
+        admin("update public.invites set expires_at = now() - interval '31 days' where inviter_id in (%s, %s)",
+              ada.user_id, sam.user_id)
+        admin("select private.purge_expired()")
+        self.assertEqual(admin("select count(*) from public.invites where inviter_id = %s", ada.user_id), [(0,)])
+        self.assertEqual(today()[:2], after[:2], "still told apart once the invites are gone")
+
+        day = Api("service_role").rpc("metrics_report")["days"][-1]
+        self.assertEqual(day["invited_new_accounts"], after[0])
+        self.assertIn("psst_invites_created", day)
+        self.assertNotIn(str(emre.user_id), json.dumps(Api("service_role").rpc("metrics_report")))
+        with self.assertRaises(errors.InsufficientPrivilege):
+            emre.rows("select * from private.account_origins")
+        admin("delete from auth.users where id = %s", emre.user_id)
+        self.assertEqual(admin("select count(*) from private.account_origins where user_id = %s", emre.user_id), [(0,)])
+
     # Blocking and removal --------------------------------------------------
 
     def test_block_removes_connection_and_prevents_reconnecting(self):
@@ -932,8 +1148,8 @@ class BackendTests(unittest.TestCase):
             try:
                 a.rpc("send_signal", uuid.uuid4(), pair, "super_psst")
                 return "sent"
-            except psycopg.Error as error:
-                return error.diag.message_primary
+            except (psycopg.Error, Refusal) as error:
+                return error_message(error)
         with ThreadPoolExecutor(max_workers=2) as pool:
             self.assertCountEqual(list(pool.map(send, pairs)), ["sent", "super_daily_limit"])
 

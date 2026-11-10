@@ -28,3 +28,8 @@ $$;
 -- and RLS plus explicit revokes do the restricting.
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+
+-- Supabase keeps pgcrypto in the extensions schema (invite codes use its
+-- gen_random_bytes).
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;

@@ -1,4 +1,4 @@
-import { json } from "../_shared/http.ts";
+import { json, refusal } from "../_shared/http.ts";
 import { ApnsEnvironment, ApnsResult, classify } from "../_shared/apns.ts";
 
 export interface AcceptResult {
@@ -33,6 +33,21 @@ export interface AcceptInviteDeps {
   ): Promise<ApnsResult>;
   nowSeconds(): number;
 }
+
+/**
+ * What public.accept_invite refuses with. The app reads invite_* (and falls back
+ * to the plain RPC only on a 404 that isn't one); the rest show its generic message.
+ */
+export const ACCEPT_ERRORS: ReadonlySet<string> = new Set([
+  "not_authenticated",
+  "profile_required",
+  "invite_invalid",
+  "invite_own",
+  "invite_used",
+  "invite_revoked",
+  "invite_expired",
+  "too_many_attempts",
+]);
 
 /** A day is plenty: after that, they'll see the person on home anyway. */
 export const JOINED_PUSH_LIFETIME_SECONDS = 24 * 60 * 60;
@@ -81,9 +96,7 @@ export async function handleAcceptInvite(req: Request, deps: AcceptInviteDeps): 
   }
 
   const { data, error, status } = await deps.acceptInvite(authorization, code);
-  if (error || !data) {
-    return json({ error: error?.message ?? "accept_failed" }, status >= 400 ? status : 500);
-  }
+  if (error || !data) return refusal(error, status, ACCEPT_ERRORS, "accept_failed");
 
   if (data.status === "accepted") {
     try {

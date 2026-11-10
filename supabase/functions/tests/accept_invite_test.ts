@@ -83,3 +83,29 @@ Deno.test("joining through your Psst says so", () => {
   const drawn = buildJoinedPayload({ connection_id: CONNECTION, joiner_name: "Kim", held_psst: true, held_doodle: true, tokens: [] });
   assertEquals(drawn.aps.alert.body, "Kim got your doodle and joined. Tap to psst them.");
 });
+
+Deno.test("invite refusals pass through; anything else is a fixed accept_failed", async () => {
+  const errors: unknown[][] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => errors.push(args);
+  try {
+    for (const [message, status] of [["invite_invalid", 404], ["invite_own", 409], ["invite_revoked", 410],
+      ["invite_expired", 410], ["too_many_attempts", 429], ["profile_required", 409]] as const) {
+      const { d } = deps("accepted", { acceptInvite: () => Promise.resolve({ data: null, error: { message }, status }) });
+      const res = await handleAcceptInvite(request({ code: "K7QX4MPA" }), d);
+      assertEquals([res.status, await res.json()], [status, { error: message }]);
+    }
+    // A raw message must not reach the app, nor look like a missing function (404 without invite_).
+    for (const [message, status] of [['relation "public.invites" does not exist', 404], ["boom", 500]] as const) {
+      const { d, pushes } = deps("accepted", { acceptInvite: () => Promise.resolve({ data: null, error: { message }, status }) });
+      const res = await handleAcceptInvite(request({ code: "K7QX4MPA" }), d);
+      assertEquals([res.status, await res.json()], [500, { error: "accept_failed" }]);
+      assertEquals(pushes.length, 0);
+    }
+    assertEquals(errors.length, 2);
+  } finally {
+    console.error = original;
+  }
+  const { d } = deps("accepted", { acceptInvite: () => Promise.resolve({ data: null, error: { message: "JWT expired" }, status: 401 }) });
+  assertEquals((await handleAcceptInvite(request({ code: "K7QX4MPA" }), d)).status, 401);
+});

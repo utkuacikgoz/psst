@@ -1,4 +1,4 @@
-import { isUuid, json } from "../_shared/http.ts";
+import { isUuid, json, refusal } from "../_shared/http.ts";
 import { PushStatus } from "../_shared/deliver.ts";
 
 export interface SendSignalResult {
@@ -22,6 +22,17 @@ export interface SendSignalDeps {
    */
   background?(work: Promise<unknown>): void;
 }
+
+/** What public.send_signal refuses with, which the app (and the smoke test) act on. */
+export const SEND_ERRORS: ReadonlySet<string> = new Set([
+  "not_authenticated",
+  "invalid_event_id",
+  "not_connected",
+  "effect_unavailable",
+  "invalid_doodle",
+  "super_daily_limit",
+  "rate_limited",
+]);
 
 /**
  * POST { event_id, connection_id, effect_id } with the user's bearer token.
@@ -56,9 +67,7 @@ export async function handleSendSignal(req: Request, deps: SendSignalDeps): Prom
     p_effect_id: effect_id,
     ...(doodle !== undefined ? { p_doodle: doodle } : {}),
   });
-  if (error || !data) {
-    return json({ error: error?.message ?? "send_failed" }, status >= 400 ? status : 500);
-  }
+  if (error || !data) return refusal(error, status, SEND_ERRORS, "send_failed");
 
   if (deps.background) {
     // The signal is stored and visible in the recipient's in-app inbox either way.

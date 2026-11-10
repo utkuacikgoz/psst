@@ -7,6 +7,7 @@ The goal is to learn whether people come back to psst each other voluntarily. Th
 - Everything below is counted from data the app already needs: accounts, invites, connections, signals (kept 30 days), blocks and reports.
 - One extra fact per person: whether notifications are on (`profiles.notifications_enabled`). The app reports it only when it changes.
 - For each pair, the time of their first two-way exchange (`connections.first_two_way_at`).
+- For each account that ever joined with an invite, one row in `private.account_origins`: whether it was **invited** (its first join came within a day of making the account), the kind of that link (`code` or `psst`), and when the account was made. No inviter and no code. Invites and their joins are deleted 30 days after an invite ends; this row is what keeps invited-vs-organic after that. It goes when the account is deleted. Accounts with no row are organic. Invited accounts from before 10 Nov 2026 whose invites were already purged couldn't be recovered and count as organic.
 - Every night at 00:10 UTC, `private.metrics_daily` stores that day's **counts only**: no ids, names or content. The daily rows survive the 30-day signal purge and account deletions.
 
 ## Where to look
@@ -16,7 +17,8 @@ Supabase dashboard → SQL Editor. Clients can't read any of this.
 ### The last 30 days
 
 ```sql
-select day, new_accounts, accepted_invites, signals, active_pairs,
+select day, new_accounts, invited_new_accounts, organic_new_accounts,
+       code_invites_created, psst_invites_created, accepted_invites, signals, active_pairs,
        two_way_pairs, first_two_way_pairs, returning_pairs,
        push_failed, push_no_devices, blocks, reports,
        notifications_off, notifications_reported
@@ -36,6 +38,14 @@ from private.metrics_daily where day > current_date - 30;
 select date_trunc('week', day) as week, sum(returning_pairs) as returning_pair_days,
        sum(two_way_pairs) as two_way_pair_days
 from private.metrics_daily group by 1 order by 1 desc;
+
+-- Where do new accounts come from? Invited (joined with an invite within a day)
+-- or organic, and which invites people make: group codes or Psst links.
+-- These four columns start on 10 Nov 2026 (null before).
+select date_trunc('week', day)::date as week,
+       sum(invited_new_accounts) as invited, sum(organic_new_accounts) as organic,
+       sum(code_invites_created) as codes_made, sum(psst_invites_created) as psst_links_made
+from private.metrics_daily where invited_new_accounts is not null group by 1 order by 1 desc;
 
 -- Is delivery healthy? Share of signals whose push failed or had no device.
 select day, signals, push_failed, push_no_devices from private.metrics_daily order by day desc limit 14;
@@ -81,6 +91,8 @@ select * from private.metrics_daily where day = current_date;
 ```
 
 Re-running a day replaces its row. Past days can be rebuilt only while their signals are within the 30-day retention.
+
+The four origin and invite counts are taken at snapshot time (00:10 UTC the next day): an account counts as invited if it has joined with an invite by then. Someone who makes an account at 23:55 and joins at 00:20 shows as organic in that night's row; re-running the day (`select private.snapshot_metrics(date '…')`) counts them as invited. Invites made by someone who has since deleted their account aren't counted. `metrics_report()` (the private dashboard) includes all four.
 
 ## Reading it honestly
 

@@ -123,3 +123,37 @@ Deno.test("passes a doodle's strokes through and rejects a malformed one", async
   await handleSendSignal(request(BODY), plain.d);
   assertEquals("p_doodle" in (plain.calls[0].args as Record<string, unknown>), false, "plain sends stay three arguments");
 });
+
+Deno.test("only the codes the app knows pass through; anything else is a fixed send_failed", async () => {
+  const errors: unknown[][] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => errors.push(args);
+  try {
+    for (const [message, status] of [["rate_limited", 429], ["super_daily_limit", 409], ["invalid_doodle", 422],
+      ["effect_unavailable", 403], ["invalid_event_id", 422]] as const) {
+      const { d } = deps({ sendSignal: () => Promise.resolve({ data: null, error: { message }, status }) });
+      const res = await handleSendSignal(request(BODY), d);
+      assertEquals([res.status, await res.json()], [status, { error: message }]);
+    }
+    for (const [message, status] of [
+      ['duplicate key value violates unique constraint "signal_events_pkey"', 409],
+      ["canceling statement due to statement timeout", 500],
+      ["not_connected", 200],
+      ["", 0],
+    ] as const) {
+      const { d } = deps({ sendSignal: () => Promise.resolve({ data: null, error: { message }, status }) });
+      const res = await handleSendSignal(request(BODY), d);
+      assertEquals([res.status, await res.json()], [500, { error: "send_failed" }]);
+    }
+    assertEquals(errors.length, 4, "each unknown refusal is logged for the function logs");
+    assertEquals(errors[0][2], 'duplicate key value violates unique constraint "signal_events_pkey"');
+  } finally {
+    console.error = original;
+  }
+});
+
+Deno.test("an expired or bad token stays a 401, so the app refreshes its session", async () => {
+  const { d } = deps({ sendSignal: () => Promise.resolve({ data: null, error: { message: "JWT expired" }, status: 401 }) });
+  const res = await handleSendSignal(request(BODY), d);
+  assertEquals([res.status, await res.json()], [401, { error: "not_authenticated" }]);
+});

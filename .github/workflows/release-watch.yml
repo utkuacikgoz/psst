@@ -28,5 +28,5 @@ jobs:
       - run: pip install -q pyjwt==2.15.1 cryptography==50.0.2
       - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
         with:
-          version: latest
+          version: 2.122.1  # v3 changed db push flags; move deliberately
       - run: python3 scripts/release_watch.py

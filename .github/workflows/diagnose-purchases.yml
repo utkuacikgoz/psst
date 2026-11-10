@@ -33,7 +33,7 @@ jobs:
         run: deno run --allow-all scripts/check_apple_ocsp.ts
       - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
         with:
-          version: latest
+          version: 2.122.1  # v3 changed db push flags; move deliberately
       - name: Recent verify-plus failures
         run: python3 scripts/diagnose_purchases.py
       - name: How long a Psst send takes (two temporary accounts)

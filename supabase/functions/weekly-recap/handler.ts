@@ -13,6 +13,29 @@ export interface RecapTarget {
 export interface InviteReminderTarget {
   user_id: string;
   code: string;
+  /** Which link (13A): a Psst link holding a doodle, a plain Psst link, or a group code. */
+  kind?: InviteKind;
+  sound?: string | null;
+  tokens: { token: string; environment: ApnsEnvironment }[];
+}
+
+export type InviteKind = "doodle" | "psst" | "code";
+
+/** A 3+ day streak that ends at midnight, for someone with the streak saver on (5A). */
+export interface StreakReminderTarget {
+  user_id: string;
+  connection_id: string;
+  /** "Your 6-day streak with Mia ends at midnight 🔥" */
+  body: string;
+  sound?: string | null;
+  tokens: { token: string; environment: ApnsEnvironment }[];
+}
+
+/** A quiet week after a busy one (11A): "Quiet week. Psst Kim?" */
+export interface QuietWeekTarget {
+  user_id: string;
+  connection_id: string;
+  body: string;
   sound?: string | null;
   tokens: { token: string; environment: ApnsEnvironment }[];
 }
@@ -24,6 +47,10 @@ export interface WeeklyRecapDeps {
   targets(): Promise<RecapTarget[]>;
   /** Psst links due their one reminder; the database marks them reminded as it returns them. */
   inviteReminders(): Promise<InviteReminderTarget[]>;
+  /** 8 PM streak reminders due now; the database claims the day as it returns them. */
+  streakReminders(): Promise<StreakReminderTarget[]>;
+  /** Sunday quiet-week pushes due now; the database marks them sent as it returns them. */
+  quietWeeks(): Promise<QuietWeekTarget[]>;
   removeTokens(tokens: string[]): Promise<void>;
   sendPush(
     token: string,
@@ -53,15 +80,45 @@ export function buildRecapPayload(target: RecapTarget) {
 /** The link still works for two more days; after a day the nudge is stale. */
 export const INVITE_REMINDER_LIFETIME_SECONDS = 24 * 60 * 60;
 
-/** Opening it shows the share sheet with the same link (owner pick 3A). */
+/** Opening it shows the share sheet with the same link (owner picks 3A, 13A). */
 export function buildInviteReminderPayload(target: InviteReminderTarget) {
   return {
     aps: {
-      alert: { title: "Your Psst hasn't been opened", body: "Send it again?" },
+      alert: { title: "Your Psst is still waiting", body: "Send it again?" },
       sound: target.sound ?? "psst.wav",
       "thread-id": "invite-reminder",
     },
-    psst: { invite_reminder: true, code: target.code },
+    psst: { invite_reminder: true, code: target.code, kind: target.kind ?? "psst" },
+  };
+}
+
+/** Only useful until midnight. */
+export const STREAK_REMINDER_LIFETIME_SECONDS = 4 * 60 * 60;
+
+/** Body only, like a Psst: iOS shows the app name above it (5A). Opens that band. */
+export function buildStreakReminderPayload(target: StreakReminderTarget) {
+  return {
+    aps: {
+      alert: { body: target.body },
+      sound: target.sound ?? "psst.wav",
+      "thread-id": "streak-reminder",
+    },
+    psst: { streak_reminder: true, connection_id: target.connection_id },
+  };
+}
+
+/** A Sunday-evening nudge; stale by the next day. */
+export const QUIET_WEEK_LIFETIME_SECONDS = 6 * 60 * 60;
+
+/** Body only (11A). Opens that person's band. */
+export function buildQuietWeekPayload(target: QuietWeekTarget) {
+  return {
+    aps: {
+      alert: { body: target.body },
+      sound: target.sound ?? "psst.wav",
+      "thread-id": "quiet-week",
+    },
+    psst: { quiet_week: true, connection_id: target.connection_id },
   };
 }
 
@@ -97,31 +154,57 @@ export async function handleWeeklyRecap(req: Request, deps: WeeklyRecapDeps): Pr
     await Promise.all(targets.slice(i, i + 50).map(pushOne));
   }
 
-  // After the recaps, the Psst link reminders (3A), on the same terms: best
-  // effort, and each link is already marked reminded, so nobody gets two.
-  const reminders = await deps.inviteReminders().catch(() => [] as InviteReminderTarget[]);
-  const reminderExpiresAt = deps.nowSeconds() + INVITE_REMINDER_LIFETIME_SECONDS;
-  let remindersSent = 0;
-  const remindOne = async (target: InviteReminderTarget) => {
-    const payload = buildInviteReminderPayload(target);
-    await Promise.all(target.tokens.map(async ({ token, environment }) => {
-      try {
-        const result = await deps.sendPush(token, environment, payload, {
-          apnsId: deps.newId(),
-          expiresAt: reminderExpiresAt,
-        });
-        const outcome = classify(result);
-        if (outcome === "invalid_token") invalid.push(token);
-        if (outcome === "accepted") remindersSent += 1;
-      } catch {
-        // Best effort, as above.
-      }
-    }));
+  // After the recaps, the other pushes of the hourly run, on the same terms: best
+  // effort, and each is already marked sent in the database, so nobody gets two.
+  // A failing lookup skips that kind only.
+  const sendAll = async <T extends { tokens: { token: string; environment: ApnsEnvironment }[] }>(
+    lookup: () => Promise<T[]>,
+    build: (target: T) => unknown,
+    lifetime: number,
+  ) => {
+    const list = await lookup().catch(() => [] as T[]);
+    const until = deps.nowSeconds() + lifetime;
+    let accepted = 0;
+    const one = async (target: T) => {
+      const payload = build(target);
+      await Promise.all(target.tokens.map(async ({ token, environment }) => {
+        try {
+          const result = await deps.sendPush(token, environment, payload, { apnsId: deps.newId(), expiresAt: until });
+          const outcome = classify(result);
+          if (outcome === "invalid_token") invalid.push(token);
+          if (outcome === "accepted") accepted += 1;
+        } catch {
+          // Best effort, as above.
+        }
+      }));
+    };
+    for (let i = 0; i < list.length; i += 50) {
+      await Promise.all(list.slice(i, i + 50).map(one));
+    }
+    return { people: list.length, sent: accepted };
   };
-  for (let i = 0; i < reminders.length; i += 50) {
-    await Promise.all(reminders.slice(i, i + 50).map(remindOne));
-  }
+
+  const reminders = await sendAll(
+    () => deps.inviteReminders(),
+    buildInviteReminderPayload,
+    INVITE_REMINDER_LIFETIME_SECONDS,
+  );
+  const streaks = await sendAll(
+    () => deps.streakReminders(),
+    buildStreakReminderPayload,
+    STREAK_REMINDER_LIFETIME_SECONDS,
+  );
+  const quiet = await sendAll(() => deps.quietWeeks(), buildQuietWeekPayload, QUIET_WEEK_LIFETIME_SECONDS);
 
   if (invalid.length > 0) await deps.removeTokens([...new Set(invalid)]).catch(() => {});
-  return json({ people: targets.length, sent, reminders: reminders.length, reminders_sent: remindersSent }, 200);
+  return json({
+    people: targets.length,
+    sent,
+    reminders: reminders.people,
+    reminders_sent: reminders.sent,
+    streak_reminders: streaks.people,
+    streak_reminders_sent: streaks.sent,
+    quiet_weeks: quiet.people,
+    quiet_weeks_sent: quiet.sent,
+  }, 200);
 }

@@ -1292,6 +1292,285 @@ class BackendTests(unittest.TestCase):
         a.rpc("remove_connection", pair)
         self.assertEqual(admin("select count(*) from private.pair_counts where connection_id = %s", pair)[0][0], 0)
 
+    # Streak saver (5A), quiet week (11A), link reminder kind (13A) --------------
+
+    def _day_psst(self, conn, sender, recipient, day, hour=12):
+        """A Psst at noon UTC on a given date (the test people keep UTC time)."""
+        import datetime
+        at = datetime.datetime.combine(day, datetime.time(hour), datetime.timezone.utc)
+        admin("insert into public.signal_events (id, connection_id, sender_id, recipient_id, effect_id, created_at) "
+              "values (gen_random_uuid(), %s, %s, %s, 'psst', %s)", conn, sender.user_id, recipient.user_id, at)
+
+    def _keep(self, conn, a, b, *days):
+        for day in days:
+            self._day_psst(conn, a, b, day)
+            self._day_psst(conn, b, a, day)
+
+    @staticmethod
+    def _streak_on(conn, day):
+        return admin("select private.streak_days_on(%s, %s)", conn, day)[0][0]
+
+    @staticmethod
+    def _freezes(conn):
+        return admin("select day, user_id, plus from private.streak_freezes where connection_id = %s order by day", conn)
+
+    def test_streak_saver_switch_and_status(self):
+        ada = new_user("Ada")
+        ada.rpc("set_time_zone", "UTC")
+        self.assertEqual(ada.rpc("streak_saver_status"), {"enabled": False, "unlimited": False, "freezes_left": 1},
+                         "off by default (the 3A rule stays the default)")
+        ada.rpc("set_streak_reminders", True)
+        self.assertTrue(ada.rpc("streak_saver_status")["enabled"])
+        with self.fails("invalid_preference", 422):
+            ada.rpc("set_streak_reminders", None)
+        self.assertTrue(ada.rpc("streak_saver_status")["enabled"], "a refused call changes nothing")
+
+        # This month's free freeze spent: none left; last month's doesn't count.
+        emre = new_user("Emre")
+        pair = connect(ada, emre)
+        admin("insert into private.streak_freezes (connection_id, day, user_id, plus) "
+              "values (%s, (date_trunc('month', now() at time zone 'UTC') - interval '1 day')::date, %s, false)",
+              pair, ada.user_id)
+        self.assertEqual(ada.rpc("streak_saver_status")["freezes_left"], 1)
+        admin("insert into private.streak_freezes (connection_id, day, user_id, plus) "
+              "values (%s, (now() at time zone 'UTC')::date, %s, false)", pair, ada.user_id)
+        self.assertEqual(ada.rpc("streak_saver_status"), {"enabled": True, "unlimited": False, "freezes_left": 0})
+        self.assertEqual(emre.rpc("streak_saver_status")["freezes_left"], 1, "spent from one account only")
+
+        admin("insert into private.plus_entitlements (user_id, original_transaction_id, valid_until) "
+              "values (%s, %s, now() + interval '30 days')", ada.user_id, "streak-plus-" + uuid.uuid4().hex)
+        self.assertEqual(ada.rpc("streak_saver_status"), {"enabled": True, "unlimited": True, "freezes_left": 1})
+        ada.rpc("set_streak_reminders", False)
+        self.assertFalse(ada.rpc("streak_saver_status")["enabled"])
+
+        ghost = Api("authenticated", uuid.uuid4())
+        with self.fails("profile_required", 409):
+            ghost.rpc("set_streak_reminders", True)
+        for fn in ("streak_saver_status", "set_streak_reminders"):
+            with self.assertRaises(errors.InsufficientPrivilege):
+                Api("anon").rpc(fn, *((True,) if fn == "set_streak_reminders" else ()))
+        with self.assertRaises(errors.InsufficientPrivilege):
+            ada.rpc("streak_reminder_targets")
+        with self.assertRaises(errors.InsufficientPrivilege):
+            ada.rows("select * from private.streak_freezes")
+
+    def test_streak_freeze_forgives_one_missed_day_a_month(self):
+        import datetime
+        D = lambda d: datetime.date(2026, 10, d)
+        ada, emre = new_user("Ada"), new_user("Emre")
+        for person in (ada, emre):
+            person.rpc("set_time_zone", "UTC")
+        ada.rpc("set_streak_reminders", True)   # Emre hasn't turned it on
+        pair = connect(ada, emre)
+
+        self._keep(pair, ada, emre, D(1), D(2), D(3))
+        # Oct 4 missed. On Oct 5 the streak is still alive: a freeze is ready.
+        self.assertEqual(self._streak_on(pair, D(5)), 3)
+        self.assertEqual(self._streak_on(pair, D(6)), 0, "two missed days end it")
+        self._keep(pair, ada, emre, D(5))
+        self.assertEqual(self._streak_on(pair, D(5)), 4, "goes on across the frozen day (which doesn't add)")
+        self.assertEqual(self._freezes(pair), [(D(4), ada.user_id, False)], "spent from Ada's account")
+
+        # A second miss in October: Ada's free freeze is gone and Emre has no saver.
+        self._keep(pair, ada, emre, D(6))
+        self.assertEqual(self._streak_on(pair, D(8)), 0)
+        self._keep(pair, ada, emre, D(8))
+        self.assertEqual(self._streak_on(pair, D(8)), 1, "starts again")
+        self.assertEqual(len(self._freezes(pair)), 1)
+
+        # With Emre's saver on too, his freeze saves the next miss: either person's works.
+        emre.rpc("set_streak_reminders", True)
+        self._keep(pair, ada, emre, D(9))
+        self.assertEqual(self._streak_on(pair, D(11)), 2)
+        self._keep(pair, ada, emre, D(11))
+        self.assertEqual(self._streak_on(pair, D(11)), 3)
+        self.assertEqual(self._freezes(pair)[-1], (D(10), emre.user_id, False))
+
+        # A new month brings a new free freeze.
+        self._keep(pair, ada, emre, D(31))           # breaks (Oct 12–30 missed), streak 1
+        self._keep(pair, ada, emre, datetime.date(2026, 11, 2))
+        self.assertEqual(self._streak_on(pair, datetime.date(2026, 11, 2)), 2)
+        self.assertEqual(self._freezes(pair)[-1][0], datetime.date(2026, 11, 1))
+
+        # Turning the saver off: no freeze is ready any more.
+        ada.rpc("set_streak_reminders", False); emre.rpc("set_streak_reminders", False)
+        self.assertEqual(self._streak_on(pair, datetime.date(2026, 11, 4)), 0)
+
+    def test_streak_without_saver_is_unchanged_and_plus_is_unlimited(self):
+        import datetime
+        D = lambda d: datetime.date(2026, 10, d)
+        kim, sam, mia, leo = new_user("Kim"), new_user("Sam"), new_user("Mia"), new_user("Leo")
+        for person in (kim, sam, mia, leo):
+            person.rpc("set_time_zone", "UTC")
+
+        plain = connect(kim, sam)
+        self._keep(plain, kim, sam, D(1), D(2), D(3))
+        self.assertEqual(self._streak_on(plain, D(5)), 0, "no saver: a missed day ends it, as before")
+        self._keep(plain, kim, sam, D(5))
+        self.assertEqual(self._streak_on(plain, D(5)), 1)
+        self.assertEqual(self._freezes(plain), [])
+
+        # Psst+ with the saver on: every single missed day is forgiven.
+        admin("insert into private.plus_entitlements (user_id, original_transaction_id, valid_until) "
+              "values (%s, %s, now() + interval '30 days')", mia.user_id, "streak-plus-" + uuid.uuid4().hex)
+        mia.rpc("set_streak_reminders", True)
+        plus = connect(mia, leo)
+        self._keep(plus, mia, leo, D(1), D(3), D(5), D(7))
+        self.assertEqual(self._streak_on(plus, D(7)), 4)
+        self.assertEqual([f[2] for f in self._freezes(plus)], [True, True, True], "Psst+ freezes don't use the monthly one")
+        self.assertEqual(mia.rpc("streak_saver_status")["unlimited"], True)
+        self._keep(plus, mia, leo, D(10))
+        self.assertEqual(self._streak_on(plus, D(10)), 1, "two missed days in a row end it even with Psst+")
+
+        # Psst+ without the saver switched on: unaffected.
+        admin("update public.profiles set streak_reminders = false where id = %s", mia.user_id)
+        self.assertEqual(self._streak_on(plus, D(12)), 0)
+
+    def test_streak_days_shows_a_frozen_streak_everywhere(self):
+        import datetime
+        today = datetime.datetime.now(datetime.timezone.utc).date()
+        ada, emre, sam, kim = new_user("Ada"), new_user("Emre"), new_user("Sam"), new_user("Kim")
+        for person in (ada, emre, sam, kim):
+            person.rpc("set_time_zone", "UTC")
+        ada.rpc("set_streak_reminders", True)
+        saved, plain = connect(ada, emre), connect(sam, kim)
+        days = [today - datetime.timedelta(days=n) for n in (4, 3, 2)]   # yesterday missed
+        self._keep(saved, ada, emre, *days)
+        self._keep(plain, sam, kim, *days)
+
+        def listed(viewer, conn):
+            return viewer.rows("select streak_days from public.list_connections() where connection_id = %s", conn)[0][0]
+
+        self.assertEqual((listed(ada, saved), listed(emre, saved)), (3, 3), "Ada's freeze keeps it alive for both")
+        self.assertEqual(listed(sam, plain), 0)
+        recap = admin("select private.recap_for(%s, %s)", emre.user_id, today)[0][0]
+        self.assertEqual(recap["streak"]["days"], 3, "the recap agrees")
+        token = secrets.token_hex(24)
+        emre.rpc("register_widget_token", token)
+        people = {p["connection_id"]: p["streak_days"] for p in Api("anon").rpc("widget_state", token)["people"]}
+        self.assertEqual(people[str(saved)], 3, "and the widget")
+
+    def test_streak_reminder_at_8pm_once_a_day_for_the_longest_streak_at_risk(self):
+        import datetime
+        D = lambda d: datetime.date(2026, 10, d)
+        at = lambda d, h: datetime.datetime(2026, 10, d, h, 30, tzinfo=datetime.timezone.utc)
+        ada, emre, mia, kim = new_user("Ada"), new_user("Emre"), new_user("Mia"), new_user("Kim")
+        for person in (ada, emre, mia, kim):
+            person.rpc("set_time_zone", "UTC")
+        ada.rpc("register_device_token", "5a" * 32, "sandbox")
+        admin("update public.profiles set notification_sound = 'psst-soft.wav' where id = %s", ada.user_id)
+        with_emre, with_mia, with_kim = connect(ada, emre), connect(ada, mia), connect(ada, kim)
+
+        def targets(now):
+            return admin("select private.streak_reminder_targets_at(%s)", now)[0][0]
+
+        self._keep(with_emre, ada, emre, D(7), D(8), D(9))            # 3 days
+        self._keep(with_mia, ada, mia, D(4), D(5), D(6), D(7), D(8), D(9))  # 6 days
+        self._keep(with_kim, ada, kim, D(8), D(9))                    # 2: too short to remind
+        self.assertEqual(targets(at(10, 20)), [], "off by default: nobody gets one")
+
+        ada.rpc("set_streak_reminders", True)
+        self.assertEqual(targets(at(10, 20)), [], "a free freeze would save it: 'ends at midnight' isn't true")
+        # Ada's October freeze is spent (and nobody else has the saver).
+        admin("insert into private.streak_freezes (connection_id, day, user_id, plus) values (%s, %s, %s, false)",
+              with_kim, D(1), ada.user_id)
+        self.assertEqual(targets(at(10, 19)), [], "not before 8 PM")
+        sent = targets(at(10, 20))
+        self.assertEqual(sent, [{
+            "user_id": str(ada.user_id), "connection_id": str(with_mia),
+            "body": "Your 6-day streak with Mia ends at midnight 🔥", "sound": "psst-soft.wav",
+            "tokens": [{"token": "5a" * 32, "environment": "sandbox"}]}], "one push, the longest streak")
+        self.assertEqual(targets(at(10, 21)), [], "never more than one a day")
+        self.assertEqual(targets(at(10, 23)), [])
+
+        # Next day: Mia's streak is kept today, Emre's isn't; Emre's goes out.
+        self._keep(with_emre, ada, emre, D(10)); self._keep(with_mia, ada, mia, D(10))
+        self._keep(with_mia, ada, mia, D(11))
+        self.assertEqual([t["body"] for t in targets(at(11, 20))], ["Your 4-day streak with Emre ends at midnight 🔥"])
+
+        # Everything kept today: nothing to say.
+        self._keep(with_emre, ada, emre, D(12)); self._keep(with_mia, ada, mia, D(12))
+        self.assertEqual(targets(at(12, 22)), [])
+        # A streak already broken isn't at risk.
+        self.assertEqual(targets(at(14, 20)), [])
+
+        # Emre never turned it on: he gets nothing, whatever his streaks.
+        self.assertNotIn(str(emre.user_id), {t["user_id"] for t in targets(at(13, 20))})
+
+        # Two runs at once: still one.
+        self._keep(with_mia, ada, mia, D(13))
+        admin("delete from private.streak_reminder_state where user_id = %s", ada.user_id)
+        with ThreadPoolExecutor(4) as pool:
+            runs = list(pool.map(lambda _: targets(at(14, 20)), range(4)))
+        self.assertEqual(sum(len(r) for r in runs), 1)
+
+        self.assertEqual(Api("service_role").rpc("streak_reminder_targets").__class__, list)
+
+    def test_quiet_week_push_after_a_quiet_week_at_most_every_three_weeks(self):
+        import datetime
+        D = lambda m, d: datetime.date(2026, m, d)
+        sunday_at = lambda m, d, h: datetime.datetime(2026, m, d, h, 30, tzinfo=datetime.timezone.utc)
+        ada, kim, sam = new_user("Ada"), new_user("Kim"), new_user("Sam")
+        for person in (ada, kim, sam):
+            person.rpc("set_time_zone", "UTC")
+        kim.rpc("set_weekly_recap", False)
+        sam.rpc("set_weekly_recap", False)
+        ada.rpc("register_device_token", "9e" * 32, "production")
+        with_kim, with_sam = connect(ada, kim), connect(ada, sam)
+
+        def targets(now):
+            return [t for t in admin("select private.quiet_week_targets_at(%s)", now)[0][0]
+                    if t["user_id"] == str(ada.user_id)]
+
+        # Week of Oct 12–18: Kim 3, Sam 1. Week of Oct 19–25: nothing.
+        for _ in range(3):
+            self._day_psst(with_kim, kim, ada, D(10, 14))
+        self._day_psst(with_sam, ada, sam, D(10, 15))
+        self.assertEqual(targets(sunday_at(10, 18, 20)), [], "that week had Pssts")
+        self.assertEqual(targets(sunday_at(10, 25, 17)), [], "not before 6 PM")
+        self.assertEqual(targets(sunday_at(10, 25, 18)), [{
+            "user_id": str(ada.user_id), "connection_id": str(with_kim), "body": "Quiet week. Psst Kim?",
+            "sound": "psst.wav", "tokens": [{"token": "9e" * 32, "environment": "production"}]}])
+        self.assertEqual(targets(sunday_at(10, 25, 19)), [], "once")
+        self.assertEqual(targets(sunday_at(11, 1, 18)), [], "the week before was quiet too")
+
+        # Busy again Oct 26–Nov 1, quiet Nov 2–8: within three weeks of the last one.
+        self._day_psst(with_sam, sam, ada, D(10, 28))
+        admin("update private.quiet_week_state set last_checked = %s where user_id = %s", D(10, 25), ada.user_id)
+        self.assertEqual(targets(sunday_at(11, 8, 18)), [], "at most once every three weeks")
+        # Three weeks on, it may send again (Sam was #1 the week before).
+        admin("update private.quiet_week_state set last_sent = %s, last_checked = %s where user_id = %s",
+              D(10, 18), D(10, 25), ada.user_id)
+        self.assertEqual([t["body"] for t in targets(sunday_at(11, 8, 18))], ["Quiet week. Psst Sam?"])
+
+        # Blocked, removed, or recap switched off: nothing.
+        reset = lambda: admin("update private.quiet_week_state set last_sent = null, last_checked = null where user_id = %s",
+                              ada.user_id)
+        reset()
+        admin("insert into public.blocks (blocker_id, blocked_id) values (%s, %s)", sam.user_id, ada.user_id)
+        self.assertEqual(targets(sunday_at(11, 8, 18)), [], "skipped if they blocked each other")
+        admin("delete from public.blocks where blocker_id = %s", sam.user_id)
+        reset()
+        ada.rpc("set_weekly_recap", False)
+        self.assertEqual(targets(sunday_at(11, 8, 18)), [], "the recap switch turns it off")
+        ada.rpc("set_weekly_recap", True)
+        reset()
+        admin("delete from public.connections where id = %s", with_sam)
+        self.assertEqual(targets(sunday_at(11, 8, 18)), [], "no longer connected")
+
+        with self.assertRaises(errors.InsufficientPrivilege):
+            ada.rpc("quiet_week_targets")
+        self.assertIsInstance(Api("service_role").rpc("quiet_week_targets"), list)
+
+    def test_link_reminder_says_which_link_it_is(self):
+        ada = new_user("Ada")
+        admin("update public.profiles set app_build = 40 where id = %s", ada.user_id)
+        plain = ada.rpc("create_psst_invite")["code"]
+        doodle = ada.rpc("create_psst_invite", json.dumps([[[0.2, 0.3], [0.5, 0.8]]]))["code"]
+        admin("update public.invites set created_at = now() - interval '5 days' where code in (%s, %s)", plain, doodle)
+        kinds = {t["code"]: t["kind"] for t in Api("service_role").rpc("invite_reminder_targets")
+                 if t["user_id"] == str(ada.user_id)}
+        self.assertEqual(kinds, {plain: "psst", doodle: "doodle"})
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)

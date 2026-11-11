@@ -25,7 +25,7 @@ export type InviteKind = "doodle" | "psst" | "code";
 export interface StreakReminderTarget {
   user_id: string;
   connection_id: string;
-  /** "Your 6-day streak with Mia ends at midnight 🔥" */
+  /** "Your 6-day streak with Mia ends at midnight 🔥", or "… needs a Psst today 🔥" when a freeze would cover today (3B). */
   body: string;
   sound?: string | null;
   tokens: { token: string; environment: ApnsEnvironment }[];

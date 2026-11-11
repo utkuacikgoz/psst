@@ -1470,7 +1470,9 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(targets(at(10, 20)), [], "off by default: nobody gets one")
 
         ada.rpc("set_streak_reminders", True)
-        self.assertEqual(targets(at(10, 20)), [], "a free freeze would save it: 'ends at midnight' isn't true")
+        # 3B (11 Nov 2026): a free freeze would save it, so the line says today, not midnight.
+        self.assertEqual([t["body"] for t in targets(at(10, 20))], ["Your 6-day streak with Mia needs a Psst today 🔥"])
+        admin("delete from private.streak_reminder_state where user_id = %s", ada.user_id)
         # Ada's October freeze is spent (and nobody else has the saver).
         admin("insert into private.streak_freezes (connection_id, day, user_id, plus) values (%s, %s, %s, false)",
               with_kim, D(1), ada.user_id)

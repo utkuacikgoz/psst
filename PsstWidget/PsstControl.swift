@@ -50,21 +50,127 @@ struct SendPsstIntent: AppIntent {
     init() {}
     init(person: PsstPersonEntity?) { self.person = person }
 
-    func perform() async throws -> some IntentResult {
+    /// 9A (owner pick, 10 Nov 2026): Shortcuts and the Action button say who it went to.
+    func perform() async throws -> some IntentResult & ProvidesDialog {
         guard let target = person ?? PsstPersonEntity.everyone().first else { throw PsstSendError.nobody }
         try await PsstSender.send(to: target.id)
+        return .result(dialog: "Psst sent to \(target.name)")
+    }
+}
+
+/// The control's own action (9A, owner pick 10 Nov 2026): sends like SendPsstIntent,
+/// and shows on the button "Sending…", then "Sent ✓" (or "Paused, try in a minute")
+/// for a moment before it reads as before. Hidden from Shortcuts, which keeps
+/// "Send a Psst".
+struct SendPsstFromControlIntent: AppIntent {
+    static let title: LocalizedStringResource = "Send a Psst"
+    static let description = IntentDescription("Sends a Psst without opening the app.")
+    static let openAppWhenRun = false
+    static let isDiscoverable = false
+    /// 7A (18 Oct 2026): from a locked phone, iOS asks for Face ID first.
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
+
+    @Parameter(title: "Person")
+    var person: PsstPersonEntity?
+
+    init() {}
+    init(person: PsstPersonEntity?) { self.person = person }
+
+    func perform() async throws -> some IntentResult {
+        guard let target = person ?? PsstPersonEntity.everyone().first else { throw PsstSendError.nobody }
+        PsstControlStatus.show(.sending, for: target.id)
+        do {
+            try await PsstSender.send(to: target.id)
+            PsstControlStatus.show(.sent, for: target.id)
+        } catch PsstSendError.paused {
+            PsstControlStatus.show(.paused, for: target.id)
+        } catch {
+            PsstControlStatus.show(nil, for: target.id)
+            throw error
+        }
+        // "For a moment", then the button reads as before. If iOS stops the extension
+        // first, the next redraw finds the status expired (PsstControlStatus.shownFor).
+        try? await Task.sleep(nanoseconds: UInt64(PsstControlStatus.shownFor * 1_000_000_000))
+        PsstControlStatus.show(nil, for: target.id)
         return .result()
     }
 }
 
+/// What the control shows right after a tap (9A), kept in the App Group so the
+/// control, redrawn with ControlCenter.reloadControls, can read it.
+struct PsstControlStatus: Codable {
+    enum Phase: String, Codable {
+        case sending, sent, paused
+
+        var text: String {
+            switch self {
+            case .sending: "Sending…"
+            case .sent: "Sent ✓"
+            case .paused: "Paused, try in a minute"
+            }
+        }
+
+        /// What VoiceOver says (no "check mark").
+        var spoken: String {
+            switch self {
+            case .sending: "Sending"
+            case .sent: "Sent"
+            case .paused: "Paused, try in a minute"
+            }
+        }
+    }
+
+    let person: UUID
+    let phase: Phase
+    let at: Date
+
+    private static let key = "psst.control.status"
+    /// How long "Sent ✓" or "Paused, try in a minute" stays on the button.
+    static let shownFor: TimeInterval = 2.5
+    /// Longer than a send can take (its timeouts), so a stuck "Sending…" clears.
+    private static let sendingFor: TimeInterval = 60
+
+    private static var defaults: UserDefaults? {
+        (Bundle.main.object(forInfoDictionaryKey: "PSSTAppGroup") as? String).flatMap(UserDefaults.init(suiteName:))
+    }
+
+    /// What to show for this person now; nil = the button as normal.
+    static func current(for person: UUID?, now: Date = Date()) -> Phase? {
+        guard let person, let data = defaults?.data(forKey: key),
+              let status = try? JSONDecoder().decode(PsstControlStatus.self, from: data),
+              status.person == person else { return nil }
+        let age = now.timeIntervalSince(status.at)
+        let limit = status.phase == .sending ? sendingFor : shownFor + 1
+        return age >= 0 && age < limit ? status.phase : nil
+    }
+
+    /// Saves what to show (nil: back to normal) and redraws the control.
+    static func show(_ phase: Phase?, for person: UUID) {
+        if let phase {
+            guard let data = try? JSONEncoder().encode(PsstControlStatus(person: person, phase: phase, at: Date())) else { return }
+            defaults?.set(data, forKey: key)
+        } else {
+            // Only clears this person's status, never one a newer tap saved for someone else.
+            if let data = defaults?.data(forKey: key),
+               let status = try? JSONDecoder().decode(PsstControlStatus.self, from: data),
+               status.person != person { return }
+            defaults?.removeObject(forKey: key)
+        }
+        if #available(iOS 18.0, *) {
+            ControlCenter.shared.reloadControls(ofKind: PsstControl.kind)
+        }
+    }
+}
+
 enum PsstSendError: Error, CustomLocalizedStringResourceConvertible {
-    case nobody, signedOut, failed
+    case nobody, signedOut, failed, paused
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
         case .nobody: "Open Psst and invite someone first."
         case .signedOut: "Open Psst once, then try again."
         case .failed: "Your Psst didn't send. Try again."
+        case .paused: "Paused, try in a minute."
         }
     }
 }
@@ -84,8 +190,17 @@ struct PsstControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         AppIntentControlConfiguration(kind: Self.kind, intent: PsstControlConfiguration.self) { configuration in
             let person = configuration.person ?? PsstPersonEntity.everyone().first
-            ControlWidgetButton(action: SendPsstIntent(person: person)) {
-                Label(person.map { "Psst \($0.name)" } ?? "Psst", systemImage: "cat.fill")
+            // 9A: right after a tap, "Sending…", then "Sent ✓" or "Paused, try in a minute".
+            let phase = PsstControlStatus.current(for: person?.id)
+            ControlWidgetButton(action: SendPsstFromControlIntent(person: person)) {
+                Label {
+                    Text(person.map { "Psst \($0.name)" } ?? "Psst")
+                    if let phase {
+                        Text(phase.text).accessibilityLabel(phase.spoken)
+                    }
+                } icon: {
+                    Image(systemName: "cat.fill")
+                }
             }
         }
         .displayName("Psst someone")
@@ -242,13 +357,40 @@ enum PsstSender {
 
     static func send(to connection: UUID) async throws {
         guard let baseURL, var session = load() else { throw PsstSendError.signedOut }
+        if isPaused(connection) { throw PsstSendError.paused }
         if session.expiresAt.timeIntervalSinceNow < 60 { session = try await refresh(session, baseURL: baseURL) }
         var status = try await post(session, baseURL: baseURL, connection: connection)
         if status == 401 {
             session = try await refresh(session, baseURL: baseURL)
             status = try await post(session, baseURL: baseURL, connection: connection)
         }
+        if status == 429 {
+            // Rate limited (rate_limited): paused for a minute, like home (LiveStore.pauseDuration).
+            pause(connection)
+            throw PsstSendError.paused
+        }
         guard (200..<300).contains(status) else { throw PsstSendError.failed }
+    }
+
+    /// When sends to each person are paused until, after the server said rate_limited (9A).
+    private static let pausedKey = "psst.control.pausedUntil"
+    private static let pauseDuration: TimeInterval = 60
+
+    private static var groupDefaults: UserDefaults? {
+        (info["PSSTAppGroup"] as? String).flatMap(UserDefaults.init(suiteName:))
+    }
+
+    private static func isPaused(_ connection: UUID) -> Bool {
+        let until = (groupDefaults?.dictionary(forKey: pausedKey)?[connection.uuidString] as? Double) ?? 0
+        return until > Date().timeIntervalSince1970
+    }
+
+    private static func pause(_ connection: UUID) {
+        let now = Date().timeIntervalSince1970
+        var paused = (groupDefaults?.dictionary(forKey: pausedKey) as? [String: Double]) ?? [:]
+        paused = paused.filter { $0.value > now }
+        paused[connection.uuidString] = now + pauseDuration
+        groupDefaults?.set(paused, forKey: pausedKey)
     }
 
     private static func post(_ session: Session, baseURL: URL, connection: UUID) async throws -> Int {

@@ -229,6 +229,11 @@ struct Provider: TimelineProvider {
 struct PeopleView: View {
     let entry: Entry
     @Environment(\.widgetFamily) private var family
+    /// 1A (owner pick, 10 Nov 2026): tinted and clear Home Screens (.accented), and
+    /// .vibrant, get outlines in the tint instead of solid colour. Full colour is as before.
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    private var tinted: Bool { renderingMode != .fullColor }
 
     private var shown: [WidgetPerson] {
         Array(entry.people.prefix(family == .systemSmall ? 1 : 3))
@@ -251,6 +256,7 @@ struct PeopleView: View {
                     Link(destination: url(for: person)) { band(person) }
                 }
             }
+            .padding(.vertical, tinted ? 3 : 0)
         }
     }
 
@@ -266,9 +272,11 @@ struct PeopleView: View {
             .minimumScaleFactor(0.5)
             .privacySensitive()
             .foregroundStyle(.white)
+            .widgetAccentable()
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(hex: person.color))
+            .modifier(BandBackground(color: Color(hex: person.color), cornerRadius: 12,
+                                     inset: EdgeInsets(top: 3, leading: 6, bottom: 3, trailing: 6)))
             .accessibilityLabel("Send \(person.name) a Psst")
     }
 
@@ -290,6 +298,7 @@ struct PeopleView: View {
                 .minimumScaleFactor(0.8)
         }
         .foregroundStyle(.white)
+        .widgetAccentable()
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .bottomLeading) {
@@ -300,10 +309,12 @@ struct PeopleView: View {
                 }
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(Color.white)
+                .widgetAccentable()
                 .padding(12)
             }
         }
-        .background(Color(hex: person.color))
+        .modifier(BandBackground(color: Color(hex: person.color), cornerRadius: 16,
+                                 inset: EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Send \(person.name) a Psst")
         .accessibilityValue(streak >= 3 ? status + ", \(streak) days in a row" : status)
@@ -319,7 +330,46 @@ struct PeopleView: View {
         return "pssted you \(Int(elapsed / (24 * 3600)))d ago"
     }
 
-    private func polaroid(_ doodle: WidgetDoodle) -> some View {
+    @ViewBuilder private func polaroid(_ doodle: WidgetDoodle) -> some View {
+        if tinted {
+            clearPolaroid(doodle)
+        } else {
+            fullColorPolaroid(doodle)
+        }
+    }
+
+    /// 1A: tinted and clear modes. The doodle in the tint on a clear card, outlined,
+    /// instead of a solid block; same size, tilt and words as the polaroid.
+    private func clearPolaroid(_ doodle: WidgetDoodle) -> some View {
+        VStack(spacing: 4) {
+            WidgetDoodleShape(strokes: doodle.strokes)
+                .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                .widgetAccentable()
+                .privacySensitive()
+                .padding(10)
+                .aspectRatio(1, contentMode: .fit)
+                .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+            Text("from \(doodle.senderName)")
+                .font(.custom("InterTight-Black", size: 12))
+                .foregroundStyle(Color.white)
+                .widgetAccentable()
+                .lineLimit(1)
+                .privacySensitive()
+        }
+        .padding(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color.white.opacity(0.7), lineWidth: 2)
+                .widgetAccentable()
+        }
+        .rotationEffect(.degrees(-4))
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("A doodle from \(doodle.senderName). Opens Psst.")
+    }
+
+    private func fullColorPolaroid(_ doodle: WidgetDoodle) -> some View {
         VStack(spacing: 4) {
             WidgetDoodleShape(strokes: doodle.strokes)
                 .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
@@ -355,6 +405,33 @@ struct PeopleView: View {
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .widgetURL(URL(string: url))
+    }
+}
+
+/// 1A (owner pick, 10 Nov 2026): a person's band. Full colour: their solid colour,
+/// as always. Tinted, clear or vibrant: an outline in the tint on a faint fill, set in
+/// by `inset` so it isn't clipped by the widget's corners and bands don't touch.
+private struct BandBackground: ViewModifier {
+    let color: Color
+    let cornerRadius: CGFloat
+    let inset: EdgeInsets
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if renderingMode == .fullColor {
+            content.background(color)
+        } else {
+            content.background {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color.white.opacity(0.12))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.7), lineWidth: 2)
+                    }
+                    .widgetAccentable()
+                    .padding(inset)
+            }
+        }
     }
 }
 

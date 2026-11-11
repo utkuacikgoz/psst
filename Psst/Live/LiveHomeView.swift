@@ -221,7 +221,12 @@ struct LiveHomeView: View {
         }
     }
 
+    // Split into parts so the compiler can type-check it in reasonable time.
     var body: some View {
+        withSheets(withLifecycleLate(withLifecycle(withOverlays(homeContent))))
+    }
+
+    private var homeContent: some View {
         GeometryReader { proxy in
             let inset = Tokens.sideInset(forWidth: proxy.size.width)
             // Room for the bands: the measured scroll area (an estimate only for the very
@@ -325,41 +330,57 @@ struct LiveHomeView: View {
         // Behind a sheet, an arrival or the tip, VoiceOver can't reach (and tap-send) the bands.
         .accessibilityHidden(anySheet || store.arrival != nil || showsCoach || showsDoodleTip || showingWidgetTip)
         .background(Color.psstCanvas.ignoresSafeArea())
-        .overlay {
-            if showsCoach {
-                CoachOverlay { withAnimation { store.dismissCoach() } }
-            } else if showsDoodleTip {
-                DoodleTipOverlay { withAnimation { store.dismissDoodleTip() } }
+    }
+
+    @ViewBuilder private var tipOverlay: some View {
+        if showsCoach {
+            CoachOverlay { withAnimation { store.dismissCoach() } }
+        } else if showsDoodleTip {
+            DoodleTipOverlay { withAnimation { store.dismissDoodleTip() } }
+        }
+    }
+
+    @ViewBuilder private var widgetTipOverlay: some View {
+        // 4A: once, after your first two-way Psst, on a visit with nothing else new.
+        if showingWidgetTip, let tip = store.widgetTip,
+           let person = store.connections.first(where: { $0.id == tip.connectionID }) {
+            WidgetTipOverlay(name: person.otherName, line: tip.line(),
+                             color: Color(hex: bandColors[person.id] ?? personalization.colorHex(for: person.id, name: person.otherName))) {
+                withAnimation { showingWidgetTip = false }
+                store.dismissWidgetTip()
             }
         }
-        .overlay {
-            // 4A: once, after your first two-way Psst, on a visit with nothing else new.
-            if showingWidgetTip, let tip = store.widgetTip,
-               let person = store.connections.first(where: { $0.id == tip.connectionID }) {
-                WidgetTipOverlay(name: person.otherName, line: tip.line(),
-                                 color: Color(hex: bandColors[person.id] ?? personalization.colorHex(for: person.id, name: person.otherName))) {
-                    withAnimation { showingWidgetTip = false }
-                    store.dismissWidgetTip()
-                }
-            }
+    }
+
+    @ViewBuilder private var arrivalOverlay: some View {
+        if let arrival = store.arrival {
+            ArrivalView(arrival: arrival,
+                        onTap: { withAnimation { store.psstBack(arrival) } },
+                        onDone: { withAnimation { store.nextArrival() } },
+                        color: arrival.connectionID.map {
+                            Color(hex: bandColors[$0] ?? personalization.colorHex(for: $0, name: arrival.senderName))
+                        },
+                        onHideDoodle: { withAnimation { store.hideDoodle(arrival) } },
+                        onBlock: sender(of: arrival).map { person -> () -> Void in { confirm(.block, person) } },
+                        onReport: sender(of: arrival).map { person -> () -> Void in { confirm(.report, person, eventID: arrival.id) } },
+                        onPickWord: pickWord)
         }
-        .overlay {
-            if let arrival = store.arrival {
-                ArrivalView(arrival: arrival,
-                            onTap: { withAnimation { store.psstBack(arrival) } },
-                            onDone: { withAnimation { store.nextArrival() } },
-                            color: arrival.connectionID.map {
-                                Color(hex: bandColors[$0] ?? personalization.colorHex(for: $0, name: arrival.senderName))
-                            },
-                            onHideDoodle: { withAnimation { store.hideDoodle(arrival) } },
-                            onBlock: sender(of: arrival).map { person -> () -> Void in { confirm(.block, person) } },
-                            onReport: sender(of: arrival).map { person -> () -> Void in { confirm(.report, person, eventID: arrival.id) } },
-                            onPickWord: pickWord)
-            }
-        }
+    }
+
+    /// Arrival, coach and tip overlays, animation, colour scheme and haptics.
+    private func withOverlays<V: View>(_ content: V) -> some View {
+        content
+        .overlay { tipOverlay }
+        .overlay { widgetTipOverlay }
+        .overlay { arrivalOverlay }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: store.arrival)
         .preferredColorScheme(.dark)
         .sensoryFeedback(trigger: store.latestEffect) { _, new in hapticsEnabled && store.arrival == nil ? new?.signal.haptic : nil }
+    }
+
+    /// Visibility, refresh and one-time prompts.
+    private func withLifecycle<V: View>(_ content: V) -> some View {
+        content
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
             // Runs alongside the first refresh instead of before it.
@@ -402,6 +423,11 @@ struct LiveHomeView: View {
             store.reviewDue = false
             requestReview()
         }
+    }
+
+    /// Psst+ requests, the widget and pending invites.
+    private func withLifecycleLate<V: View>(_ content: V) -> some View {
+        content
         .onChange(of: store.plusRequested) { _, requested in
             if requested { showingPlus = true; store.plusRequested = false }
         }
@@ -420,6 +446,11 @@ struct LiveHomeView: View {
         .onChange(of: store.pendingInviteCode) { _, code in
             if code != nil { showingInvite = true }
         }
+    }
+
+    /// Every sheet and cover home can show.
+    private func withSheets<V: View>(_ content: V) -> some View {
+        content
         .sheet(isPresented: $showingFeatureIntro, onDismiss: { store.dismissFeatureIntro() }) { FeatureIntroSheet() }
         .sheet(isPresented: $showingWhatsNew, onDismiss: { store.dismissWhatsNew() }) { WhatsNewSheet() }
         // 3A: a joiner's first two-way Psst; the same card as after sharing a Psst link.

@@ -73,6 +73,21 @@ extension Color {
     /// Small labels on bands. Solid white since owner pick 3A (20 Oct 2026): 90% white
     /// measured 4.1–4.5:1 on the gold, blue, green and rust bands, under the 4.5:1 guideline.
     static let onBandSoft = Color.white
+    /// Placeholders on a shaded field (Search people over home, Draw here on the doodle
+    /// pad). 16A (owner pick, 10 Nov 2026): 90% white is at least 4.6:1 on every band and
+    /// the canvas (82% and 60% measured 4.2 and 3.1:1). Solid white with Increase Contrast.
+    static let placeholderOnShade = Color(UIColor { traits in
+        traits.accessibilityContrast == .high ? .white : UIColor.white.withAlphaComponent(0.9)
+    })
+    /// The NAME placeholder on a bare band (16A): 95% white is at least 4.6:1 on the
+    /// usual band colours (55% measured 2.5–2.9:1).
+    static let placeholderOnBand = Color(UIColor { traits in
+        traits.accessibilityContrast == .high ? .white : UIColor.white.withAlphaComponent(0.95)
+    })
+    /// A quiet capsule behind small white text on a band (the arrival's "Pick yours"
+    /// chip, 12A). Black at 20% keeps white text at 6.5:1 or more on every band colour,
+    /// like the Edit name capsule (10A). Owner pick 2A on the follow-ups page, 11 Nov 2026.
+    static let quietCapsule = Color.black.opacity(0.2)
 
     /// Raised person surface and sheets.
     static let surface = Color.white
@@ -110,10 +125,12 @@ extension Color {
 }
 
 extension Text {
-    /// Names and headlines in Inter Tight Black (DESIGN.md). Oversized titles wrap
+    /// Names and headlines in Inter Tight Black (DESIGN.md). Titles with spaces wrap
     /// at the requested text size instead of shrinking away the accessibility setting.
     /// A single word too wide for its band (owner pick 2A, 20 Oct 2026) shrinks to
     /// as little as 75% to stay whole, rather than breaking mid-word ("CHRISTOPHE / R").
+    /// If it still doesn't fit, at any text size including the accessibility ones
+    /// (owner pick 6A, 10 Nov 2026), it breaks with a hyphen: "CHRISTO- / PHER".
     func bandTitle(_ text: String, size: CGFloat, tracking: CGFloat) -> some View {
         BandTitleText(text: self, word: text, size: size, tracking: tracking)
     }
@@ -124,7 +141,6 @@ private struct BandTitleText: View {
     let word: String
     let size: CGFloat
     let tracking: CGFloat
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     static let smallestScale: CGFloat = 0.75
 
@@ -143,20 +159,93 @@ private struct BandTitleText: View {
         return ceil(width)
     }
 
+    /// The word with soft hyphens at its break points (6A). SwiftUI's Text breaks a
+    /// line at a soft hyphen and draws a "-" there; where the line doesn't break, the
+    /// soft hyphen stays invisible. (Text ignores NSParagraphStyle's hyphenationFactor,
+    /// and iOS 17 has no hyphenation modifier, so the break points are put in the string.)
+    private var hyphenated: some View {
+        Text(verbatim: Hyphenation.softHyphenated(word))
+            .font(.psst(size: size, weight: .black))
+            .tracking(tracking)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     var body: some View {
-        if word.contains(where: \.isWhitespace) || dynamicTypeSize.isAccessibilitySize {
+        if word.contains(where: \.isWhitespace) {
             wrapping
         } else {
+            // 2A, and since 6A at accessibility sizes too: whole on one line, then
+            // shrunk to 75% at most, then broken with a hyphen.
             ViewThatFits(in: .horizontal) {
                 styled.lineLimit(1)
                 styled
                     .lineLimit(1)
                     .minimumScaleFactor(Self.smallestScale)
                     .frame(idealWidth: naturalWidth * Self.smallestScale)
-                wrapping
+                hyphenated
             }
             .multilineTextAlignment(.center)
         }
+    }
+}
+
+/// Where a single word may break with a hyphen (owner pick 6A, 10 Nov 2026).
+enum Hyphenation {
+    static let softHyphen = "\u{00AD}"
+
+    /// The word in capitals with a soft hyphen at each place it may break: the
+    /// language's hyphenation points ("CHRIS·TO·PHER"), or, for a word the dictionary
+    /// doesn't know, between any two letters. Each piece keeps at least two letters;
+    /// words under five letters are left alone.
+    static func softHyphenated(_ word: String, locale: Locale = .current) -> String {
+        let pieces = segments(of: word, locale: locale)
+        return pieces.map { $0.uppercased() }.joined(separator: softHyphen)
+    }
+
+    /// The word split at its break points, in its own letter case.
+    static func segments(of word: String, locale: Locale = .current) -> [String] {
+        let characters = Array(word)
+        guard characters.count >= 5, !word.contains(where: \.isWhitespace) else { return [word] }
+        let pieces = split(characters, at: dictionaryBreaks(in: word, locale: locale))
+        guard pieces.count == 1, characters.allSatisfy(\.isLetter) else { return pieces }
+        return split(characters, at: Array(2...(characters.count - 2)))
+    }
+
+    /// Pieces of at least two characters, cut at the given offsets where that allows.
+    private static func split(_ characters: [Character], at offsets: [Int]) -> [String] {
+        var pieces: [String] = []
+        var start = 0
+        for offset in offsets.sorted() where offset - start >= 2 && characters.count - offset >= 2 {
+            pieces.append(String(characters[start..<offset]))
+            start = offset
+        }
+        pieces.append(String(characters[start...]))
+        return pieces
+    }
+
+    /// Character offsets before which the system's hyphenation dictionary allows a break.
+    private static func dictionaryBreaks(in word: String, locale: Locale) -> [Int] {
+        let english = Locale(identifier: "en_US")
+        let chosen = CFStringIsHyphenationAvailableForLocale((locale as NSLocale) as CFLocale) ? locale : english
+        guard CFStringIsHyphenationAvailableForLocale((chosen as NSLocale) as CFLocale) else { return [] }
+        let string = word as NSString
+        let length = string.length
+        var breaks: [Int] = []
+        var location = length
+        while location > 0 {
+            let found = CFStringGetHyphenationLocationBeforeIndex(string as CFString, location,
+                                                                 CFRange(location: 0, length: length),
+                                                                 0, (chosen as NSLocale) as CFLocale, nil)
+            guard found != kCFNotFound, found > 0, found < location else { break }
+            // UTF-16 offset → character offset; skip anything inside a character.
+            let index = String.Index(utf16Offset: found, in: word)
+            if index.samePosition(in: word) != nil {
+                breaks.append(word.distance(from: word.startIndex, to: index))
+            }
+            location = found
+        }
+        return breaks
     }
 }
 

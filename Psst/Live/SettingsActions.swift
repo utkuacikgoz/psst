@@ -68,7 +68,7 @@ final class SettingsActions {
             try await api.revokeInvite(code: invite.code)
             openInvites.removeAll { $0.code == invite.code }
         } catch {
-            inviteError = "Couldn't cancel \(invite.displayCode). It may still work. Try Cancel again."
+            inviteError = "Couldn't cancel \(invite.displayCode). It may still work. Try again."
         }
     }
 
@@ -81,7 +81,7 @@ final class SettingsActions {
             try await api.unblockUser(person.userId)
             blocked.removeAll { $0.userId == person.userId }
         } catch {
-            unblockError = "Couldn't unblock \(person.displayName). Try Unblock again."
+            unblockError = "Couldn't unblock \(person.displayName). Try again."
         }
     }
 }

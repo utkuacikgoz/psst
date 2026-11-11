@@ -30,3 +30,16 @@ extension View {
         }
     }
 }
+
+extension View {
+    /// Centred in the space it's given when it fits; scrolls when it's taller, at the
+    /// largest text sizes, instead of clipping (16A, owner pick 10 Nov 2026). Used by
+    /// the first tip and the doodle tip.
+    func scrollsWhenTall() -> some View {
+        ViewThatFits(in: .vertical) {
+            self.frame(maxWidth: .infinity, maxHeight: .infinity)
+            ScrollView { self.frame(maxWidth: .infinity) }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}

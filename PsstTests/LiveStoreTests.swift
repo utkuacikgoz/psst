@@ -45,6 +45,18 @@ final class FakeAPI: PsstAPI {
         return recapStatus
     }
     func setWeeklyRecap(_ enabled: Bool) async throws { recapSettings.append(enabled) }
+    var streakSaver: StreakSaverStatus?
+    var streakReminderSettings: [Bool] = []
+    func streakSaverStatus() async throws -> StreakSaverStatus {
+        guard let streakSaver else { throw APIError.offline }
+        return streakSaver
+    }
+    func setStreakReminders(_ enabled: Bool) async throws {
+        streakReminderSettings.append(enabled)
+        if let status = streakSaver {
+            streakSaver = StreakSaverStatus(enabled: enabled, unlimited: status.unlimited, freezesLeft: status.freezesLeft)
+        }
+    }
 
     func activity(monthStart: Date) async throws -> [ActivitySummary] {
         if let activityError { throw activityError }

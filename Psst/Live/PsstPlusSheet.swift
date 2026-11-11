@@ -5,6 +5,10 @@ import SwiftUI
 /// Option PS1: the standard sheet. What Psst+ includes, one App Store price,
 /// Unlock and Restore. Once unlocked, the same sheet holds the choices.
 struct PsstPlusSheet: View {
+    /// 12A (owner pick, 10 Nov 2026): opened from an arrival's "Pick yours" chip,
+    /// the sheet starts scrolled to the word card.
+    var scrollToWord = false
+
     @Environment(Purchases.self) private var purchases
     @Environment(LiveStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -12,61 +16,71 @@ struct PsstPlusSheet: View {
     @State private var restoring = false
     @State private var redeeming = false
 
+    private static let wordCardID = "wordCard"
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    VStack(spacing: Tokens.Space.xs) {
-                        Text("Psst+")
-                            .font(.psst(.largeTitle, weight: .black))
-                            .tracking(Tokens.Band.titleTracking)
-                            .foregroundStyle(Color.psstCanvas)
-                        Text(purchases.isUnlocked ? "Unlocked. Thank you!" : "One purchase. Yours for good.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .listRowBackground(Color.clear)
-                    .accessibilityElement(children: .combine)
-                }
-                .listRowInsets(EdgeInsets(top: 0, leading: Tokens.Space.l, bottom: Tokens.Space.s, trailing: Tokens.Space.l))
-
-                // 1A / 2A (owner picks, 18 Oct 2026): your word is the hero, before and
-                // after buying. Colours and app icons are a quiet extra.
-                Section {
-                    WordHero(unlocked: purchases.isUnlocked)
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.psstCanvas)
-                }
-
-                if purchases.isUnlocked {
-                    SoundSection()
+            ScrollViewReader { reader in
+                Form {
                     Section {
-                        NavigationLink {
-                            Form { IconSection() }.navigationTitle("App icon")
-                        } label: {
-                            LabeledContent("App icon", value: Personalization.icons.first {
-                                $0.name == UIApplication.shared.alternateIconName
-                            }?.title ?? "Purple")
+                        VStack(spacing: Tokens.Space.xs) {
+                            Text("Psst+")
+                                .font(.psst(.largeTitle, weight: .black))
+                                .tracking(Tokens.Band.titleTracking)
+                                .foregroundStyle(Color.psstCanvas)
+                            Text(purchases.isUnlocked ? "Unlocked. Thank you!" : "One purchase. Yours for good.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
-                        Text("Band colours: hold someone's band → Colour…")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    } header: {
-                        Text("Looks")
+                        .frame(maxWidth: .infinity)
+                        .listRowBackground(Color.clear)
+                        .accessibilityElement(children: .combine)
                     }
-                } else {
+                    .listRowInsets(EdgeInsets(top: 0, leading: Tokens.Space.l, bottom: Tokens.Space.s, trailing: Tokens.Space.l))
+
+                    // 1A / 2A (owner picks, 18 Oct 2026): your word is the hero, before and
+                    // after buying. Colours and app icons are a quiet extra.
                     Section {
-                        perk("Unlimited Super Pssts", symbol: "sparkles", tint: Color.inviteGold)
-                        perk("Your whisper sound", symbol: "speaker.wave.2.fill", tint: Color(hex: 0x187F69))
-                        perk("Three-person and Lock Screen widgets", symbol: "rectangle.grid.1x2.fill", tint: Color(hex: 0x5F61AE))
+                        WordHero(unlocked: purchases.isUnlocked)
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.psstCanvas)
+                            .id(Self.wordCardID)
                     }
-                    Section {
-                        Text("Also: band colours and app icons")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+
+                    if purchases.isUnlocked {
+                        SoundSection()
+                        Section {
+                            NavigationLink {
+                                Form { IconSection() }.navigationTitle("App icon")
+                            } label: {
+                                LabeledContent("App icon", value: Personalization.icons.first {
+                                    $0.name == UIApplication.shared.alternateIconName
+                                }?.title ?? "Purple")
+                            }
+                            Text("Band colours: hold someone's band → Colour…")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        } header: {
+                            Text("Looks")
+                        }
+                    } else {
+                        Section {
+                            perk("Unlimited Super Pssts", symbol: "sparkles", tint: Color.inviteGold)
+                            perk("Your whisper sound", symbol: "speaker.wave.2.fill", tint: Color(hex: 0x187F69))
+                            perk("Three-person and Lock Screen widgets", symbol: "rectangle.grid.1x2.fill", tint: Color(hex: 0x5F61AE))
+                        }
+                        Section {
+                            Text("Also: band colours and app icons")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        buySection
                     }
-                    buySection
+                }
+                .onAppear {
+                    guard scrollToWord else { return }
+                    // After the sheet has laid out, so the Form has rows to scroll to.
+                    DispatchQueue.main.async { reader.scrollTo(Self.wordCardID, anchor: .top) }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -111,7 +125,7 @@ struct PsstPlusSheet: View {
                 .listRowBackground(Color.psstCanvas)
                 .disabled(purchases.state == .purchasing)
             } else if purchases.loadFailed {
-                Button("Couldn't reach the App Store. Try again") { Task { await purchases.load() } }
+                Button("Couldn't reach the App Store. Try again.") { Task { await purchases.load() } }
             } else {
                 HStack { Spacer(); ProgressView(); Spacer() }
             }
@@ -181,7 +195,7 @@ private struct IconSection: View {
                     UIApplication.shared.setAlternateIconName(icon.name) { error in
                         Task { @MainActor in
                             if error == nil { current = UIApplication.shared.alternateIconName }
-                            else { changeError = "Couldn't change the icon. Try choosing it again." }
+                            else { changeError = "Couldn't change the icon. Try again." }
                             isChanging = false
                         }
                     }
@@ -254,7 +268,7 @@ private struct SoundSection: View {
         } header: {
             Text("Whisper sound")
         } footer: {
-            Text(failed ? "That didn't save. Check you're online and try again."
+            Text(failed ? "Couldn't save your sound. Try again."
                         : "How Pssts sound on this iPhone. Silent mode and Focus still apply.")
         }
         // Back to the usual session, which follows the ringer switch.
@@ -341,7 +355,7 @@ private struct WordHero: View {
                 }
             }
             if failed {
-                Text("That didn't save. Check you're online and try again.")
+                Text("Couldn't save your word. Try again.")
                     .font(.psst(.footnote, weight: .semibold))
             }
         }

@@ -20,14 +20,14 @@ final class FeatureScreenshotTests: XCTestCase {
         app = XCUIApplication()
         app.launchArguments += ["-PsstUITestLive", "settingsFailure", "-PsstDesignScreen", "settings"]
         app.launch()
-        let retry = app.buttons["Couldn't load blocked people. Try again"]
+        let retry = app.buttons["Couldn't load blocked people. Try again."]
         for _ in 0..<4 where !retry.isHittable { app.swipeUp() }
         XCTAssertTrue(retry.waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["No one."].exists)
         shot("recovery-settings")
         retry.tap()
         XCTAssertTrue(app.staticTexts["No one."].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["Couldn't load invites. Try again"].exists)
+        XCTAssertFalse(app.buttons["Couldn't load invites. Try again."].exists)
         app.terminate()
 
     }

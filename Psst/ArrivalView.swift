@@ -35,8 +35,15 @@ struct ArrivalView: View {
     var onHideDoodle: (() -> Void)? = nil
     var onBlock: (() -> Void)? = nil
     var onReport: (() -> Void)? = nil
+    /// 12A (owner pick, 10 Nov 2026): opens Psst+ at the word card. Pass it only when
+    /// you don't have Psst+; nil never shows the "Pick yours" chip.
+    var onPickWord: (() -> Void)? = nil
 
     @State private var showingOptions = false
+    /// This moment shows the "Pick yours" chip (decided once when it appears).
+    @State private var showsWordChip = false
+    /// A finger is on the chip, so the moment doesn't close under it.
+    @State private var chipPressed = false
     private var hasOptions: Bool { arrival.kind == .doodle && onBlock != nil && onReport != nil }
 
     static let displayTime: Duration = .milliseconds(1800)
@@ -51,8 +58,9 @@ struct ArrivalView: View {
         // App Store screenshot runs hold each moment so it can be captured.
         if ProcessInfo.processInfo.arguments.contains("-PsstUITestHoldMoments") { return .seconds(8) }
         #endif
-        // Rare ones linger: a same moment, or a doodle someone drew for you.
-        if arrival.kind == .sameMoment || arrival.kind == .doodle { return Self.sameMomentTime }
+        // Rare ones linger: a same moment, or a doodle someone drew for you. So does
+        // a moment with the "Pick yours" chip (12A), so it can be read and tapped.
+        if arrival.kind == .sameMoment || arrival.kind == .doodle || showsWordChip { return Self.sameMomentTime }
         return arrival.total == nil ? Self.displayTime : Self.queuedTime
     }
 
@@ -117,6 +125,7 @@ struct ArrivalView: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: "Close", onDone)
         .accessibilityActions {
+            if showsWordChip { Button("Pick your own word", action: pickWord) }
             if hasOptions {
                 if let onHideDoodle { Button("Hide doodle", action: onHideDoodle) }
                 if let onBlock { Button("Block \(name)", action: onBlock) }
@@ -140,6 +149,7 @@ struct ArrivalView: View {
             hapticsEnabled && arrival.kind == .sameMoment ? .success : nil
         }
         .task(id: arrival.id) {
+            showsWordChip = decideWordChip()
             AccessibilityNotification.Announcement(announcement).post()
             try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 150))
             trigger = arrival.id
@@ -150,8 +160,9 @@ struct ArrivalView: View {
         // Closes on its own, but never while the doodle's ••• menu is open or Psst
         // isn't on screen (so a moment nobody saw doesn't close itself); the wait
         // starts again after.
-        .task(id: AutoClose(arrival: arrival.id, paused: showingOptions || scenePhase != .active)) {
-            guard !staysOpen, !showingOptions, scenePhase == .active else { return }
+        .task(id: AutoClose(arrival: arrival.id, paused: showingOptions || chipPressed || scenePhase != .active,
+                            chip: showsWordChip)) {
+            guard !staysOpen, !showingOptions, !chipPressed, scenePhase == .active else { return }
             try? await Task.sleep(for: holdTime + .milliseconds(reduceMotion ? 0 : 150))
             guard !Task.isCancelled else { return }
             onDone()
@@ -161,6 +172,40 @@ struct ArrivalView: View {
     private struct AutoClose: Hashable {
         let arrival: UUID
         let paused: Bool
+        let chip: Bool
+    }
+
+    /// 12A: a Psst+ friend's own word, you without Psst+, and not shown in the last
+    /// week. Showing it now starts the next week.
+    private func decideWordChip() -> Bool {
+        guard onPickWord != nil, arrival.kind == .signal, arrival.word != nil else { return false }
+        let defaults = UserDefaults.standard
+        let last = defaults.object(forKey: WordChip.shownKey) as? Date
+        guard WordChip.isDue(lastShown: last, now: .now) else { return false }
+        defaults.set(Date.now, forKey: WordChip.shownKey)
+        return true
+    }
+
+    private func pickWord() {
+        chipPressed = false
+        onPickWord?()
+    }
+
+    /// "Mia's word · Pick yours ›", quietly under their word (12A).
+    private var wordChip: some View {
+        Button(action: pickWord) {
+            Text("\(name)'s word · Pick yours ›")
+                .font(.psst(.caption, weight: .bold))
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.8)
+                .padding(.horizontal, Tokens.Space.m + 2)
+                .padding(.vertical, Tokens.Space.s - 1)
+                .background(Color.quietCapsule, in: Capsule())
+                .frame(minHeight: Tokens.minTouch)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(ChipPressStyle(pressed: $chipPressed))
+        .padding(.top, Tokens.Space.xs)
     }
 
     /// ••• top left (1B): Hide doodle, Block, Report, in a small dark menu. A tap
@@ -298,6 +343,7 @@ struct ArrivalView: View {
                             if let note = arrival.note {
                                 Text(note).font(.psst(.subheadline, weight: .semibold))
                             }
+                            if showsWordChip { wordChip }
                         }
                     } else {
                         Text("IS IN")
@@ -375,5 +421,30 @@ struct ArrivalView: View {
             .padding(Tokens.Space.xl)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(color.ignoresSafeArea())
+    }
+}
+
+/// 12A (owner pick, 10 Nov 2026): when a Psst+ friend's own word arrives and you don't
+/// have Psst+, a quiet chip offers yours, at most once a week.
+enum WordChip {
+    /// When the chip last showed on this phone.
+    static let shownKey = "psst.wordChipShownAt"
+    static let interval: TimeInterval = 7 * 24 * 60 * 60
+
+    static func isDue(lastShown: Date?, now: Date) -> Bool {
+        guard let lastShown else { return true }
+        // A clock set back counts as due rather than hiding the chip for good.
+        return now.timeIntervalSince(lastShown) >= interval || now < lastShown
+    }
+}
+
+/// Dims while pressed and reports the press, so the moment waits (12A).
+private struct ChipPressStyle: ButtonStyle {
+    @Binding var pressed: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.7 : 1)
+            .onChange(of: configuration.isPressed) { _, new in pressed = new }
     }
 }

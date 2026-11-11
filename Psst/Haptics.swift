@@ -1,4 +1,5 @@
 import CoreHaptics
+import SwiftUI
 
 /// The "ps-st" vibration, timed to the whisper sound (scripts/make_psst_sound.py):
 /// a light tick for the p, a short swell-and-fade buzz for the ss, a soft tick for the t.
@@ -57,5 +58,26 @@ enum PsstHaptics {
             CHHapticEventParameter(parameterID: .hapticIntensity, value: intensity),
             CHHapticEventParameter(parameterID: .hapticSharpness, value: sharpness),
         ], relativeTime: time)
+    }
+}
+
+/// 7A (owner pick, 10 Nov 2026): small taps around sending, besides the light tick
+/// once the server accepts (Signal.haptic). All follow Settings → Haptic feedback.
+enum SendHaptics {
+    /// The Settings switch they follow (on by default).
+    static let settingKey = "psst.hapticsEnabled"
+    /// A soft tick as a finger touches a band.
+    static let touch: SensoryFeedback = .impact(flexibility: .soft, intensity: 0.45)
+    /// A Psst that didn't make it.
+    static let failed: SensoryFeedback = .error
+    /// Tapping a band while sending to them is paused.
+    static let paused: SensoryFeedback = .warning
+}
+
+extension LiveRowStatus {
+    /// A Psst that didn't make it (the band reads "Didn't make it · tap to try again").
+    var didNotSend: Bool {
+        if case .notSent = self { return true }
+        return false
     }
 }

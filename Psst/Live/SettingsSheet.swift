@@ -22,6 +22,8 @@ struct SettingsSheet: View {
     @State private var superPerson: ConnectionSummary?
     @State private var colouring: ConnectionSummary?
     @State private var showingPlus = false
+    @State private var savingStreakSaver = false
+    @State private var streakSaverFailed = false
 
     var body: some View {
         // Option S3: the standard grouped iPhone list.
@@ -41,13 +43,24 @@ struct SettingsSheet: View {
                     NavigationLink { recapPage } label: {
                         LabeledContent("Weekly recap", value: store.recapEnabled == false ? "Off" : "On")
                     }
+                    // 5A (owner pick, 10 Nov 2026): off unless you turn it on.
+                    NavigationLink { streakSaverPage } label: {
+                        LabeledContent("Streak saver", value: store.streakSaver?.enabled == true ? "On" : "Off")
+                    }
                 }
 
                 Section {
                     NavigationLink { peoplePage } label: {
                         LabeledContent("People", value: "\(store.connections.count)")
                     }
-                    NavigationLink("Notifications") { notificationsPage }
+                    NavigationLink { notificationsPage } label: {
+                        // 2A (owner pick, 10 Nov 2026): "Not now" means quiet delivery; say so.
+                        if notificationStatus == .provisional {
+                            LabeledContent("Notifications", value: "Quiet")
+                        } else {
+                            Text("Notifications")
+                        }
+                    }
                     Button { showingPlus = true } label: {
                         HStack {
                             Text("Psst+").foregroundStyle(.primary)
@@ -109,6 +122,7 @@ struct SettingsSheet: View {
         .preferredColorScheme(.light)
         .task {
             notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+            await store.loadStreakSaver()
             await actions.load(api: store.api)
         }
         .manageConnection(menuFor: $managing, confirming: $confirming, onDone: {
@@ -142,6 +156,42 @@ struct SettingsSheet: View {
             }
         }
         .navigationTitle("Weekly recap")
+    }
+
+    /// 5A: one 8 PM reminder when a streak is about to go out, and the monthly freeze.
+    private var streakSaverPage: some View {
+        Form {
+            Section {
+                Toggle("Streak saver", isOn: Binding(
+                    get: { store.streakSaver?.enabled ?? false },
+                    set: { on in
+                        savingStreakSaver = true; streakSaverFailed = false
+                        Task {
+                            if on { await Self.allowNotificationsIfNeeded() }
+                            streakSaverFailed = !(await store.setStreakReminders(on))
+                            savingStreakSaver = false
+                        }
+                    }))
+                    .disabled(store.streakSaver == nil || savingStreakSaver)
+            } footer: {
+                Text(streakSaverFailed ? "Couldn't save that. Try again." : streakSaverFooter)
+            }
+        }
+        .navigationTitle("Streak saver")
+        .task { await store.loadStreakSaver() }
+    }
+
+    private var streakSaverFooter: String {
+        let base = "One reminder at 8 PM if a streak is about to go out, never more than one a day. A free streak freeze once a month saves a missed day; Psst+ gets unlimited freezes."
+        guard let status = store.streakSaver, status.enabled else { return base }
+        if status.unlimited { return base + " Yours are unlimited." }
+        return base + (status.freezesLeft > 0 ? " This month's freeze is ready." : " This month's freeze is used.")
+    }
+
+    /// The reminder is a notification: ask iOS first if it has no full yes yet.
+    static func allowNotificationsIfNeeded() async {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        if status == .notDetermined || status == .provisional { _ = await NotificationPermission.ask() }
     }
 
     private var peoplePage: some View {
@@ -178,7 +228,7 @@ struct SettingsSheet: View {
             if !actions.openInvites.isEmpty || actions.invitesLoadFailed || !actions.listsLoaded {
                 Section {
                     if actions.invitesLoadFailed {
-                        Button("Couldn't load invites. Try again") { Task { await actions.load(api: store.api) } }
+                        Button("Couldn't load invites. Try again.") { Task { await actions.load(api: store.api) } }
                             .disabled(actions.loadingLists)
                     } else if !actions.listsLoaded { ProgressView("Loading invites…") }
                     ForEach(actions.openInvites) { invite in
@@ -211,7 +261,7 @@ struct SettingsSheet: View {
 
             Section {
                 if actions.blockedLoadFailed {
-                    Button("Couldn't load blocked people. Try again") { Task { await actions.load(api: store.api) } }
+                    Button("Couldn't load blocked people. Try again.") { Task { await actions.load(api: store.api) } }
                         .disabled(actions.loadingLists)
                 } else if !actions.listsLoaded { ProgressView("Loading blocked people…") }
                 else if actions.blocked.isEmpty {
@@ -237,6 +287,18 @@ struct SettingsSheet: View {
     private var notificationsPage: some View {
         Form {
             Section {
+                if notificationStatus == .provisional {
+                    // 2A: quiet delivery; iOS's real prompt turns sounds and alerts on.
+                    Button {
+                        Task {
+                            _ = await NotificationPermission.turnOnSounds()
+                            notificationStatus = await UNUserNotificationCenter.current()
+                                .notificationSettings().authorizationStatus
+                        }
+                    } label: {
+                        Text("Turn on sounds").frame(maxWidth: .infinity)
+                    }
+                }
                 if notificationStatus == .notDetermined {
                     // "Not now" at first launch: iOS has no switch for Psst
                     // until it has asked once, so ask here.
@@ -272,7 +334,7 @@ struct SettingsSheet: View {
                     }))
                     .disabled(savingSuper)
             } footer: {
-                Text(superSaveFailed ? "Couldn't save. Try again when you're online." : "Turn off Super effects to receive them like ordinary Pssts. Silent mode and Focus still apply.")
+                Text(superSaveFailed ? "Couldn't save that. Try again." : "Turn off Super effects to receive them like ordinary Pssts. Silent mode and Focus still apply.")
             }
         }
         .navigationTitle("Notifications")
@@ -293,7 +355,9 @@ struct SettingsSheet: View {
 
     private var notificationText: String {
         switch notificationStatus {
-        case .authorized, .provisional, .ephemeral:
+        case .provisional:
+            "Quiet: Pssts go to Notification Center without a sound."
+        case .authorized, .ephemeral:
             "On. Sounds and alert style follow your iPhone's settings, including Focus and silent mode."
         case .denied:
             "Off. Pssts still wait for you in the app."
@@ -318,7 +382,7 @@ struct SettingsSheet: View {
                 try await store.deleteAccount()
                 dismiss()
             } catch {
-                deleteError = "Your account is still here: that didn't go through. Check you're online and try again."
+                deleteError = "Couldn't delete your account. It's still here. Try again."
             }
             isDeleting = false
         }
@@ -381,7 +445,8 @@ private struct YouBand: View {
                     .font(.psst(.subheadline, weight: .bold))
                     .padding(.horizontal, Tokens.Space.l)
                     .padding(.vertical, Tokens.Space.s)
-                    .background(Capsule().fill(Color.white.opacity(0.22)))
+                    // 10A (owner pick, 10 Nov 2026): black at 20%, about 6:1 with the white text.
+                    .background(Capsule().fill(Color.black.opacity(0.2)))
                     // Same capsule, a 44 pt tap area around it (11A).
                     .frame(minHeight: Tokens.minTouch)
                     .contentShape(Rectangle())

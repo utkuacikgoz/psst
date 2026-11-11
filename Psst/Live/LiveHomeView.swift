@@ -170,8 +170,15 @@ struct LiveHomeView: View {
     @State private var managing: ConnectionSummary?
     @State private var confirming: ConnectionAction?
     @State private var showingPlus = false
+    /// Psst+ opened from an arrival's "Pick yours" chip starts at the word card (12A).
+    @State private var plusAtWord = false
     @State private var colouring: ConnectionSummary?
     @State private var notificationsOff = false
+    /// 1.0.9 one-time things (owner picks 3A, 4A, 5A): at most one per visit.
+    @State private var askingNotifications = false
+    @State private var showingWhatsNew = false
+    @State private var streakSaverPerson: ConnectionSummary?
+    @State private var showingWidgetTip = false
     @ScaledMetric(relativeTo: .largeTitle) private var firstInviteTitleSize: CGFloat = 40
 
     private func loadingPeople(minHeight: CGFloat) -> some View {
@@ -194,10 +201,24 @@ struct LiveHomeView: View {
 
     /// The tip waits for any full-screen moment to finish, so the two never stack.
     private var showsCoach: Bool { store.showsCoach && store.hasLoadedConnections && !anySheet && store.arrival == nil }
-    private var showsDoodleTip: Bool { store.showsDoodleTip && !showsCoach && store.hasLoadedConnections && !anySheet }
+    private var showsDoodleTip: Bool {
+        store.showsDoodleTip && !showsCoach && store.hasLoadedConnections && !anySheet
+            && !store.promptedThisVisit && !showingWidgetTip
+    }
 
     private var anySheet: Bool {
         showingFeatureIntro || superPerson != nil || doodlePerson != nil || showingInvite || startingPsst || reshare != nil || enteringCode || showingSettings || managing != nil || confirming != nil || showingPlus || colouring != nil
+            || askingNotifications || showingWhatsNew || streakSaverPerson != nil
+    }
+
+    /// 12A: the arrival's "Pick yours" chip closes the moment and opens Psst+ at the word card.
+    private var pickWord: (() -> Void)? {
+        if purchases.isUnlocked { return nil }
+        return {
+            withAnimation { store.nextArrival() }
+            plusAtWord = true
+            showingPlus = true
+        }
     }
 
     var body: some View {
@@ -241,6 +262,7 @@ struct LiveHomeView: View {
                             let colours = bandColors
                             ForEach(visible) { connection in
                                 row(connection, minHeight: bandHeight, colour: colours[connection.id])
+                                    .id(connection.id)
                             }
                             if visible.isEmpty {
                                 Text("No one called “\(searchQuery)”")
@@ -293,18 +315,32 @@ struct LiveHomeView: View {
                 // Start with the search field tucked above the top edge.
                 .onAppear { hideSearch(reader) }
                 .onChange(of: showsSearch) { hideSearch(reader) }
+                // A push about someone (streak saver 5A, quiet week 11A) opens their band.
+                .onChange(of: store.focusConnectionID, initial: true) { focus(reader) }
+                .onChange(of: store.hasLoadedConnections) { focus(reader) }
                 .pinnedFooter(!dynamicTypeSize.isAccessibilitySize, inset: inset) { settingsButton.padding(.top, Tokens.Space.l) }
                 }
             }
         }
         // Behind a sheet, an arrival or the tip, VoiceOver can't reach (and tap-send) the bands.
-        .accessibilityHidden(anySheet || store.arrival != nil || showsCoach || showsDoodleTip)
+        .accessibilityHidden(anySheet || store.arrival != nil || showsCoach || showsDoodleTip || showingWidgetTip)
         .background(Color.psstCanvas.ignoresSafeArea())
         .overlay {
             if showsCoach {
                 CoachOverlay { withAnimation { store.dismissCoach() } }
             } else if showsDoodleTip {
                 DoodleTipOverlay { withAnimation { store.dismissDoodleTip() } }
+            }
+        }
+        .overlay {
+            // 4A: once, after your first two-way Psst, on a visit with nothing else new.
+            if showingWidgetTip, let tip = store.widgetTip,
+               let person = store.connections.first(where: { $0.id == tip.connectionID }) {
+                WidgetTipOverlay(name: person.otherName, line: tip.line(),
+                                 color: Color(hex: bandColors[person.id] ?? personalization.colorHex(for: person.id, name: person.otherName))) {
+                    withAnimation { showingWidgetTip = false }
+                    store.dismissWidgetTip()
+                }
             }
         }
         .overlay {
@@ -317,7 +353,8 @@ struct LiveHomeView: View {
                             },
                             onHideDoodle: { withAnimation { store.hideDoodle(arrival) } },
                             onBlock: sender(of: arrival).map { person -> () -> Void in { confirm(.block, person) } },
-                            onReport: sender(of: arrival).map { person -> () -> Void in { confirm(.report, person, eventID: arrival.id) } })
+                            onReport: sender(of: arrival).map { person -> () -> Void in { confirm(.report, person, eventID: arrival.id) } },
+                            onPickWord: pickWord)
             }
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: store.arrival)
@@ -349,7 +386,12 @@ struct LiveHomeView: View {
         }
         .onDisappear { store.isHomeVisible = false }
         .onChange(of: anySheet) { updateVisibility() }
-        .onChange(of: scenePhase) { updateVisibility() }
+        .onChange(of: scenePhase) { _, phase in
+            updateVisibility()
+            if phase == .background { store.startNewVisit() }
+        }
+        // 3A, then 5A, then 4A: one per visit, never over a sheet, a moment or a tip.
+        .task(id: oneTimeKey) { await showNextOneTimeThing() }
         .onChange(of: store.sendStates) { old, new in announceSends(from: old, to: new) }
         // After the first accepted Psst, once its "sent" has shown and nothing
         // else is on screen. Apple decides whether the prompt actually appears.
@@ -379,6 +421,14 @@ struct LiveHomeView: View {
             if code != nil { showingInvite = true }
         }
         .sheet(isPresented: $showingFeatureIntro, onDismiss: { store.dismissFeatureIntro() }) { FeatureIntroSheet() }
+        .sheet(isPresented: $showingWhatsNew, onDismiss: { store.dismissWhatsNew() }) { WhatsNewSheet() }
+        // 3A: a joiner's first two-way Psst; the same card as after sharing a Psst link.
+        .sheet(isPresented: $askingNotifications) {
+            NotificationAskCard { askingNotifications = false }
+        }
+        .sheet(item: $streakSaverPerson, onDismiss: { store.finishStreakSaverOffer() }) { person in
+            StreakSaverSheet(name: person.otherName) { streakSaverPerson = nil }
+        }
         .sheet(item: $superPerson) { SuperPsstSheet(connection: $0) }
         .fullScreenCover(item: $doodlePerson) { person in
             DoodleSheet(connection: person,
@@ -390,8 +440,10 @@ struct LiveHomeView: View {
         .sheet(item: $reshare) { ShareSheet(items: $0.items) }
         .task(id: store.reshareCode) {
             guard let code = store.reshareCode else { return }
+            let kind = store.reshareKind
             store.reshareCode = nil
-            reshare = PsstShare.resend(code: code)
+            store.reshareKind = nil
+            reshare = PsstShare.resend(code: code, kind: kind)
         }
         .sheet(isPresented: $enteringCode) { InviteSheet(startEntering: true) }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
@@ -413,7 +465,7 @@ struct LiveHomeView: View {
                           onSuper: { superPerson = $0 },
                           onColour: { if purchases.isUnlocked { colouring = $0 } else { showingPlus = true } },
                           onDoodle: { doodlePerson = $0 })
-        .sheet(isPresented: $showingPlus) { PsstPlusSheet() }
+        .sheet(isPresented: $showingPlus, onDismiss: { plusAtWord = false }) { PsstPlusSheet(scrollToWord: plusAtWord) }
         .sheet(item: $colouring) { ColourSheet(connection: $0) }
     }
 
@@ -441,6 +493,9 @@ struct LiveHomeView: View {
         confirming = nil
         showingPlus = false
         colouring = nil
+        askingNotifications = false
+        showingWhatsNew = false
+        streakSaverPerson = nil
     }
 
     private func showDesignPreviewIfRequested() {
@@ -465,6 +520,81 @@ struct LiveHomeView: View {
         if store.isExistingUser && !store.featureIntroSeen && store.pendingInviteCode == nil
             && !store.connections.isEmpty && !anySheet {
             showingFeatureIntro = true
+        } else if store.whatsNewDue && store.featureIntroSeen && store.pendingInviteCode == nil
+                    && !store.connections.isEmpty && !anySheet && !store.promptedThisVisit {
+            // "New in Psst" (4A): once after updating, never on the same visit as another one-time thing.
+            store.notePrompted()
+            showingWhatsNew = true
+        }
+    }
+
+    // MARK: One-time things (1.0.9 picks 3A, 4A, 5A)
+
+    private var canShowOneTimeThing: Bool {
+        scenePhase == .active && store.hasLoadedConnections && !store.promptedThisVisit && !anySheet
+            && store.arrival == nil && !showsCoach && !showsDoodleTip && !showingWidgetTip
+    }
+
+    private var oneTimeKey: String {
+        [store.notificationAskDue ? "ask" : "", store.streakSaverOffer?.uuidString ?? "", store.widgetTip?.saved ?? "",
+         canShowOneTimeThing ? "free" : "busy"].joined(separator: "|")
+    }
+
+    /// The notifications ask (3A) first, then the streak saver (5A), then the widget
+    /// tip (4A): one per visit, so two never show at once or back to back.
+    private func showNextOneTimeThing() async {
+        guard canShowOneTimeThing,
+              store.notificationAskDue || store.streakSaverOffer != nil || store.widgetTip != nil else { return }
+        // Let whatever just closed (a moment, a send) settle first.
+        try? await Task.sleep(for: .seconds(1))
+        guard !Task.isCancelled, canShowOneTimeThing else { return }
+        if store.notificationAskDue {
+            // Once ever, and only while iOS has no yes or no (quiet or never asked).
+            let ask = await NotificationPermission.shouldAskAgain()
+            store.finishNotificationAsk()
+            if ask, canShowOneTimeThing {
+                store.notePrompted()
+                askingNotifications = true
+            }
+            return
+        }
+        if let id = store.streakSaverOffer {
+            guard let person = store.connections.first(where: { $0.id == id }) else {
+                store.finishStreakSaverOffer()
+                return
+            }
+            // Unknown (offline, or a server without it yet): it waits for a later visit.
+            let status = await store.loadStreakSaver()
+            guard !Task.isCancelled else { return }
+            if let status {
+                if status.enabled {
+                    store.finishStreakSaverOffer()
+                } else if canShowOneTimeThing {
+                    store.notePrompted()
+                    streakSaverPerson = person
+                }
+                return
+            }
+        }
+        if let tip = store.widgetTip, canShowOneTimeThing {
+            guard store.connections.contains(where: { $0.id == tip.connectionID }) else {
+                store.dismissWidgetTip()
+                return
+            }
+            store.notePrompted()
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { showingWidgetTip = true }
+        }
+    }
+
+    /// Scrolls to the band a push pointed at, once the people are known.
+    private func focus(_ reader: ScrollViewProxy) {
+        guard let id = store.focusConnectionID, store.hasLoadedConnections else { return }
+        store.focusConnectionID = nil
+        guard store.connections.contains(where: { $0.id == id }) else { return }
+        searchText = ""
+        if anySheet { closePresentations() }
+        DispatchQueue.main.async {
+            withAnimation(reduceMotion ? nil : .snappy) { reader.scrollTo(id, anchor: .center) }
         }
     }
 
@@ -490,7 +620,7 @@ struct LiveHomeView: View {
     private func searchField(inset: CGFloat) -> some View {
         HStack(spacing: Tokens.Space.s) {
             Image(systemName: "magnifyingglass").accessibilityHidden(true)
-            TextField("", text: $searchText, prompt: Text("Search people").foregroundStyle(Color.onCanvasSecondary))
+            TextField("", text: $searchText, prompt: Text("Search people").foregroundStyle(Color.placeholderOnShade))
                 .focused($searchFocused)
                 .submitLabel(.search)
                 .autocorrectionDisabled()
@@ -797,7 +927,8 @@ struct LiveHomeView: View {
                 exchangeDate: connection.lastCreatedAt,
                 exchangeFromMe: connection.lastFromMe,
                 streakDays: connection.streakDays ?? 0,
-                streakMoment: store.streakMoments[connection.id]
+                streakMoment: store.streakMoments[connection.id],
+                sendFailed: status.didNotSend
             )
             // Remove, block and report: a long press here, the VoiceOver action,
             // or Settings → People. Each explains itself before acting.
@@ -929,22 +1060,35 @@ struct NoticeView: View {
     var action: (() -> Void)?
     var onDismiss: (() -> Void)? = nil
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s) {
-            Image(systemName: symbol).accessibilityHidden(true)
-            Text(text).fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            if let actionTitle, let action {
-                Button(actionTitle, action: action)
-                    .font(.psst(.subheadline, weight: .bold))
-                    .underline()
-                    .frame(minHeight: Tokens.minTouch)
-            }
-            if let onDismiss {
-                Button(action: onDismiss) { Image(systemName: "xmark") }
-                    .font(.psst(.subheadline, weight: .bold))
-                    .frame(minWidth: Tokens.minTouch, minHeight: Tokens.minTouch)
-                    .accessibilityLabel("Not now")
+        Group {
+            // 16A (owner pick, 10 Nov 2026): at accessibility sizes the buttons go
+            // under the text, so the text keeps the strip's width.
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s) {
+                        Image(systemName: symbol).accessibilityHidden(true)
+                        Text(text).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, Tokens.Space.s)
+                    if (actionTitle != nil && action != nil) || onDismiss != nil {
+                        HStack(spacing: Tokens.Space.l) {
+                            actionButton
+                            Spacer(minLength: 0)
+                            dismissButton
+                        }
+                    }
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s) {
+                    Image(systemName: symbol).accessibilityHidden(true)
+                    Text(text).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    actionButton
+                    dismissButton
+                }
             }
         }
         .font(.psst(.subheadline, weight: .semibold))
@@ -954,6 +1098,24 @@ struct NoticeView: View {
         .frame(maxWidth: .infinity, minHeight: Tokens.minTouch, alignment: .leading)
         .background(Color.black.opacity(0.28))
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private var actionButton: some View {
+        if let actionTitle, let action {
+            Button(actionTitle, action: action)
+                .font(.psst(.subheadline, weight: .bold))
+                .underline()
+                .frame(minHeight: Tokens.minTouch)
+        }
+    }
+
+    @ViewBuilder private var dismissButton: some View {
+        if let onDismiss {
+            Button(action: onDismiss) { Image(systemName: "xmark") }
+                .font(.psst(.subheadline, weight: .bold))
+                .frame(minWidth: Tokens.minTouch, minHeight: Tokens.minTouch)
+                .accessibilityLabel("Not now")
+        }
     }
 }
 
@@ -986,7 +1148,7 @@ struct CoachOverlay: View {
             .multilineTextAlignment(.center)
             .foregroundStyle(Color.onCanvas)
             .padding(Tokens.Space.xl)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .scrollsWhenTall()
             .background(Color.black.opacity(0.8).ignoresSafeArea())
             .contentShape(Rectangle())
         }
@@ -1036,7 +1198,7 @@ struct DoodleTipOverlay: View {
             .multilineTextAlignment(.center)
             .foregroundStyle(Color.onCanvas)
             .padding(Tokens.Space.xl)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .scrollsWhenTall()
             .background(Color.black.opacity(0.8).ignoresSafeArea())
             .contentShape(Rectangle())
         }

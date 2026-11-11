@@ -75,6 +75,7 @@ final class LiveStore {
     private(set) var connections: [ConnectionSummary] = [] {
         didSet {
             noteStreaks(from: oldValue, to: connections)
+            noteFirstExchange(from: oldValue, to: connections)
             reorder()
         }
     }
@@ -114,6 +115,12 @@ final class LiveStore {
     var pendingInviteCode: String?
     /// A Psst link to share again, from its day-5 reminder (3A).
     var reshareCode: String?
+    /// What that link held ("doodle", "psst" or "code"), so it's shared with the
+    /// same message as the first time (13A, 10 Nov 2026). Nil from older servers.
+    var reshareKind: String?
+    /// A person a push points at (the streak saver, a quiet week: 5A, 11A): home
+    /// scrolls to their band, then clears this.
+    var focusConnectionID: UUID?
     /// IF2: someone new opened an invite link. Their start leads with the
     /// inviter; once they've chosen a name, the invite is accepted for them.
     private(set) var invitedBy: String?
@@ -180,6 +187,10 @@ final class LiveStore {
         // Never right after the first tip: someone who just met Psst sees this one
         // on a later launch.
         doodleTipEligible = coachDismissed
+        whatsNewSeen = defaults.bool(forKey: Self.whatsNewKey)
+        notificationAskDue = defaults.bool(forKey: Self.notificationAskPendingKey)
+        widgetTip = WidgetTipPerson(saved: defaults.string(forKey: Self.widgetTipPendingKey))
+        streakSaverOffer = defaults.string(forKey: Self.streakSaverPendingKey).flatMap(UUID.init(uuidString:))
         myName = defaults.string(forKey: Self.myNameKey)
         pinnedOrder = (defaults.stringArray(forKey: Self.pinnedOrderKey) ?? []).compactMap(UUID.init(uuidString:))
         // Show the people from last time straight away; refresh() replaces them.
@@ -234,6 +245,12 @@ final class LiveStore {
         }
         try await api.setDisplayName(name)
         remember(name: name)
+        // A new account: no "New in Psst" (4A); the widget tip comes after the first exchange instead.
+        if !defaults.bool(forKey: Self.profileKey) {
+            whatsNewSeen = true
+            defaults.set(true, forKey: Self.whatsNewKey)
+            defaults.set(true, forKey: Self.widgetTipEligibleKey)
+        }
         defaults.set(true, forKey: Self.profileKey)
         phase = defaults.bool(forKey: Self.notificationChoiceKey) ? .ready : .needsNotificationChoice
         await acceptIntroInvite()
@@ -392,6 +409,7 @@ final class LiveStore {
         for connection in new {
             let days = connection.streakDays ?? 0
             guard days >= 3, let previous = before[connection.id], days > previous else { continue }
+            if previous < 3 { offerStreakSaver(connection.id) }
             streakMoments[connection.id] = days
             if days >= 7 { noteHappyMoment() }
             Task { [weak self] in
@@ -598,6 +616,7 @@ final class LiveStore {
     @ObservationIgnored private var doodleTipEligible = false
 
     func dismissDoodleTip() {
+        promptedThisVisit = true
         doodleTipDismissed = true
         defaults.set(true, forKey: Self.doodleTipKey)
     }
@@ -614,8 +633,134 @@ final class LiveStore {
 
     func dismissCoach() {
         if !isExistingUser { dismissSuperHint(); dismissFeatureIntro() }
+        promptedThisVisit = true
         coachDismissed = true
         defaults.set(true, forKey: Self.coachKey)
+    }
+
+    // MARK: One-time asks, one at a time (1.0.9 picks 3A, 4A, 5A; 10 Nov 2026)
+
+    static let whatsNewKey = "psst.live.whatsNew.109"
+    static let joinedByInviteKey = "psst.live.joinedByInvite"
+    static let firstExchangeKey = "psst.live.firstTwoWayExchange"
+    static let notificationAskPendingKey = "psst.live.notificationAsk.pending"
+    static let widgetTipEligibleKey = "psst.live.widgetTip.eligible"
+    static let widgetTipPendingKey = "psst.live.widgetTip.pending"
+    static let widgetTipShownKey = "psst.live.widgetTip.shown"
+    static let streakSaverOfferedKey = "psst.live.streakSaver.offered"
+    static let streakSaverPendingKey = "psst.live.streakSaver.pending"
+
+    /// "New in Psst" (4A): seen, or not needed (an account made on this version).
+    private(set) var whatsNewSeen = false
+    /// Something one-time (a tip, an ask, What's new) already showed since Psst last
+    /// came to the front. The next one waits for a later visit, so two never stack.
+    private(set) var promptedThisVisit = false
+    /// 3A: a joiner just had their first two-way Psst; home asks about notifications
+    /// once (the same card as after sharing a Psst link), if iOS still has no answer.
+    private(set) var notificationAskDue = false
+    /// 4A: the person of your first two-way Psst, for the one-time widget tip.
+    private(set) var widgetTip: WidgetTipPerson?
+    /// 5A: a streak just reached 3 for the first time; home offers the streak saver once.
+    private(set) var streakSaverOffer: UUID?
+    /// The streak saver on the server (5A); nil until known.
+    private(set) var streakSaver: StreakSaverStatus?
+
+    /// Existing users see "New in Psst" once after updating (4A). Never in UI test
+    /// runs, whose made-up accounts all look like existing ones.
+    var whatsNewDue: Bool { isExistingUser && !whatsNewSeen && !Self.isUITest }
+
+    /// A one-time thing is on screen now; nothing else one-time shows this visit.
+    func notePrompted() { promptedThisVisit = true }
+
+    /// Psst went to the background: the next visit may show the next one-time thing.
+    func startNewVisit() { promptedThisVisit = false }
+
+    func dismissWhatsNew() {
+        whatsNewSeen = true
+        defaults.set(true, forKey: Self.whatsNewKey)
+    }
+
+    /// The card was shown (or iOS already has an answer): never asked this way again.
+    func finishNotificationAsk() {
+        notificationAskDue = false
+        defaults.removeObject(forKey: Self.notificationAskPendingKey)
+    }
+
+    func dismissWidgetTip() {
+        widgetTip = nil
+        defaults.removeObject(forKey: Self.widgetTipPendingKey)
+        defaults.set(true, forKey: Self.widgetTipShownKey)
+    }
+
+    /// Offered once ever, whatever the answer.
+    func finishStreakSaverOffer() {
+        streakSaverOffer = nil
+        defaults.removeObject(forKey: Self.streakSaverPendingKey)
+        defaults.set(true, forKey: Self.streakSaverOfferedKey)
+    }
+
+    @discardableResult
+    func loadStreakSaver() async -> StreakSaverStatus? {
+        if let status = try? await api.streakSaverStatus() { streakSaver = status }
+        return streakSaver
+    }
+
+    /// Turns the 8 PM streak reminder on or off. Returns false if the server didn't take it.
+    @discardableResult
+    func setStreakReminders(_ enabled: Bool) async -> Bool {
+        do {
+            try await api.setStreakReminders(enabled)
+            if let status = streakSaver {
+                streakSaver = StreakSaverStatus(enabled: enabled, unlimited: status.unlimited, freezesLeft: status.freezesLeft)
+            }
+            await loadStreakSaver()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func offerStreakSaver(_ connectionID: UUID) {
+        guard !Self.isUITest, !defaults.bool(forKey: Self.streakSaverOfferedKey), streakSaverOffer == nil else { return }
+        streakSaverOffer = connectionID
+        defaults.set(connectionID.uuidString, forKey: Self.streakSaverPendingKey)
+    }
+
+    /// The first time this phone sees a two-way Psst (one of you pssted, the other
+    /// pssted back, or a streak day began): 3A and 4A wait for this moment.
+    private func noteFirstExchange(from old: [ConnectionSummary], to new: [ConnectionSummary]) {
+        guard !Self.isUITest, !defaults.bool(forKey: Self.firstExchangeKey),
+              let exchange = Self.firstTwoWayExchange(from: old, to: new) else { return }
+        defaults.set(true, forKey: Self.firstExchangeKey)
+        if defaults.bool(forKey: Self.joinedByInviteKey) {
+            notificationAskDue = true
+            defaults.set(true, forKey: Self.notificationAskPendingKey)
+        }
+        if defaults.bool(forKey: Self.widgetTipEligibleKey), !defaults.bool(forKey: Self.widgetTipShownKey) {
+            let tip = WidgetTipPerson(connectionID: exchange.connectionID, theirLastPsst: exchange.theirLastPsst ?? now())
+            widgetTip = tip
+            defaults.set(tip.saved, forKey: Self.widgetTipPendingKey)
+        }
+    }
+
+    /// A person whose latest Psst changed direction (theirs, then yours, or the other
+    /// way round) or whose streak began, between two lists; with when they last
+    /// pssted you, if known.
+    nonisolated static func firstTwoWayExchange(from old: [ConnectionSummary], to new: [ConnectionSummary])
+        -> (connectionID: UUID, theirLastPsst: Date?)? {
+        let before = Dictionary(old.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for connection in new {
+            guard let previous = before[connection.id] else { continue }
+            let flipped = previous.lastEventId != nil && connection.lastEventId != previous.lastEventId
+                && previous.lastFromMe != nil && connection.lastFromMe != nil
+                && previous.lastFromMe != connection.lastFromMe
+            let streakBegan = (connection.streakDays ?? 0) > 0 && (previous.streakDays ?? 0) == 0
+            guard flipped || streakBegan else { continue }
+            let theirs = connection.lastFromMe == false ? connection.lastCreatedAt
+                : previous.lastFromMe == false ? previous.lastCreatedAt : nil
+            return (connection.id, theirs)
+        }
+        return nil
     }
 
     // MARK: Order (O2, plus dragging)
@@ -839,6 +984,8 @@ final class LiveStore {
 
     func acceptInvite(code: String) async throws -> UUID? {
         let result = try await api.acceptInvite(code: code)
+        // A joiner (3A): after their first two-way Psst, Psst asks once about notifications.
+        defaults.set(true, forKey: Self.joinedByInviteKey)
         if result.heldPsst == true, let id = result.connectionId { heldPsstConnections.insert(id) }
         await refresh()
         return result.connectionId
@@ -1003,6 +1150,16 @@ final class LiveStore {
         defaults.removeObject(forKey: Self.myNameKey)
         defaults.removeObject(forKey: Self.connectionsCacheKey)
         defaults.removeObject(forKey: Self.activityCacheKey)
+        for key in [Self.joinedByInviteKey, Self.firstExchangeKey, Self.notificationAskPendingKey,
+                    Self.widgetTipEligibleKey, Self.widgetTipPendingKey, Self.widgetTipShownKey,
+                    Self.streakSaverOfferedKey, Self.streakSaverPendingKey] {
+            defaults.removeObject(forKey: key)
+        }
+        notificationAskDue = false
+        widgetTip = nil
+        streakSaverOffer = nil
+        streakSaver = nil
+        focusConnectionID = nil
         activity = []
         streakMoments = [:]
         reportedTimeZone = nil

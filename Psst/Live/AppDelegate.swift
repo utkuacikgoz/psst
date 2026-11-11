@@ -75,6 +75,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         return psst["code"] as? String
     }
 
+    /// What the reminded link held (13A): "doodle", "psst" or "code"; nil from older servers.
+    nonisolated static func inviteReminderKind(_ userInfo: [AnyHashable: Any]) -> String? {
+        guard inviteReminderCode(userInfo) != nil else { return nil }
+        return (userInfo["psst"] as? [String: Any])?["kind"] as? String
+    }
+
+    /// The streak saver's 8 PM reminder (5A) or the quiet-week Sunday push (11A):
+    /// the person whose band it opens.
+    nonisolated static func focusedConnection(_ userInfo: [AnyHashable: Any]) -> UUID? {
+        guard let psst = userInfo["psst"] as? [String: Any],
+              psst["streak_reminder"] as? Bool == true || psst["quiet_week"] as? Bool == true,
+              let id = psst["connection_id"] as? String else { return nil }
+        return UUID(uuidString: id)
+    }
+
     /// The push the inviter gets when someone accepts (accept-invite function).
     nonisolated static func isJoined(_ userInfo: [AnyHashable: Any]) -> Bool {
         (userInfo["psst"] as? [String: Any])?["joined"] as? Bool == true
@@ -100,7 +115,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                 return
             }
             if let code = Self.inviteReminderCode(userInfo) {
+                self.store?.reshareKind = Self.inviteReminderKind(userInfo)
                 self.store?.reshareCode = code
+                return
+            }
+            if let id = Self.focusedConnection(userInfo) {
+                guard let store = self.store else { return }
+                // Someone home doesn't know yet: fetch the people first.
+                if !store.connections.contains(where: { $0.id == id }) { await store.refresh() }
+                store.focusConnectionID = id
                 return
             }
             guard let store = self.store, let payload = SignalPayload(userInfo: userInfo) else { return }
@@ -125,7 +148,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     private static func postSendBackFailure(to name: String, signal: Signal) async {
         let content = UNMutableNotificationContent()
         content.title = "Didn't make it"
-        content.body = "Your \(signal.title) to \(name) didn't get through. Open Psst to try again."
+        content.body = "Couldn't send your \(signal.title) to \(name). Open Psst to try again."
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         try? await UNUserNotificationCenter.current().add(request)
     }

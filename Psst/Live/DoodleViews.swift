@@ -86,13 +86,21 @@ struct DoodleSheet: View {
     @State private var current: [[Double]] = []
     @State private var refused = 0
     @State private var atLimit = false
+    /// 8A (owner pick, 10 Nov 2026): Cancel asks before throwing a drawing away.
+    @State private var confirmingDiscard = false
+    @AppStorage(SendHaptics.settingKey) private var hapticsEnabled = true
 
     private var pointCount: Int { strokes.reduce(0) { $0 + $1.count } + current.count }
+    private var hasDrawing: Bool { !strokes.isEmpty || !current.isEmpty }
+
+    /// Said at the ink limit, on screen and to VoiceOver (8A).
+    static let inkLimitLine = "That's all the ink. Send it, or undo a line."
 
     var body: some View {
         VStack(spacing: Tokens.Space.m) {
             HStack {
-                Button("Cancel") { dismiss() }
+                // 8A: only asks when something is drawn.
+                Button("Cancel") { if hasDrawing { confirmingDiscard = true } else { dismiss() } }
                 Spacer()
                 Text(title).font(.psst(.body, weight: .bold))
                 Spacer()
@@ -109,9 +117,26 @@ struct DoodleSheet: View {
                     DoodleShape(strokes: strokes + (current.isEmpty ? [] : [current]))
                         .stroke(Color.white, style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round))
                     if strokes.isEmpty && current.isEmpty {
-                        Text("Draw here").font(.psst(.headline, weight: .semibold)).opacity(0.6)
+                        // 16A: brighter, to pass 4.5:1 on every band colour.
+                        Text("Draw here").font(.psst(.headline, weight: .semibold)).foregroundStyle(Color.placeholderOnShade)
                     }
                 }
+                // 8A: at the limit a line says why the pen stopped, besides the buzz.
+                .overlay(alignment: .bottom) {
+                    if atLimit {
+                        Text(Self.inkLimitLine)
+                            .font(.psst(.footnote, weight: .semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, Tokens.Space.m)
+                            .padding(.vertical, Tokens.Space.s)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
+                            .padding(Tokens.Space.m)
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                    }
+                }
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: atLimit)
                 .frame(width: side, height: side)
                 .contentShape(Rectangle())
                 .gesture(
@@ -156,8 +181,18 @@ struct DoodleSheet: View {
                     LinearKeyframe(0, duration: 0.05)
                 }
             }
-            .sensoryFeedback(.error, trigger: refused)
-            .sensoryFeedback(.warning, trigger: atLimit) { _, new in new }
+            // Both follow Settings → Haptic feedback, like every send haptic (7A).
+            .sensoryFeedback(.error, trigger: refused) { _, _ in hapticsEnabled }
+            .sensoryFeedback(.warning, trigger: atLimit) { _, new in hapticsEnabled && new }
+        }
+        .onChange(of: atLimit) { _, new in
+            if new { AccessibilityNotification.Announcement(Self.inkLimitLine).post() }
+        }
+        .alert("Discard this doodle?", isPresented: $confirmingDiscard) {
+            Button("Keep drawing", role: .cancel) {}
+            Button("Discard", role: .destructive) { dismiss() }
+        } message: {
+            Text("Your drawing will be lost.")
         }
         .padding(Tokens.Space.l)
         .foregroundStyle(Color.onCanvas)

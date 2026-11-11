@@ -58,6 +58,9 @@ protocol PsstAPI: AnyObject {
     func weeklyRecap() async throws -> WeeklyRecap
     func weeklyRecapStatus() async throws -> WeeklyRecapStatus
     func setWeeklyRecap(_ enabled: Bool) async throws
+    /// The streak saver (5A): one 8 PM reminder when a streak is about to go out.
+    func streakSaverStatus() async throws -> StreakSaverStatus
+    func setStreakReminders(_ enabled: Bool) async throws
     func deleteAccount() async throws
     func signOutLocally()
     /// Reads the saved session again: before the first unlock after a restart the
@@ -91,6 +94,8 @@ extension PsstAPI {
     func weeklyRecap() async throws -> WeeklyRecap { throw APIError.server(status: 503, code: "feature_unavailable") }
     func weeklyRecapStatus() async throws -> WeeklyRecapStatus { throw APIError.server(status: 503, code: "feature_unavailable") }
     func setWeeklyRecap(_ enabled: Bool) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
+    func streakSaverStatus() async throws -> StreakSaverStatus { throw APIError.server(status: 503, code: "feature_unavailable") }
+    func setStreakReminders(_ enabled: Bool) async throws { throw APIError.server(status: 503, code: "feature_unavailable") }
 }
 
 struct AuthSession: Codable, Equatable {
@@ -384,6 +389,8 @@ final class APIClient: PsstAPI {
     func weeklyRecap() async throws -> WeeklyRecap { try await rpc("weekly_recap", [String: String]()) }
     func weeklyRecapStatus() async throws -> WeeklyRecapStatus { try await rpc("weekly_recap_status", [String: String]()) }
     func setWeeklyRecap(_ enabled: Bool) async throws { try await rpcVoid("set_weekly_recap", ["p_enabled": enabled]) }
+    func streakSaverStatus() async throws -> StreakSaverStatus { try await rpc("streak_saver_status", [String: String]()) }
+    func setStreakReminders(_ enabled: Bool) async throws { try await rpcVoid("set_streak_reminders", ["p_enabled": enabled]) }
 
     func deleteAccount() async throws {
         let _: EmptyResponse = try await authorizedRequest(path: "functions/v1/delete-account", body: [String: String]())

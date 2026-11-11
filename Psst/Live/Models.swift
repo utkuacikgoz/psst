@@ -285,6 +285,42 @@ struct WeeklyRecapStatus: Decodable, Equatable {
     let weekTotal: Int
 }
 
+/// The streak saver (owner pick 5A, 10 Nov 2026): streak_saver_status().
+/// `freezesLeft` is this month's free freeze (0 or 1); unlimited with Psst+.
+struct StreakSaverStatus: Decodable, Equatable {
+    let enabled: Bool
+    let unlimited: Bool
+    let freezesLeft: Int
+}
+
+/// The person of your first two-way Psst, for the one-time widget tip (4A), and
+/// when they last pssted you (what their widget would say).
+struct WidgetTipPerson: Equatable {
+    let connectionID: UUID
+    let theirLastPsst: Date
+
+    /// Kept on this phone until the tip has shown: "UUID|seconds".
+    var saved: String { "\(connectionID.uuidString)|\(theirLastPsst.timeIntervalSince1970)" }
+
+    /// The widget's own wording: "pssted you just now", "pssted you 2h ago".
+    func line(now: Date = Date()) -> String {
+        let elapsed = max(0, now.timeIntervalSince(theirLastPsst))
+        if elapsed < 60 { return "pssted you just now" }
+        if elapsed < 3600 { return "pssted you \(Int(elapsed / 60))m ago" }
+        if elapsed < 24 * 3600 { return "pssted you \(Int(elapsed / 3600))h ago" }
+        return "pssted you \(Int(elapsed / (24 * 3600)))d ago"
+    }
+}
+
+extension WidgetTipPerson {
+    init?(saved: String?) {
+        let parts = saved?.split(separator: "|") ?? []
+        guard parts.count == 2, let id = UUID(uuidString: String(parts[0])),
+              let seconds = TimeInterval(String(parts[1])) else { return nil }
+        self.init(connectionID: id, theirLastPsst: Date(timeIntervalSince1970: seconds))
+    }
+}
+
 /// Your word (owner picks 1A 2A 3A, 16 Oct 2026; Psst+): what the people you psst
 /// see instead of "psst". A fixed list (the server checks the same one); the name
 /// and the verb stay Psst.

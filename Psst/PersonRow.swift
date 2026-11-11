@@ -24,12 +24,33 @@ struct PersonRow: View {
     var streakDays = 0
     /// Set for a few seconds when the streak just grew: "7 days in a row".
     var streakMoment: Int? = nil
+    /// The last Psst to them didn't make it (7A: one error buzz as it happens).
+    var sendFailed = false
 
     @ScaledMetric(relativeTo: .largeTitle) private var nameSize: CGFloat = Tokens.Band.titleSize
+    /// The flame's line height at this text size, for the room kept for corner marks (16A).
+    @ScaledMetric(relativeTo: .footnote) private var cornerLine: CGFloat = 16
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @AppStorage(SendHaptics.settingKey) private var hapticsEnabled = true
+    /// Taps on a paused band, each one a warning buzz (7A).
+    @State private var pausedTaps = 0
+
+    /// 16A (owner pick, 10 Nov 2026): at accessibility sizes the text fills the band's
+    /// width, so the bottom keeps room for the corner marks (the flame, bottom left, and
+    /// the cat home puts bottom right) and they never cover it. Each mark is a 44 pt
+    /// target with 8 pt around it; the flame grows with the text.
+    private var cornerRoom: CGFloat {
+        guard dynamicTypeSize.isAccessibilitySize else { return 0 }
+        let mark = max(Tokens.minTouch, cornerLine) + Tokens.Space.s * 2
+        return max(0, mark - Tokens.Band.verticalPadding)
+    }
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            if isDimmed { pausedTaps += 1 }
+            action()
+        } label: {
             VStack(spacing: Tokens.Space.m) {
                 Text(name.uppercased())
                     .bandTitle(name, size: nameSize, tracking: Tokens.Band.titleTracking)
@@ -86,6 +107,7 @@ struct PersonRow: View {
             .foregroundStyle(.white)
             .padding(.horizontal, Tokens.Space.xl)
             .padding(.vertical, Tokens.Band.verticalPadding)
+            .padding(.bottom, cornerRoom)
             .frame(maxWidth: .infinity, minHeight: minHeight)
             // A Super Psst nudges: the name shakes side to side (owner pick 1A, 14 Oct).
             .keyframeAnimator(initialValue: 0.0, trigger: effect?.signal == .superPsst ? effect?.id : nil) { content, x in
@@ -140,6 +162,10 @@ struct PersonRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PersonBandStyle(color: color ?? .personBand(name), isDimmed: isDimmed))
+        // 7A (owner pick, 10 Nov 2026): a warning buzz for a tap while paused, an error
+        // buzz when a Psst didn't make it. The soft touch tick is in PersonBandStyle.
+        .sensoryFeedback(trigger: pausedTaps) { _, _ in hapticsEnabled ? SendHaptics.paused : nil }
+        .sensoryFeedback(trigger: sendFailed) { old, new in hapticsEnabled && new && !old ? SendHaptics.failed : nil }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name)
         .accessibilityValue([status, cornerMark.map { "Psst \($0)" } ?? "",
@@ -292,11 +318,27 @@ private struct PersonBandStyle: ButtonStyle {
     let color: Color
     var isDimmed = false
     func makeBody(configuration: Configuration) -> some View {
+        PressedBand(configuration: configuration, color: color, isDimmed: isDimmed)
+    }
+}
+
+/// The band's look while a finger is on it, and (7A) a soft tick the moment the
+/// finger touches it. A paused band skips the tick: its tap buzzes a warning instead.
+private struct PressedBand: View {
+    let configuration: ButtonStyleConfiguration
+    let color: Color
+    let isDimmed: Bool
+    @AppStorage(SendHaptics.settingKey) private var hapticsEnabled = true
+
+    var body: some View {
         configuration.label
             .background(color.opacity(configuration.isPressed ? Tokens.Band.pressedOpacity : 1)
                 .saturation(isDimmed ? 0.35 : 1)
                 .brightness(isDimmed ? -0.12 : 0))
             .opacity(isDimmed ? 0.9 : 1)
             .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+            .sensoryFeedback(trigger: configuration.isPressed) { old, new in
+                hapticsEnabled && !isDimmed && new && !old ? SendHaptics.touch : nil
+            }
     }
 }

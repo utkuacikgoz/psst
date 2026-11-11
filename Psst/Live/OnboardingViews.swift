@@ -120,7 +120,7 @@ struct NameStepView: View {
             } catch APIError.offline {
                 error = "You're offline. Try again once you're back online."
             } catch {
-                self.error = "That didn't save. Give it another go?"
+                self.error = "Couldn't save your name. Try again."
             }
             isSaving = false
         }
@@ -206,7 +206,7 @@ struct NameEditSheet: View {
             } catch APIError.offline {
                 error = "You're offline. Try again once you're back online."
             } catch {
-                self.error = "That didn't save. Try again."
+                self.error = "Couldn't save your name. Try again."
             }
             isSaving = false
         }
@@ -250,7 +250,8 @@ struct NameBand: View {
             HStack(spacing: 2) {
                 Text(trimmed.isEmpty ? "NAME" : name.uppercased())
                     .bandTitle(trimmed.isEmpty ? "NAME" : name, size: titleSize, tracking: Tokens.Band.titleTracking)
-                    .opacity(trimmed.isEmpty ? 0.55 : 1)
+                    // 16A: the NAME placeholder at 95% white passes 4.5:1 on every band colour.
+                    .foregroundStyle(trimmed.isEmpty ? Color.placeholderOnBand : Color.onCanvas)
                     .multilineTextAlignment(.center)
                 if focused.wrappedValue { BlinkingCaret(height: titleSize) }
             }
@@ -435,6 +436,15 @@ enum NotificationPermission {
     }
 
     static let askedAgainKey = "psst.live.notificationAskedAgain"
+
+    /// "Turn on sounds" in Settings (2A, 10 Nov 2026): from quiet delivery, a full
+    /// request shows iOS's real prompt, which upgrades quiet to alerts and sound.
+    @MainActor static func turnOnSounds() async -> Bool {
+        let granted = (try? await UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+        if granted { UIApplication.shared.registerForRemoteNotifications() }
+        return granted
+    }
 
     /// "Not now" (6A): no prompt; Pssts land quietly in Notification Center, where
     /// iOS offers Keep / Turn off.

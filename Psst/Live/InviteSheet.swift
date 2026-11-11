@@ -73,7 +73,6 @@ struct InviteSheet: View {
         }
         .sheet(isPresented: $askingNotifications) {
             NotificationAskCard { askingNotifications = false }
-                .presentationDetents([.medium])
         }
         .fullScreenCover(isPresented: $drawingInvite, onDismiss: { if inviteDoodle != nil { createDoodle() } }) {
             DoodleSheet(title: "For someone new", sendTitle: "SEND AS A LINK", color: Color(hex: 0xAC3E68)) { strokes in
@@ -258,7 +257,7 @@ struct InviteSheet: View {
             if let invite {
                 ShareLink(
                     item: invite.link,
-                    message: Text("I want to be able to psst you. Tap to join me (code \(invite.code)).")
+                    message: Text(PsstShare.groupMessage(code: invite.code))
                 ) {
                     Label(progress?.code == invite.code ? "Share again" : "Share invite", systemImage: "square.and.arrow.up")
                         .font(.psst(.body, weight: .semibold))
@@ -520,10 +519,22 @@ struct PsstShare: Identifiable {
     static let message = "I pssted you. Open it to see, and psst me back."
     static let doodleMessage = "I drew you something. Open it to see, and psst me back."
 
-    /// The same one-person link again (the day-5 reminder, 3A).
-    static func resend(code: String) -> PsstShare? {
+    /// The group invite's message (13A, 10 Nov 2026). "(code …)" stays at the end:
+    /// InviteSheet.inviteCode(in:) finds the code there when it's pasted.
+    static func groupMessage(code: String) -> String {
+        "Join our Psst? One tap says thinking of you. (code \(code))"
+    }
+
+    /// The same link again (the day-5 reminder, 3A), with the message it first went
+    /// out with: "doodle" (13A), "code" (a group code) or "psst" (also older servers).
+    static func resend(code: String, kind: String? = nil) -> PsstShare? {
+        if kind == "code" {
+            guard let link = URL(string: "https://\(InviteLink.webHost)/invite/\(code)") else { return nil }
+            return PsstShare(items: [groupMessage(code: code), link])
+        }
         guard let link = URL(string: "https://\(InviteLink.webHost)/p/\(code)") else { return nil }
-        return PsstShare(items: [message, link])
+        let isDoodle = kind == "doodle"
+        return PsstShare(items: [isDoodle ? doodleMessage : message, link], isDoodle: isDoodle)
     }
 }
 
@@ -550,8 +561,23 @@ struct ShareSheet: UIViewControllerRepresentable {
 struct NotificationAskCard: View {
     let onDone: () -> Void
     @State private var isAsking = false
+    /// 16A (10 Nov 2026): as tall as what it shows, and it scrolls when that's more
+    /// than the screen, so it fits an iPhone SE and the largest text sizes.
+    @State private var contentHeight: CGFloat = 360
+    @State private var bottomInset: CGFloat = 0
 
     var body: some View {
+        ScrollView {
+            card
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
+        .presentationDetents([.height(contentHeight + bottomInset)])
+        .presentationBackground(Color.white)
+    }
+
+    private var card: some View {
         VStack(spacing: Tokens.Space.l) {
             MoodCat(mood: .awake)
                 .frame(width: 44, height: 40)
@@ -592,7 +618,6 @@ struct NotificationAskCard: View {
                 .frame(minHeight: Tokens.minTouch)
         }
         .padding(Tokens.Space.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .presentationBackground(Color.white)
+        .frame(maxWidth: .infinity)
     }
 }

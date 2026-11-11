@@ -452,7 +452,7 @@ struct ActivityView: View {
                 } else if store.activity.isEmpty && failed {
                     VStack(spacing: Tokens.Space.s) {
                         SadCat(eyes: LightPageCatColors(colorScheme).eyes, outline: LightPageCatColors(colorScheme).outline)
-                        Button("Couldn't load activity. Try again") { Task { await load() } }
+                        Button("Couldn't load activity. Try again.") { Task { await load() } }
                             .frame(maxWidth: .infinity, minHeight: Tokens.minTouch)
                     }
                     .padding(.top, Tokens.Space.l)
@@ -730,7 +730,7 @@ struct SuperPsstSheet: View {
             if store.isOffline {
                 statusLine("You're offline", detail: "Super Psst needs a connection. Nothing was sent.")
             } else {
-                statusLine("Couldn't reach Psst", detail: "Try again in a moment.")
+                statusLine("Couldn't reach Psst", detail: "Try again.")
             }
         case .sending:
             sparkleLine("Sending…").opacity(0.6)
@@ -974,6 +974,8 @@ struct WeeklyRecapView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var recap: WeeklyRecap?
     @State private var failed = false
+    /// 14A: the story card and link, in the share sheet.
+    @State private var sharingWeek: PsstShare?
     @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 40
     @ScaledMetric(relativeTo: .largeTitle) private var bigSize: CGFloat = 52
 
@@ -1000,6 +1002,21 @@ struct WeeklyRecapView: View {
                 .multilineTextAlignment(.center)
             }
             .scrollBounceBehavior(.basedOnSize)
+            // 14A (owner pick, 10 Nov 2026): one SHARE MY WEEK button, a 9:16 story card.
+            if let recap, recap.total > 0 {
+                Button { shareWeek(recap) } label: {
+                    Label("SHARE MY WEEK", systemImage: "square.and.arrow.up")
+                        .font(.psst(.body, weight: .black))
+                        .tracking(Tokens.Band.labelTracking)
+                        .foregroundStyle(Color.onCanvas)
+                        .frame(maxWidth: .infinity, minHeight: Tokens.Band.barMinHeight)
+                        .background(Color.bandShade)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Share my week")
+                .accessibilityHint("Shares a picture of your week. Your #1 shows as an initial only.")
+            }
             if let top = recap?.top, let connection = store.connections.first(where: { $0.id == top.connectionId }) {
                 Button {
                     store.tap(connection)
@@ -1020,6 +1037,14 @@ struct WeeklyRecapView: View {
         .foregroundStyle(Color.onCanvas)
         .background(Color.psstCanvas.ignoresSafeArea())
         .task { await load() }
+        .sheet(item: $sharingWeek) { ShareSheet(items: $0.items) }
+    }
+
+    private func shareWeek(_ recap: WeeklyRecap) {
+        var items: [Any] = []
+        if let image = ShareWeekCard.image(for: recap, connections: store.connections) { items.append(image) }
+        items.append(ShareWeekCard.link)
+        sharingWeek = PsstShare(items: items)
     }
 
     @ViewBuilder private var content: some View {
@@ -1065,7 +1090,7 @@ struct WeeklyRecapView: View {
         } else if failed {
             VStack(spacing: Tokens.Space.s) {
                 SadCat()
-                Button("Couldn't load your week. Try again") { Task { await load() } }
+                Button("Couldn't load your week. Try again.") { Task { await load() } }
                     .font(.psst(.body, weight: .bold))
                     .frame(minHeight: Tokens.minTouch)
             }

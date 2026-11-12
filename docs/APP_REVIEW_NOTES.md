@@ -310,6 +310,47 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 
 **App Privacy:** doodles are covered by the existing **User Content → Other User Content** (linked, not tracking, App Functionality); the privacy manifest now lists it too. The device's time zone is now saved on the account (streak days and the recap's Sunday 6 PM). Apple has no time-zone category and it is far coarser than "Coarse Location", so the safe declaration is **Other Data → App Functionality, linked to the user, not used for tracking**. Weekly recap and Psst links collect nothing else new: the recap is computed from Pssts already stored, and a Psst link stores only the same invite row as an invite code.
 
+## 1.0.9 (build 48)
+
+1.0.8 (build 46) is live on the App Store and is the baseline for rule 3. Every visible change in 1.0.9 is an owner pick from the 1.0.9 audit page (1A–16A, 10 Nov 2026) or its follow-ups (1A 2A 3B, 11 Nov 2026); see DESIGN.md. Submit with the Release to App Store workflow, which makes fresh Psst Team codes for `{REVIEW_CODE}` and `{BACKUP_CODE}` (never printed). Store listings are unchanged.
+
+**What's New in This Version:**
+
+```
+• Streak saver: one reminder at 8 PM before a streak goes out, and a free freeze each month (unlimited with Psst+)
+• Share my week: turn your Sunday recap into a story card
+• Widgets now get new doodles while Psst is closed, and look right on tinted and clear Home Screens
+• The Control Center button tells you your Psst was sent
+• Clearer haptics, a doodle pad that asks before throwing a drawing away, and fixes for the largest text sizes
+```
+
+**Notes for the reviewer:**
+
+```
+Psst lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
+
+What's new in 1.0.9:
+- Streak saver (off by default): Settings → Streak saver, or offered once when a streak reaches 3 days. It sends at most one notification a day, at 8 PM, when a streak is about to end, and forgives one missed day a month (unlimited with Psst+).
+- The Sunday recap (Settings → Weekly recap, off by default) can be shared as an image with SHARE MY WEEK. It shows a count and an initial, never a full name.
+- An optional Sunday notification after a quiet week ("Quiet week. Psst Kim?"), at most once every three weeks, controlled by the Weekly recap switch.
+- Home Screen widgets now refresh with their own read-only key instead of the account session, and adapt to tinted and clear Home Screens. The Control Center button shows "Sending…" then "Sent ✓".
+- If notifications were set to quiet delivery, Settings says "Quiet" and offers "Turn on sounds" (Apple's standard permission prompt).
+- Invite codes are limited to 20 wrong tries an hour per account.
+
+To try it with a real person (our team):
+1. Open the app, enter any name, and choose whether to allow notifications.
+2. On home, tap "I have a code" and enter:  {REVIEW_CODE}
+   (backup code:  {BACKUP_CODE})
+3. Tap Connect. A band for "Psst Team" appears on home.
+4. Tap the band to send a Psst. We'll psst you back within a few minutes during review hours.
+
+Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. On a doodle, ••• offers Hide doodle, Block and Report. Reports are reviewed within 24 hours; a report keeps a copy of the reported doodle for 90 days so it can be reviewed after the block. Settings → Delete account removes the account and its data immediately (reports stay, without the account, until their 90 days are up).
+
+Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "Psst+" → Unlock, or "Redeem a code". Pssting, replies, invites, doodles, the streak saver and the small widget are free.
+
+Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
+```
+
 ## 1.0.8 (build 46)
 
 1.0.7 (build 42) was approved on 19 Oct 2026 and is the baseline for rule 3. Submit with the Release to App Store workflow. No codes to make by hand: each run that sets the notes makes two fresh Psst Team codes in production (3 joins each, 30 days), revokes the ones earlier runs made, and fills them in for `{REVIEW_CODE}` and `{BACKUP_CODE}`. They are never printed; to see them, open the notes in App Store Connect. The workflow also sets the store listings in every language from docs/ASO.md (new name "Psst: Doodle & Miss You Widget", subtitle, keywords, description) and adds the UK English and Mexican Spanish store pages.

@@ -4,6 +4,31 @@ Drafts to copy, edit into your own voice, and post. Every link carries its campa
 
 Before posting anywhere, read that community's self-promotion rules. Post as yourself, answer every comment, and don't ask friends to upvote (Reddit, HN and Product Hunt all penalise it).
 
+## Fresh for 1.0.9 (Nov 2026): free channels
+
+What's new to talk about: doodles that land on their Home Screen as a polaroid (free widget), Streak saver (one 8 PM reminder and a free monthly freeze), Share my week story cards, and widgets that look right on tinted and clear Home Screens. Link: https://apps.apple.com/app/apple-store/id6815764359?pt=129413467&mt=8&ct=<campaign>
+
+**One-liner:** Draw something with one finger and it lands on their Home Screen. Psst is the "thinking of you" app for your few people: no feed, no chat.
+
+**r/LongDistance** (only if the rules allow app posts; otherwise ask the mods first), `ct=reddit`:
+> **Title:** We send each other doodles that land on the other's Home Screen
+>
+> My partner and I are 9 hours apart, and texting "miss you" every day started to feel like a chore. So I made a tiny iPhone app: tap their name and they feel a "psst", or draw something with one finger and it shows up on their Home Screen widget as a little polaroid. They psst back from the notification.
+>
+> It keeps a streak for days you both psst, and there's an optional reminder at 8 PM if it's about to go out (plus one free "freeze" a month for the day you forget). No chat, no feed, no location. Free.
+>
+> Would love to hear how other LDR couples stay in touch without it feeling like homework.
+
+Edit the first line into your own story: only post what's true for you.
+
+**Videos to film this month** (real screens, `ct=tiktok` / `ct=instagram`):
+1. **"It landed"**: draw a heart on one phone, cut to the other phone's Home Screen where the polaroid appears. Caption: "The widget we send each other."
+2. **Tinted Home Screen**: switch an iPhone to tinted mode, show the Psst widget turning into an outline in the tint. Caption: "Finally a widget that matches."
+3. **Streak saver**: 7:59 PM, a phone buzzes "Your 6-day streak with Mia ends at midnight 🔥", they psst, flame stays. Caption: "The only reminder I want."
+4. **Share my week**: Sunday recap → SHARE MY WEEK → post the card to Stories. Caption: "My week in pssts."
+
+**Weekly rhythm (free):** 3 videos a week; one community post a week, in a different community each time, answering every comment; one share of a real user's Share my week card a week, with their permission. Check invited vs organic sign-ups every Monday (docs/METRICS.md) to see what's working.
+
 ## One-liners
 
 - **Short:** Psst — one tap tells someone you're thinking of them.

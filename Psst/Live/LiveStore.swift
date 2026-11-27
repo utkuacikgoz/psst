@@ -53,9 +53,16 @@ final class LiveStore {
 
     static let coachKey = "psst.live.coachShown"
     static let doodleTipKey = "psst.live.doodleTipShown"
-    /// Asked once at a happy moment (19 Oct 2026); a new key, so people first asked
-    /// after their first Psst get this one chance too.
+    /// Asked once at a happy moment (19 Oct 2026). Replaced in 1.0.10 by the keys
+    /// below; kept only so it isn't reused.
     static let reviewAskedKey = "psst.live.reviewAsked.happy"
+    /// When the rating prompt was requested (seconds since 1970), the last year's only,
+    /// and the app version it was last requested in (owner go, 27 Nov 2026): at most
+    /// once per version, 120 days apart, three a year. Apple may still not show it.
+    static let reviewAsksKey = "psst.live.reviewAsks"
+    static let reviewAskedVersionKey = "psst.live.reviewAskedVersion"
+    /// A two-way Psst counts as a happy moment only from day 3.
+    static let reviewExchangeWait: TimeInterval = 3 * 86_400
     /// When this install first ran Psst (1.0.8 or later); the rating waits two days from it.
     static let firstSeenKey = "psst.live.firstSeen"
     static let reviewWait: TimeInterval = 2 * 86_400
@@ -76,6 +83,7 @@ final class LiveStore {
         didSet {
             noteStreaks(from: oldValue, to: connections)
             noteFirstExchange(from: oldValue, to: connections)
+            noteExchangeForRating(from: oldValue, to: connections)
             reorder()
         }
     }
@@ -411,7 +419,7 @@ final class LiveStore {
             guard days >= 3, let previous = before[connection.id], days > previous else { continue }
             if previous < 3 { offerStreakSaver(connection.id) }
             streakMoments[connection.id] = days
-            if days >= 7 { noteHappyMoment() }
+            noteHappyMoment()  // a streak growing past 3 days (1.0.10; was 7+)
             Task { [weak self] in
                 try? await Task.sleep(for: Self.streakMomentDuration)
                 if self?.streakMoments[connection.id] == days { self?.streakMoments[connection.id] = nil }
@@ -1092,13 +1100,42 @@ final class LiveStore {
         arrival = arrivalQueue.isEmpty ? nil : arrivalQueue.removeFirst()
     }
 
-    /// The one time Psst asks for a rating: after something that felt good, and
-    /// never in someone's first days (a newcomer's first moment is often a doodle).
-    private func noteHappyMoment() {
-        guard !defaults.bool(forKey: Self.reviewAskedKey),
-              now().timeIntervalSince(firstSeen) >= Self.reviewWait else { return }
-        defaults.set(true, forKey: Self.reviewAskedKey)
+    /// Psst asks for a rating after something that felt good, never in someone's
+    /// first days (a newcomer's first moment is often a doodle), and only as often as
+    /// reviewAllowed says. Home requests it, then calls didRequestReview().
+    private func noteHappyMoment(after wait: TimeInterval = LiveStore.reviewWait) {
+        guard Self.reviewAllowed(asks: defaults.array(forKey: Self.reviewAsksKey) as? [Double] ?? [],
+                                 askedVersion: defaults.string(forKey: Self.reviewAskedVersionKey),
+                                 version: Self.currentVersion, firstSeen: firstSeen, now: now(), wait: wait)
+        else { return }
         reviewDue = !Self.isUITest
+    }
+
+    /// A two-way Psst (one of you pssted, the other pssted back, or a streak day
+    /// began), from day 3 on.
+    private func noteExchangeForRating(from old: [ConnectionSummary], to new: [ConnectionSummary]) {
+        guard !old.isEmpty, Self.firstTwoWayExchange(from: old, to: new) != nil else { return }
+        noteHappyMoment(after: Self.reviewExchangeWait)
+    }
+
+    /// Home has just requested the rating prompt: remember when and in which version.
+    func didRequestReview() {
+        reviewDue = false
+        let time = now().timeIntervalSince1970
+        let asks = (defaults.array(forKey: Self.reviewAsksKey) as? [Double] ?? []).filter { time - $0 < 365 * 86_400 }
+        defaults.set(asks + [time], forKey: Self.reviewAsksKey)
+        defaults.set(Self.currentVersion, forKey: Self.reviewAskedVersionKey)
+    }
+
+    /// Whether the rating may be asked for now: past the wait since first launch, not
+    /// yet in this version, at least 120 days since the last ask, under three a year.
+    nonisolated static func reviewAllowed(asks: [Double], askedVersion: String?, version: String,
+                                          firstSeen: Date, now: Date, wait: TimeInterval) -> Bool {
+        guard now.timeIntervalSince(firstSeen) >= wait, askedVersion != version else { return false }
+        let time = now.timeIntervalSince1970
+        guard asks.filter({ time - $0 < 365 * 86_400 }).count < 3 else { return false }
+        if let last = asks.max(), time - last < 120 * 86_400 { return false }
+        return true
     }
 
     /// Tapping the arrival sends a Psst back to that person. Tapping a same

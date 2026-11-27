@@ -411,7 +411,7 @@ final class LiveStoreTests: XCTestCase {
         XCTAssertNil(store.sendStates[ada.id], "Sent clears after its display time")
     }
 
-    func testRatingIsDueOnceAfterAHappyMoment() async {
+    func testRatingIsDueAfterAHappyMomentOncePerVersion() async {
         let ada = connection()
         api.connections = [ada]
         await store.refresh()
@@ -431,11 +431,29 @@ final class LiveStoreTests: XCTestCase {
         store.nextArrival()
         XCTAssertTrue(store.reviewDue, "SAME MOMENT closing is a happy moment")
 
-        store.reviewDue = false
+        store.didRequestReview()
+        XCTAssertFalse(store.reviewDue)
         clock += 5
         await store.tap(ada)?.value
         store.nextArrival()
-        XCTAssertFalse(store.reviewDue, "Asked only once")
+        XCTAssertFalse(store.reviewDue, "Not again in the same version")
+    }
+
+    func testRatingAsksAreSpacedAndCapped() {
+        let day: TimeInterval = 86_400
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        func allowed(_ asks: [Double], _ askedVersion: String?, at days: Double, wait: TimeInterval = LiveStore.reviewWait) -> Bool {
+            LiveStore.reviewAllowed(asks: asks.map { start.timeIntervalSince1970 + $0 * day }, askedVersion: askedVersion,
+                                    version: "1.0.10", firstSeen: start, now: start.addingTimeInterval(days * day), wait: wait)
+        }
+        XCTAssertFalse(allowed([], nil, at: 1), "Not in the first two days")
+        XCTAssertTrue(allowed([], nil, at: 2))
+        XCTAssertFalse(allowed([], nil, at: 2, wait: LiveStore.reviewExchangeWait), "A two-way Psst waits for day 3")
+        XCTAssertFalse(allowed([2], "1.0.10", at: 200), "Once per version")
+        XCTAssertFalse(allowed([2], "1.0.9", at: 100), "120 days apart")
+        XCTAssertTrue(allowed([2], "1.0.9", at: 123))
+        XCTAssertFalse(allowed([2, 130, 260], "1.0.9", at: 365), "At most three a year")
+        XCTAssertTrue(allowed([2, 130, 260], "1.0.9", at: 400), "The oldest falls out of the year")
     }
 
     func testClosingOrReportingADoodleDoesNotAskForARating() async {

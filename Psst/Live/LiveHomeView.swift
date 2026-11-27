@@ -420,7 +420,7 @@ struct LiveHomeView: View {
             guard store.reviewDue, store.arrival == nil, !anySheet, scenePhase == .active else { return }
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }
-            store.reviewDue = false
+            store.didRequestReview()
             requestReview()
         }
     }

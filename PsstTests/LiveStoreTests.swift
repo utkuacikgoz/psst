@@ -422,7 +422,7 @@ final class LiveStoreTests: XCTestCase {
         clock += 5
         await store.tap(ada)?.value
         store.nextArrival()
-        XCTAssertFalse(store.reviewDue, "Never in someone's first two days")
+        XCTAssertFalse(store.reviewDue, "Not on the day of your first Psst")
 
         clock += LiveStore.reviewWait
         await store.tap(ada)?.value
@@ -442,13 +442,12 @@ final class LiveStoreTests: XCTestCase {
     func testRatingAsksAreSpacedAndCapped() {
         let day: TimeInterval = 86_400
         let start = Date(timeIntervalSince1970: 1_800_000_000)
-        func allowed(_ asks: [Double], _ askedVersion: String?, at days: Double, wait: TimeInterval = LiveStore.reviewWait) -> Bool {
+        func allowed(_ asks: [Double], _ askedVersion: String?, at days: Double) -> Bool {
             LiveStore.reviewAllowed(asks: asks.map { start.timeIntervalSince1970 + $0 * day }, askedVersion: askedVersion,
-                                    version: "1.0.10", firstSeen: start, now: start.addingTimeInterval(days * day), wait: wait)
+                                    version: "1.0.10", since: start, now: start.addingTimeInterval(days * day))
         }
-        XCTAssertFalse(allowed([], nil, at: 1), "Not in the first two days")
-        XCTAssertTrue(allowed([], nil, at: 2))
-        XCTAssertFalse(allowed([], nil, at: 2, wait: LiveStore.reviewExchangeWait), "A two-way Psst waits for day 3")
+        XCTAssertFalse(allowed([], nil, at: 0.5), "Not on the day of your first Psst")
+        XCTAssertTrue(allowed([], nil, at: 1), "From a day after it")
         XCTAssertFalse(allowed([2], "1.0.10", at: 200), "Once per version")
         XCTAssertFalse(allowed([2], "1.0.9", at: 100), "120 days apart")
         XCTAssertTrue(allowed([2], "1.0.9", at: 123))

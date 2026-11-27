@@ -61,11 +61,13 @@ final class LiveStore {
     /// once per version, 120 days apart, three a year. Apple may still not show it.
     static let reviewAsksKey = "psst.live.reviewAsks"
     static let reviewAskedVersionKey = "psst.live.reviewAskedVersion"
-    /// A two-way Psst counts as a happy moment only from day 3.
-    static let reviewExchangeWait: TimeInterval = 3 * 86_400
-    /// When this install first ran Psst (1.0.8 or later); the rating waits two days from it.
+    /// When this phone's first Psst was accepted: the rating can be asked a day after
+    /// it (owner, 27 Nov 2026). Installs from before 1.0.10 count from firstSeen.
+    static let firstPsstKey = "psst.live.firstPsstAt"
+    /// When this install first ran Psst (1.0.8 or later).
     static let firstSeenKey = "psst.live.firstSeen"
-    static let reviewWait: TimeInterval = 2 * 86_400
+    /// The rating waits a day after your first Psst (two days after first launch until 1.0.10).
+    static let reviewWait: TimeInterval = 86_400
     @ObservationIgnored private var firstSeen = Date.distantPast
     static let myNameKey = "psst.live.myName"
     /// The last list of people from the server, shown at launch while it refreshes.
@@ -929,6 +931,7 @@ final class LiveStore {
                 if arrival == nil { arrival = moment } else { arrivalQueue.insert(moment, at: 0) }
             }
             sendStates[connectionID] = .sent(eventID: eventID, signal: signal)
+            if defaults.object(forKey: Self.firstPsstKey) == nil { defaults.set(now(), forKey: Self.firstPsstKey) }
             play(EffectTrigger(id: eventID, signal: signal), on: connectionID)
             if let updated = try? await api.listConnections() { connections = updated }
             // Pssting someone back takes their doodle off your widget (5A).
@@ -1103,19 +1106,19 @@ final class LiveStore {
     /// Psst asks for a rating after something that felt good, never in someone's
     /// first days (a newcomer's first moment is often a doodle), and only as often as
     /// reviewAllowed says. Home requests it, then calls didRequestReview().
-    private func noteHappyMoment(after wait: TimeInterval = LiveStore.reviewWait) {
+    private func noteHappyMoment() {
+        let firstPsst = defaults.object(forKey: Self.firstPsstKey) as? Date
         guard Self.reviewAllowed(asks: defaults.array(forKey: Self.reviewAsksKey) as? [Double] ?? [],
                                  askedVersion: defaults.string(forKey: Self.reviewAskedVersionKey),
-                                 version: Self.currentVersion, firstSeen: firstSeen, now: now(), wait: wait)
+                                 version: Self.currentVersion, since: firstPsst ?? firstSeen, now: now())
         else { return }
         reviewDue = !Self.isUITest
     }
 
-    /// A two-way Psst (one of you pssted, the other pssted back, or a streak day
-    /// began), from day 3 on.
+    /// A two-way Psst (one of you pssted, the other pssted back, or a streak day began).
     private func noteExchangeForRating(from old: [ConnectionSummary], to new: [ConnectionSummary]) {
         guard !old.isEmpty, Self.firstTwoWayExchange(from: old, to: new) != nil else { return }
-        noteHappyMoment(after: Self.reviewExchangeWait)
+        noteHappyMoment()
     }
 
     /// Home has just requested the rating prompt: remember when and in which version.
@@ -1127,11 +1130,11 @@ final class LiveStore {
         defaults.set(Self.currentVersion, forKey: Self.reviewAskedVersionKey)
     }
 
-    /// Whether the rating may be asked for now: past the wait since first launch, not
-    /// yet in this version, at least 120 days since the last ask, under three a year.
+    /// Whether the rating may be asked for now: a day since `since` (your first Psst),
+    /// not yet in this version, at least 120 days since the last ask, under three a year.
     nonisolated static func reviewAllowed(asks: [Double], askedVersion: String?, version: String,
-                                          firstSeen: Date, now: Date, wait: TimeInterval) -> Bool {
-        guard now.timeIntervalSince(firstSeen) >= wait, askedVersion != version else { return false }
+                                          since: Date, now: Date) -> Bool {
+        guard now.timeIntervalSince(since) >= 86_400, askedVersion != version else { return false }
         let time = now.timeIntervalSince1970
         guard asks.filter({ time - $0 < 365 * 86_400 }).count < 3 else { return false }
         if let last = asks.max(), time - last < 120 * 86_400 { return false }

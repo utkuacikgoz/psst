@@ -13,7 +13,7 @@ Reporting always blocks the person for the reporter straight away. Your review d
 
 ## Alerts
 
-The **Report alerts** workflow runs hourly and opens one GitHub issue (assigned to you) whenever there are new reports: the count, the report ids and times, whether a doodle was kept, and the query to open them. The repo is public, so the issue never holds names or drawings. It then sets `notified_at` on those reports. Close the issue once you've reviewed them. It needs `SUPABASE_PROJECT_REF_PROD` and `SUPABASE_ACCESS_TOKEN_PROD` (or `SUPABASE_ACCESS_TOKEN`) on the production environment, the same secrets as the Release workflow.
+The **Report alerts** workflow runs twice a day (07:23 and 19:23 UTC) and opens one GitHub issue (assigned to you) whenever there are new reports: only the count and a query keyed on that batch's notified_at time. The repo is public, so the issue never holds report ids, times, names or drawings. It then sets `notified_at` on those reports. Close the issue once you've reviewed them. It needs `SUPABASE_PROJECT_REF_PROD` and `SUPABASE_ACCESS_TOKEN_PROD` (or `SUPABASE_ACCESS_TOKEN`) on the production environment, the same secrets as the Release workflow.
 
 ## Where
 

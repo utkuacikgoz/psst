@@ -1,17 +1,17 @@
 name: Report alerts
 
-# Hourly, Linux only (owner pick 12A): tells the owner about new reports by
+# Twice a day, Linux only (owner pick 12A; hourly until 27 Nov 2026): tells the owner about new reports by
 # opening one GitHub issue per run. This repo is public, so the issue holds only
 # the count and a query keyed on the batch's notified_at time: no report ids, no
 # report times, no names, no drawings (a reported person mustn't be able to tell).
 # The details are read in Supabase. Reports are marked notified only after the
-# issue exists, so a failed run alerts again next hour instead of never.
+# issue exists, so a failed run alerts again at the next run instead of never.
 # Heartbeat: GitHub pauses scheduled workflows after 60 days without repository
 # activity, which would silence these alerts. Once main's last commit is 50 days
 # old, the heartbeat job opens one issue asking for a push.
 on:
   schedule:
-    - cron: "23 * * * *"
+    - cron: "23 7,19 * * *"   # twice a day (owner, 27 Nov 2026): well within the 24-hour review
   workflow_dispatch:
 
 permissions:

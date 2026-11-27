@@ -1,11 +1,11 @@
 name: Release watch
 
-# Linux only. Every 6 hours: once a new version is live on the App Store, turn
+# Linux only. Once a day: once a new version is live on the App Store, turn
 # on the soft-update notice (app_config.latest_build / latest_version). Never
 # changes min_build.
 on:
   schedule:
-    - cron: "23 */6 * * *"
+    - cron: "23 6 * * *"   # once a day (owner, 27 Nov 2026)
   workflow_dispatch:
 
 permissions:

@@ -20,6 +20,8 @@ struct AppConfig {
     static let privacyURL = URL(string: "https://psstapp.fun/privacy")!
     static let termsURL = URL(string: "https://psstapp.fun/terms")!
     static let supportURL = URL(string: "https://psstapp.fun/support")!
+    /// The App Store's write-a-review page for Psst ("Rate Psst" in Settings, owner pick 1A, 28 Nov 2026).
+    static let reviewURL = URL(string: "https://apps.apple.com/app/id6815764359?action=write-review")!
 
     /// APNs environment of this build's device tokens.
     static var pushEnvironment: String {

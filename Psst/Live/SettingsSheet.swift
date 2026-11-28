@@ -78,6 +78,17 @@ struct SettingsSheet: View {
 
                 Section {
                     NavigationLink("Privacy and help") { privacyPage }
+                    // 1A (owner pick, 28 Nov 2026): a way to rate Psst whenever you like.
+                    Link(destination: AppConfig.reviewURL) {
+                        HStack {
+                            Text("Rate Psst on the App Store")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.footnote.weight(.semibold))
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .accessibilityHint("Opens the App Store")
                 }
 
                 Section {

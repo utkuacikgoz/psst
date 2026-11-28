@@ -310,6 +310,42 @@ Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms 
 
 **App Privacy:** doodles are covered by the existing **User Content → Other User Content** (linked, not tracking, App Functionality); the privacy manifest now lists it too. The device's time zone is now saved on the account (streak days and the recap's Sunday 6 PM). Apple has no time-zone category and it is far coarser than "Coarse Location", so the safe declaration is **Other Data → App Functionality, linked to the user, not used for tracking**. Weekly recap and Psst links collect nothing else new: the recap is computed from Pssts already stored, and a Psst link stores only the same invite row as an invite code.
 
+## 1.0.10 (build 49)
+
+1.0.9 (build 48) is live on the App Store and is the baseline for rule 3. The only visible change is the "Rate Psst on the App Store" row in Settings (owner pick 1A, 28 Nov 2026); the rating prompt's timing changed behind the scenes (DESIGN.md, Rating). Submit with the Release to App Store workflow, which makes fresh Psst Team codes for `{REVIEW_CODE}` and `{BACKUP_CODE}` (never printed). Store listings are unchanged.
+
+**What's New in This Version:**
+
+```
+• Like Psst? You can now rate it any time from Settings
+• Small fixes and improvements
+```
+
+**Notes for the reviewer:**
+
+```
+Psst lets two people who have both agreed to connect send each other a one-tap "Psst". There is no login: an anonymous account is created when you enter a name.
+
+What's new in 1.0.10:
+- Settings has a "Rate Psst on the App Store" row that opens the App Store's write-a-review page.
+- Apple's standard rating request can appear after a happy moment, at most once per version and never on the day of someone's first Psst.
+
+Features from 1.0.9 (Streak saver, Share my week, widget refresh, quiet notifications) are unchanged.
+
+To try it with a real person (our team):
+1. Open the app, enter any name, and choose whether to allow notifications.
+2. On home, tap "I have a code" and enter:  {REVIEW_CODE}
+   (backup code:  {BACKUP_CODE})
+3. Tap Connect. A band for "Psst Team" appears on home.
+4. Tap the band to send a Psst. We'll psst you back within a few minutes during review hours.
+
+Safety: hold any band (or Settings → People) to Remove, Block or Report. Reporting also blocks. On a doodle, ••• offers Hide doodle, Block and Report. Reports are reviewed within 24 hours; a report keeps a copy of the reported doodle for 90 days so it can be reviewed after the block. Settings → Delete account removes the account and its data immediately (reports stay, without the account, until their 90 days are up).
+
+Psst+ (in-app purchase "psstplus.unlock", non-consumable, unchanged): home → "Psst+" → Unlock, or "Redeem a code". Pssting, replies, invites, doodles, the streak saver and the small widget are free.
+
+Privacy policy: https://psstapp.fun/privacy · Terms: https://psstapp.fun/terms · Support: https://psstapp.fun/support
+```
+
 ## 1.0.9 (build 48)
 
 1.0.8 (build 46) is live on the App Store and is the baseline for rule 3. Every visible change in 1.0.9 is an owner pick from the 1.0.9 audit page (1A–16A, 10 Nov 2026) or its follow-ups (1A 2A 3B, 11 Nov 2026); see DESIGN.md. Submit with the Release to App Store workflow, which makes fresh Psst Team codes for `{REVIEW_CODE}` and `{BACKUP_CODE}` (never printed). Store listings are unchanged.
